@@ -1,0 +1,24 @@
+model_name_or_path: meta-llama/Llama-3.1-8B
+dataset_name: allenai/tulu-3-sft-mixture
+chat_template_path: allenai/Llama-3.1-Tulu-3-8B-SFT
+
+sft:
+  # Training hyperparameters
+  learning_rate: 5.0e-6
+  lr_scheduler_type: linear
+  warmup_ratio: 0.03
+  max_length: 4096
+
+  # Batch settings
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 16
+
+  # Other settings
+  bf16: true
+  gradient_checkpointing: true
+  logging_steps: 10
+  save_steps: 500
+  save_total_limit: 100
+  eval_strategy: "no"
+  seed: 42
