@@ -31,8 +31,7 @@ fi
 ######################
 ### Set environment ###
 ######################
-source ~/.bashrc
-conda activate trl
+source .venv/bin/activate
 export GPUS_PER_NODE=4
 ######################
 

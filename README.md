@@ -2,21 +2,21 @@
 
 ## Prerequisites
 
-Ensure you have conda installed on your system. If you don't have it yet, you can install Miniconda or Anaconda following the [official conda documentation](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html).
+Ensure you have uv installed on your system. If you don't have it yet, you can install it following the [official uv documentation](https://docs.astral.sh/uv/getting-started/installation/).
 
 ## Installation
 
-Create and activate a conda environment, then install TRL using pip:
+Create and activate a virtual environment, then install TRL:
 
 ```bash
-# Create a new conda environment with Python
-conda create -n trl python=3.14
+# Create a new virtual environment with Python
+uv venv --python 3.14
 
 # Activate the environment
-conda activate trl
+source .venv/bin/activate
 
-# Install TRL using pip
-pip install trl==0.27.0
+# Install TRL
+uv pip install trl==0.27.0
 ```
 
 ## Running SFT
