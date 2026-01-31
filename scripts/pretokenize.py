@@ -88,12 +88,12 @@ def main():
             output_dir="tmp_tokenize",
             max_length=max_length,
             dataset_num_proc=args.num_proc,
+            model_init_kwargs={
+                "device_map": "cpu",
+                "torch_dtype": "auto",
+                "low_cpu_mem_usage": True,
+            },
         ),
-        model_init_kwargs={
-            "device_map": "cpu",
-            "torch_dtype": "auto",
-            "low_cpu_mem_usage": True,
-        },
     )
 
     # Save the tokenized datasets
