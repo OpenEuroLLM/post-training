@@ -9,9 +9,10 @@ Config file format (YAML):
     model_name: Qwen/Qwen2.5-0.5B-Instruct
     dataset_name: trl-lib/Capybara
     output_path: ./tokenized_capybara
-    max_length: 2048        # optional, default: 2048
-    train_split: train      # optional, default: train
-    eval_split: test        # optional, default: None
+    max_length: 2048            # optional, default: 2048
+    train_split: train          # optional, default: train
+    eval_split: test            # optional, default: None
+    chat_template_path: ...     # optional, model/path to load chat template from (for base models)
 """
 
 import argparse
@@ -19,6 +20,7 @@ import os
 
 import yaml
 from datasets import get_dataset_split_names, load_dataset
+from transformers import AutoTokenizer
 from trl import SFTConfig, SFTTrainer
 
 
@@ -38,6 +40,7 @@ def main():
     max_length = config.get("max_length", 2048)
     train_split = config.get("train_split", "train")
     eval_split = config.get("eval_split")
+    chat_template_path = config.get("chat_template_path")
 
     # Print configuration
     print("=" * 50)
@@ -48,6 +51,7 @@ def main():
     print(f"  Max length:   {max_length}")
     print(f"  Train split:  {train_split}")
     print(f"  Eval split:   {eval_split or 'None'}")
+    print(f"  Chat template: {chat_template_path or 'None (using model default)'}")
     print(f"  Num proc:     {args.num_proc}")
     print("=" * 50)
 
@@ -65,10 +69,19 @@ def main():
         else:
             print(f"Warning: eval split '{eval_split}' not found. Available splits: {available_splits}")
 
+    # Load tokenizer and optionally set chat template from another model
+    print(f"Loading tokenizer from {model_name}")
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    if chat_template_path:
+        print(f"Loading chat template from {chat_template_path}")
+        template_tokenizer = AutoTokenizer.from_pretrained(chat_template_path)
+        tokenizer.chat_template = template_tokenizer.chat_template
+
     # Create trainer with CPU-only model loading
     print(f"Loading model {model_name} on CPU")
     trainer = SFTTrainer(
         model=model_name,
+        processing_class=tokenizer,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         args=SFTConfig(
