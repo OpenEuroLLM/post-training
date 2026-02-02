@@ -93,6 +93,7 @@ def main():
                 "torch_dtype": "auto",
                 "low_cpu_mem_usage": True,
             },
+            use_cpu=True,
         ),
     )
 
