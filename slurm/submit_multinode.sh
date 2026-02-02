@@ -55,7 +55,7 @@ export LAUNCHER="accelerate launch \
     --machine_rank \$SLURM_PROCID \
     "
 
-export SCRIPT="scripts/${TASK}.py"
+export SCRIPT="scripts/train/${TASK}.py"
 export SCRIPT_ARGS="--config $CONFIG_FILE"
 
 # This step is necessary because accelerate launch does not handle multiline arguments properly

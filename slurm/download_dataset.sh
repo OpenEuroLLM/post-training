@@ -30,6 +30,6 @@ source .venv/bin/activate
 echo "START TIME: $(date)"
 echo "Downloading dataset: $DATASET with $SLURM_CPUS_PER_TASK workers"
 
-python scripts/download.py "$DATASET" --workers "$SLURM_CPUS_PER_TASK"
+python scripts/data/download.py "$DATASET" --workers "$SLURM_CPUS_PER_TASK"
 
 echo "END TIME: $(date)"
