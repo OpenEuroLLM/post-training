@@ -102,12 +102,14 @@ def main():
 
     train_path = os.path.join(output_path, "train")
     print(f"Saving tokenized train dataset to {train_path}")
-    trainer.train_dataset.save_to_disk(train_path)
+    train_dataset = trainer.train_dataset.remove_columns("messages")
+    train_dataset.save_to_disk(train_path)
 
     if trainer.eval_dataset is not None:
         eval_path = os.path.join(output_path, "eval")
         print(f"Saving tokenized eval dataset to {eval_path}")
-        trainer.eval_dataset.save_to_disk(eval_path)
+        eval_dataset = trainer.eval_dataset.remove_columns("messages")
+        eval_dataset.save_to_disk(eval_path)
 
     print("Done!")
 
