@@ -62,30 +62,41 @@ python trl/scripts/sft.py \
 ```
 """
 
-import sys
 import argparse
 import os
+from dataclasses import dataclass, field
+from typing import Optional
 
 import datasets
 import transformers
 
 from accelerate import logging
-from datasets import load_dataset
+from datasets import load_from_disk
 from transformers import AutoConfig, AutoModelForCausalLM
 from transformers.models.auto.modeling_auto import MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES
 
 from trl import (
-    DatasetMixtureConfig,
     ModelConfig,
-    ScriptArguments,
     SFTConfig,
     SFTTrainer,
     TrlParser,
-    get_dataset,
     get_kbit_device_map,
     get_peft_config,
     get_quantization_config,
 )
+
+
+@dataclass
+class DataArguments:
+    """Arguments for dataset paths."""
+
+    train_data_path: str = field(
+        metadata={"help": "Path to the pre-tokenized training dataset (required)."}
+    )
+    val_data_path: Optional[str] = field(
+        default=None,
+        metadata={"help": "Path to the pre-tokenized validation dataset (optional)."},
+    )
 
 
 logger = logging.get_logger(__name__)
@@ -102,15 +113,14 @@ def setup_logging(log_level):
     transformers.utils.logging.enable_explicit_format()
 
 
-def main(script_args, training_args, model_args, dataset_args):
+def main(training_args, model_args, data_args):
     ################
     # Setup logging
     ################
     setup_logging(training_args.get_process_log_level())
     logger.info(f"Model parameters {model_args}")
-    logger.info(f"Script parameters {script_args}")
     logger.info(f"Training parameters {training_args}")
-    logger.info(f"Dataset parameters {dataset_args}")
+    logger.info(f"Data parameters {data_args}")
 
     ################
     # Model init kwargs
@@ -138,28 +148,22 @@ def main(script_args, training_args, model_args, dataset_args):
     else:
         model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path, **model_kwargs)
 
-    # Load the dataset
-    if dataset_args.datasets and script_args.dataset_name:
-        logger.warning(
-            "Both `datasets` and `dataset_name` are provided. The `datasets` argument will be used to load the "
-            "dataset and `dataset_name` will be ignored."
-        )
-        dataset = get_dataset(dataset_args)
-    elif dataset_args.datasets and not script_args.dataset_name:
-        dataset = get_dataset(dataset_args)
-    elif not dataset_args.datasets and script_args.dataset_name:
-        dataset = load_dataset(
-            script_args.dataset_name, name=script_args.dataset_config, streaming=script_args.dataset_streaming
-        )
-    else:
-        raise ValueError("Either `datasets` or `dataset_name` must be provided.")
+    # Load the training dataset
+    logger.info(f"Loading training dataset from {data_args.train_data_path}")
+    train_dataset = load_from_disk(data_args.train_data_path)
+
+    # Load the validation dataset if provided
+    eval_dataset = None
+    if data_args.val_data_path is not None and training_args.eval_strategy != "no":
+        logger.info(f"Loading validation dataset from {data_args.val_data_path}")
+        eval_dataset = load_from_disk(data_args.val_data_path)
 
     # Initialize the SFT trainer
     trainer = SFTTrainer(
         model=model,
         args=training_args,
-        train_dataset=dataset[script_args.dataset_train_split],
-        eval_dataset=dataset[script_args.dataset_test_split] if training_args.eval_strategy != "no" else None,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
         peft_config=get_peft_config(model_args),
     )
 
@@ -174,12 +178,12 @@ def main(script_args, training_args, model_args, dataset_args):
     trainer.accelerator.print(f"💾 Model saved to {training_args.output_dir}.")
 
     if training_args.push_to_hub:
-        trainer.push_to_hub(dataset_name=script_args.dataset_name)
+        trainer.push_to_hub()
         trainer.accelerator.print(f"🤗 Model pushed to the Hub in https://huggingface.co/{trainer.hub_model_id}.")
 
 
 def make_parser(subparsers: argparse._SubParsersAction | None = None):
-    dataclass_types = (ScriptArguments, SFTConfig, ModelConfig, DatasetMixtureConfig)
+    dataclass_types = (SFTConfig, ModelConfig, DataArguments)
     if subparsers is not None:
         parser = subparsers.add_parser("sft", help="Run the SFT training script", dataclass_types=dataclass_types)
     else:
@@ -192,7 +196,7 @@ if __name__ == "__main__":
     # When using the trl cli, this script may be run with additional arguments, corresponding accelerate arguments.
     # To ensure that their parsing does not interfere with the script arguments, parse the arguments with
     # `return_remaining_strings=True`, then ignore the remaining strings.
-    script_args, training_args, model_args, dataset_args, _ = parser.parse_args_and_config(
+    training_args, model_args, data_args, _ = parser.parse_args_and_config(
         return_remaining_strings=True
     )
-    main(script_args, training_args, model_args, dataset_args)
+    main(training_args, model_args, data_args)
