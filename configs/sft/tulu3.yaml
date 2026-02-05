@@ -1,6 +1,6 @@
 model_name_or_path: meta-llama/Llama-3.1-8B
-train_data_path: /tokenized/tulu3/train/
-# val_data_path: /tokenized/tulu3/val/  # optional
+dataset_name: allenai/tulu-3-sft-mixture
+chat_template_path: allenai/Llama-3.1-Tulu-3-8B-SFT
 
 sft:
   # Training hyperparameters
