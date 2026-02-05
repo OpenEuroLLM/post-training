@@ -21,7 +21,32 @@ import os
 import yaml
 from datasets import get_dataset_split_names, load_dataset
 from transformers import AutoTokenizer
-from trl import SFTConfig, SFTTrainer
+
+
+def tokenize_example(example, tokenizer, max_length):
+    """Apply chat template and tokenize a single example."""
+    messages = example["messages"]
+
+    # Apply chat template to convert messages to text
+    text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=False,
+    )
+
+    # Tokenize the text
+    tokenized = tokenizer(
+        text,
+        truncation=True,
+        max_length=max_length,
+        padding=False,
+        return_tensors=None,
+    )
+
+    # Add labels (same as input_ids for causal LM)
+    tokenized["labels"] = tokenized["input_ids"].copy()
+
+    return tokenized
 
 
 def main():
@@ -55,6 +80,21 @@ def main():
     print(f"  Num proc:     {args.num_proc}")
     print("=" * 50)
 
+    # Load tokenizer (NOT the model - saves ~16GB of memory for 8B models)
+    print(f"Loading tokenizer from {model_name}")
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    # Set pad token if not set (common for Llama models)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+        print(f"  Set pad_token to eos_token: {tokenizer.pad_token}")
+
+    # Optionally load chat template from another model
+    if chat_template_path:
+        print(f"Loading chat template from {chat_template_path}")
+        template_tokenizer = AutoTokenizer.from_pretrained(chat_template_path)
+        tokenizer.chat_template = template_tokenizer.chat_template
+
     # Load datasets
     print(f"Loading dataset {dataset_name} (train split: {train_split})")
     train_dataset = load_dataset(dataset_name, split=train_split)
@@ -69,49 +109,45 @@ def main():
         else:
             print(f"Warning: eval split '{eval_split}' not found. Available splits: {available_splits}")
 
-    # Load tokenizer and optionally set chat template from another model
-    print(f"Loading tokenizer from {model_name}")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    if chat_template_path:
-        print(f"Loading chat template from {chat_template_path}")
-        template_tokenizer = AutoTokenizer.from_pretrained(chat_template_path)
-        tokenizer.chat_template = template_tokenizer.chat_template
-
-    # Create trainer with CPU-only model loading
-    print(f"Loading model {model_name} on CPU")
-    trainer = SFTTrainer(
-        model=model_name,
-        processing_class=tokenizer,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        args=SFTConfig(
-            output_dir="tmp_tokenize",
-            max_length=max_length,
-            dataset_num_proc=args.num_proc,
-            model_init_kwargs={
-                "device_map": "cpu",
-                "torch_dtype": "auto",
-                "low_cpu_mem_usage": True,
-            },
-            use_cpu=True,
-        ),
+    # Tokenize datasets
+    print(f"Tokenizing train dataset with {args.num_proc} processes...")
+    tokenized_train = train_dataset.map(
+        lambda x: tokenize_example(x, tokenizer, max_length),
+        num_proc=args.num_proc,
+        remove_columns=train_dataset.column_names,
+        desc="Tokenizing train",
     )
+
+    tokenized_eval = None
+    if eval_dataset is not None:
+        print(f"Tokenizing eval dataset with {args.num_proc} processes...")
+        tokenized_eval = eval_dataset.map(
+            lambda x: tokenize_example(x, tokenizer, max_length),
+            num_proc=args.num_proc,
+            remove_columns=eval_dataset.column_names,
+            desc="Tokenizing eval",
+        )
 
     # Save the tokenized datasets
     os.makedirs(output_path, exist_ok=True)
 
     train_path = os.path.join(output_path, "train")
     print(f"Saving tokenized train dataset to {train_path}")
-    train_dataset = trainer.train_dataset.remove_columns("messages")
-    train_dataset.save_to_disk(train_path)
+    tokenized_train.save_to_disk(train_path)
 
-    if trainer.eval_dataset is not None:
+    if tokenized_eval is not None:
         eval_path = os.path.join(output_path, "eval")
         print(f"Saving tokenized eval dataset to {eval_path}")
-        eval_dataset = trainer.eval_dataset.remove_columns("messages")
-        eval_dataset.save_to_disk(eval_path)
+        tokenized_eval.save_to_disk(eval_path)
 
+    # Print summary
+    print("=" * 50)
     print("Done!")
+    print(f"  Train examples: {len(tokenized_train)}")
+    if tokenized_eval:
+        print(f"  Eval examples:  {len(tokenized_eval)}")
+    print(f"  Output path:    {output_path}")
+    print("=" * 50)
 
 
 if __name__ == "__main__":
