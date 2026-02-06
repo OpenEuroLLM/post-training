@@ -9,7 +9,8 @@ Usage:
 import argparse
 
 import yaml
-from huggingface_hub import scan_cache_dir, snapshot_download
+from datasets import load_dataset
+from huggingface_hub import snapshot_download
 
 # Config keys that reference HuggingFace model repos
 MODEL_KEYS = {"model_name_or_path", "chat_template_path"}
@@ -58,15 +59,17 @@ def main():
         print("No HuggingFace resources found in config(s).")
         return
 
-    repos = [(repo_id, "model") for repo_id in sorted(models)] + [
-        (repo_id, "dataset") for repo_id in sorted(datasets)
-    ]
+    for repo_id in sorted(models):
+        print(f"[downloading]    model  {repo_id}")
+        path = snapshot_download(repo_id=repo_id, repo_type="model", max_workers=args.workers)
+        print(f"[done]           model  {repo_id}  ({path})")
 
-    for repo_id, repo_type in repos:
-        print(f"[downloading]  {repo_type:>7}  {repo_id}")
-        path = snapshot_download(repo_id=repo_id, repo_type=repo_type, max_workers=args.workers)
-        print(f"[done]         {repo_type:>7}  {repo_id}  ({path})")
+    for repo_id in sorted(datasets):
+        print(f"[downloading]  dataset  {repo_id}")
+        load_dataset(repo_id)
+        print(f"[done]         dataset  {repo_id}")
 
 
 if __name__ == "__main__":
     main()
+
