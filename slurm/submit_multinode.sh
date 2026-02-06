@@ -56,7 +56,7 @@ export LAUNCHER="accelerate launch \
     "
 
 export SCRIPT="scripts/train/${TASK}.py"
-export SCRIPT_ARGS="--config $CONFIG_FILE"
+export SCRIPT_ARGS="--config $CONFIG_FILE --dataset_num_proc $SLURM_CPUS_PER_TASK"
 
 # This step is necessary because accelerate launch does not handle multiline arguments properly
 export CMD="$LAUNCHER $SCRIPT $SCRIPT_ARGS"
