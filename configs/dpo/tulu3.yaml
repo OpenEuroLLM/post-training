@@ -1,0 +1,24 @@
+model_name_or_path: meta-llama/Llama-3.1-8B-Instruct
+dataset_name: allenai/llama-3.1-tulu-3-8b-preference-mixture
+chat_template_path: allenai/Llama-3.1-Tulu-3-8B-DPO
+
+# DPO hyperparameters
+learning_rate: 5.0e-7
+lr_scheduler_type: linear
+warmup_ratio: 0.03
+beta: 0.1
+max_length: 4096
+
+# Batch settings
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 16
+
+# Other settings
+bf16: true
+gradient_checkpointing: true
+logging_steps: 10
+save_steps: 500
+save_total_limit: 100
+eval_strategy: "no"
+seed: 42
