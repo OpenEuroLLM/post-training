@@ -6,7 +6,7 @@
 #SBATCH --nodes=2                   # number of nodes
 #SBATCH --ntasks-per-node=1         # number of MP tasks
 #SBATCH --gres=gpu:4                # number of GPUs per node
-#SBATCH --cpus-per-task=16          # number of cores per tasks
+#SBATCH --cpus-per-task=32          # Important: this is the number of cores for ALL the GPUs on the node
 #SBATCH --time=01:59:00             # maximum execution time (HH:MM:SS)
 #SBATCH --output=logs/O-%x.%j
 #SBATCH --error=logs/E-%x.%j
@@ -45,6 +45,8 @@ MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 MASTER_PORT=9001
 ######################
 
+export HF_HUB_OFFLINE=1
+
 export LAUNCHER="accelerate launch \
     --config_file $ACCELERATE_CONFIG \
     --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
@@ -56,7 +58,7 @@ export LAUNCHER="accelerate launch \
     "
 
 export SCRIPT="scripts/train/${TASK}.py"
-export SCRIPT_ARGS="--config $CONFIG_FILE --dataset_num_proc $SLURM_CPUS_PER_TASK"
+export SCRIPT_ARGS="--config $CONFIG_FILE --dataset_num_proc $((SLURM_CPUS_PER_TASK / GPUS_PER_NODE))"
 
 # This step is necessary because accelerate launch does not handle multiline arguments properly
 export CMD="$LAUNCHER $SCRIPT $SCRIPT_ARGS"
