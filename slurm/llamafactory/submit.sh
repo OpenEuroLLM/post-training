@@ -8,7 +8,7 @@
 #SBATCH --gres=gpu:4
 #SBATCH --account=jureap59
 #SBATCH --partition=booster
-#SBATCH --time=24:00:00
+#SBATCH --time=02:00:00
 #SBATCH --threads-per-core=1
 #SBATCH --output=logs/llamafactory_%j.out
 
@@ -29,8 +29,12 @@ if [ ! -f "$CONFIG" ]; then
 fi
 
 # --- Source cluster environment ---
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-REPO_DIR=$(dirname "$(dirname "$SCRIPT_DIR")")
+if [ -n "${SLURM_SUBMIT_DIR:-}" ]; then
+    REPO_DIR="${SLURM_SUBMIT_DIR}"
+else
+    SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+    REPO_DIR=$(dirname "$(dirname "$SCRIPT_DIR")")
+fi
 source "${REPO_DIR}/env/jupiter.env"
 
 echo "=========================================="
@@ -70,8 +74,8 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     set -e
 
     # Prevent host Python packages from interfering
-    export PYTHONPATH=\"\"
     export PYTHONNOUSERSITE=1
+    export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
     export NODE_RANK=\"\$SLURM_NODEID\"
     export NNODES=\"\$SLURM_NNODES\"
@@ -79,10 +83,10 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     export HF_HOME=${HF_HOME}
     export HF_HUB_CACHE=${HF_HUB_CACHE}
     export HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE}
-    export HF_DATASETS_CACHE=${HF_DATASETS_CACHE}
-    export HF_DATASETS_OFFLINE=${HF_DATASETS_OFFLINE}
-    export TRANSFORMERS_OFFLINE=${TRANSFORMERS_OFFLINE}
-    export HF_HUB_OFFLINE=${HF_HUB_OFFLINE}
+    export HF_DATASETS_CACHE=${HF_HOME}/datasets
+    export HF_DATASETS_OFFLINE=1
+    export TRANSFORMERS_OFFLINE=1
+    export HF_HUB_OFFLINE=1
     export ALLOW_EXTRA_ARGS=1
 
     cd ${REPO_DIR}
