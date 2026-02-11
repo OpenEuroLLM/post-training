@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+logs/
+*.sif
+core.*
+data/**/*.jsonl
