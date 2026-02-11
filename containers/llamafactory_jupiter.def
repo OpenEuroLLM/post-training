@@ -61,6 +61,9 @@ From: /e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals/eval_env-ju
     # Install metrics requirements
     pip install --no-cache-dir -r requirements/metrics.txt || true
 
+    mkdir -p /usr/local/lib/python3.12/dist-packages/torchaudio
+    echo '__version__ = "0.0.0-stub"' > /usr/local/lib/python3.12/dist-packages/torchaudio/__init__.py
+
     # Clean up source to reduce image size
     cd /
     rm -rf /opt/LLaMA-Factory
