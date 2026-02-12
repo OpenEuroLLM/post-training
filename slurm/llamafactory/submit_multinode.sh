@@ -16,8 +16,8 @@ set -euo pipefail
 
 # --- Usage check ---
 if [ $# -ne 1 ]; then
-    echo "Usage: sbatch slurm/llamafactory/submit.sh <llamafactory_config_path>" >&2
-    echo "Example: sbatch slurm/llamafactory/submit.sh configs/llamafactory/long-context.yaml" >&2
+    echo "Usage: sbatch slurm/llamafactory/submit_multinode.sh <llamafactory_config_path>" >&2
+    echo "Example: sbatch slurm/llamafactory/submit_multinode.sh configs/llamafactory/long-context.yaml" >&2
     exit 1
 fi
 
@@ -74,6 +74,7 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     set -e
 
     # Prevent host Python packages from interfering
+    export PYTHONPATH=\"\"
     export PYTHONNOUSERSITE=1
     export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
