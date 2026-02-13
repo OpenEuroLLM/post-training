@@ -6,17 +6,10 @@ Ensure you have uv installed on your system. If you don't have it yet, you can i
 
 ## Installation
 
-Create and activate a virtual environment, then install TRL:
+Create the uv environment with the dependencies:
 
 ```bash
-# Create a new virtual environment with Python
-uv venv --python 3.14
-
-# Activate the environment
-source .venv/bin/activate
-
-# Install TRL
-uv pip install trl==0.27.0
+uv sync
 ```
 
 ## Running SFT
