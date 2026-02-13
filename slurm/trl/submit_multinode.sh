@@ -35,6 +35,8 @@ source .venv/bin/activate
 export GPUS_PER_NODE=4
 ######################
 
+module load cuda/12.3
+
 # force crashing on nccl issues like hanging broadcast
 export NCCL_ASYNC_ERROR_HANDLING=1
 
@@ -55,7 +57,7 @@ export LAUNCHER="accelerate launch \
     --machine_rank \$SLURM_PROCID \
     "
 
-export SCRIPT="scripts/train/${TASK}.py"
+export SCRIPT="scripts/trl/train/${TASK}.py"
 export SCRIPT_ARGS="--config $CONFIG_FILE --dataset_num_proc $SLURM_CPUS_PER_TASK"
 
 # This step is necessary because accelerate launch does not handle multiline arguments properly

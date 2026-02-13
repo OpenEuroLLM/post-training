@@ -41,10 +41,10 @@ Ensure you have uv installed on your system. If you don't have it yet, you can i
 
 ### Installation
 
+Create the uv environment with the dependencies:
+
 ```bash
-uv venv --python 3.14
-source .venv/bin/activate
-uv pip install trl==0.27.0
+uv sync
 ```
 
 ### Running SFT
