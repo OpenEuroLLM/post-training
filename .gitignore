@@ -1,0 +1,25 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Runtime outputs
+outputs/
+
+# Weights & Biases
+wandb/
+
+# SLURM logs (the ones inside outputs/ are already covered)
+slurm-*.out
+slurm-*.err
+
+# Data selection experiments
+configs/data_selection/
+scripts/data_selection_exp.py
+scripts/playground.ipynb

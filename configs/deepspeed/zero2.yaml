@@ -1,0 +1,35 @@
+# ============================================================================
+# DeepSpeed ZeRO Stage 2 Configuration
+# ============================================================================
+# This file is loaded at runtime, converted to a dict, and passed to
+# SFTConfig(deepspeed=...).  Values set to "auto" are resolved by
+# TRL / Accelerate based on the TrainingArguments.
+# ============================================================================
+
+bf16:
+  enabled: true
+
+zero_optimization:
+  stage: 2
+  overlap_comm: true
+  contiguous_gradients: true
+  reduce_scatter: true
+
+gradient_clipping: 1.0
+
+# "auto" — resolved by the Trainer at runtime
+train_micro_batch_size_per_gpu: "auto"
+gradient_accumulation_steps: "auto"
+train_batch_size: "auto"
+
+# Optimizer managed by DeepSpeed (actual values pulled from SFTConfig via "auto").
+# This section must be present so that the Trainer creates a DummyOptim/DummyScheduler,
+# which triggers accelerator.prepare() and moves the model to GPU.
+optimizer:
+  type: AdamW
+  params:
+    lr: "auto"
+    betas: "auto"
+    eps: "auto"
+    weight_decay: "auto"
+

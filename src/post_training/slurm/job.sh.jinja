@@ -1,0 +1,75 @@
+#!/bin/bash
+# ============================================================================
+# Auto-generated SLURM job script — do not edit by hand.
+# Re-generate via: python scripts/submit.py --config <your_config.yaml>
+# ============================================================================
+
+#SBATCH --job-name={{ job_name }}
+#SBATCH --partition={{ partition }}
+#SBATCH --nodes={{ num_nodes }}
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:{{ gpus_per_node }}
+#SBATCH --cpus-per-gpu={{ cpus_per_gpu }}
+#SBATCH --time={{ wall_time }}
+#SBATCH --signal=B:USR1@{{ signal_time_seconds }}
+#SBATCH --output={{ run_dir }}/slurm/slurm-%j.out
+#SBATCH --error={{ run_dir }}/slurm/slurm-%j.err
+#SBATCH --open-mode=append
+
+# ── Explicit multi-node setup ──────────────────────────────────────────────
+export MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
+export MASTER_PORT=29500
+export NUM_NODES={{ num_nodes }}
+export GPUS_PER_NODE={{ gpus_per_node }}
+export WORLD_SIZE=$(( $NUM_NODES * $GPUS_PER_NODE ))
+
+# ── Self-healing machinery ─────────────────────────────────────────────────
+FAILURE_COUNT_FILE="{{ run_dir }}/slurm/failure_count"
+MAX_FAILURES={{ max_failures }}
+
+if [ ! -f "$FAILURE_COUNT_FILE" ]; then
+    echo 0 > "$FAILURE_COUNT_FILE"
+fi
+
+handle_signal() {
+    echo "[$(date)] Received SIGUSR1 — timeout approaching. Requeuing..."
+    scontrol requeue $SLURM_JOB_ID
+}
+trap handle_signal USR1
+
+# ── Launch via accelerate (explicit flags from config) ─────────────────────
+export LAUNCHER="accelerate launch \
+    --num_machines $NUM_NODES \
+    --num_processes $WORLD_SIZE \
+    --machine_rank \$SLURM_PROCID \
+    --main_process_ip $MASTER_ADDR \
+    --main_process_port $MASTER_PORT \
+    --mixed_precision {{ mixed_precision }} \
+    --dynamo_backend {{ dynamo_backend }} \
+{% if use_deepspeed %}    --use_deepspeed \{% endif %}
+    --deepspeed_multinode_launcher {{ deepspeed_multinode_launcher }} \
+{% if same_network %}    --same_network \{% endif %}
+    --rdzv_backend {{ rdzv_backend }} \
+    --max_restarts 0 \
+    --role \$(hostname -s): \
+    scripts/train.py --config {{ config_path }}"
+
+srun --ntasks=$NUM_NODES --export=ALL --wait=60 --kill-on-bad-exit=1 bash -c "$LAUNCHER" &
+
+wait $!
+EXIT_CODE=$?
+
+# ── Handle failure / resubmit ─────────────────────────────────────────────
+if [ $EXIT_CODE -ne 0 ]; then
+    FAILURES=$(cat "$FAILURE_COUNT_FILE")
+    FAILURES=$((FAILURES + 1))
+    echo $FAILURES > "$FAILURE_COUNT_FILE"
+    if [ $FAILURES -lt $MAX_FAILURES ]; then
+        echo "[$(date)] Failure $FAILURES/$MAX_FAILURES. Resubmitting..."
+        sbatch "$0"
+    else
+        echo "[$(date)] Max failures reached ($MAX_FAILURES). Stopping."
+        exit 1
+    fi
+fi
+
