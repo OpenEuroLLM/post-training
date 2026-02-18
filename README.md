@@ -1,16 +1,36 @@
-# Post-Training
+# Post-Training Framework
 
-A modular framework for post-training large language models, supporting **SFT** (supervised fine-tuning) and **DPO** (direct preference optimisation). Built on [TRL](https://github.com/huggingface/trl) with DeepSpeed ZeRO and multi-node SLURM support.
+A modular, configuration-driven framework for **SFT** (Supervised Fine-Tuning) and **DPO** (Direct Preference Optimization). Built on **TRL**, **DeepSpeed**, and **Accelerate** with multi-node **SLURM** support.
 
-## Quick Start
+## Table of Contents
 
-### 1. Install dependencies
+- [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
+- [Configuration Philosophy](#configuration-philosophy)
+- [Feature Guide](#feature-guide)
+  - [Training Methods](#training-methods)
+  - [Data Pipeline](#data-pipeline)
+  - [Training Length](#training-length)
+  - [Infrastructure & Compute](#infrastructure--compute)
+  - [Checkpointing](#checkpointing)
+  - [Environment Modes](#environment-modes)
+- [Run Outputs & Directory Layout](#run-outputs--directory-layout)
+
+## ⚡ Quick Start
+
+### Installation
+
+This project uses `uv` for dependency management. To create the Python environment, run:
 
 ```bash
 uv sync
 ```
 
-### 2. Local SFT training (single-node)
+### Local Training (Single-Node)
+
+To run training locally, use `accelerate launch`. You must specify the distributed flags explicitly.
+
+#### SFT example
 
 ```bash
 accelerate launch \
@@ -27,7 +47,7 @@ accelerate launch \
     offline=true
 ```
 
-### 3. Local DPO training (single-node)
+#### DPO example
 
 ```bash
 accelerate launch \
@@ -44,32 +64,22 @@ accelerate launch \
     offline=true
 ```
 
-### 4. SLURM submission
-
-```bash
-python scripts/submit.py --config configs/sft.yaml training.max_steps=100 offline=true
-python scripts/submit.py --config configs/dpo.yaml training.max_steps=100 offline=true
-```
-
-### 5. Switch DeepSpeed ZeRO stage (example)
-
-```bash
-scripts/train.py --config configs/sft.yaml deepspeed.config_path=configs/deepspeed/zero3.yaml
-```
-
 > [!NOTE]
 > The `--mixed_precision` flag passed to `accelerate launch` must match `model.dtype` in your config.
 
-## Table of Contents
+### SLURM Submission (Multi-Node)
 
-- [Project Structure](#project-structure)
-- [Configuration: one YAML + CLI overrides](#configuration-one-yaml--cli-overrides)
-- [Run outputs & directory layout](#run-outputs--directory-layout)
-- [Configuration reference (by YAML section)](#configuration-reference-by-yaml-section)
+For cluster environments, use the submission script. It auto-generates a SLURM batch script based on your YAML configuration and submits it.
 
-## Project Structure
+- SLURM job template: `src/post_training/slurm/job.sh.jinja`
 
+```bash
+python scripts/submit.py --config configs/sft.yaml
 ```
+
+## 📂 Project Structure
+
+```text
 post-training/
 ├── configs/
 │   ├── sft.yaml                  # SFT example config
@@ -92,245 +102,273 @@ post-training/
 └── pyproject.toml
 ```
 
-## Configuration: one YAML + CLI overrides
+## 🛠 Configuration Philosophy
 
-All runs are configured via a **single YAML file** passed with `--config` (e.g. `configs/sft.yaml` or `configs/dpo.yaml`).
+### The golden rule
 
-Both `scripts/train.py` and `scripts/submit.py` accept additional arguments as **OmegaConf dot-notation overrides** (unknown args are forwarded to the config loader). This makes it easy to run quick experiments without copying YAML files.
+All run configuration lives in a **single YAML file**.
 
-Examples:
+You do not need to edit Python scripts to change hyperparameters, models, or data mixtures.
+
+- Override any YAML value via the CLI using **dot-notation**
+- Or create a new YAML config specific to your run
+
+### Example: overriding the config via CLI
 
 ```bash
-# Change model and training length
-scripts/train.py --config configs/sft.yaml model.name_or_path=org/model training.max_steps=200
-
-# Disable SFT packing (enabled by default)
-scripts/train.py --config configs/sft.yaml sft.packing=false
-
-# Token-based training length (ONLY valid when sft.packing=true)
-scripts/train.py --config configs/sft.yaml training.num_training_tokens=500000000
-
-# Switch DeepSpeed config
-scripts/train.py --config configs/sft.yaml deepspeed.config_path=configs/deepspeed/zero3.yaml
+scripts/train.py \
+    --config configs/sft.yaml \
+    model.name_or_path="meta-llama/Llama-3.1-8B" \
+    training.learning_rate=5e-6 \
+    sft.packing=false
 ```
 
-## Run outputs & directory layout
+## 🧩 Feature Guide
 
-Each run writes into a run directory created by `setup_run_directory()`.
+### 1. Training Methods
 
-- **Base path**: `paths.output_base` (or `paths.debug_base` if `debug.enabled=true`)
-- **Run name**: auto-generated from method/model/dataset mix, unless `run_name` is provided
+Select your training strategy using `method`.
 
-Directory layout:
+- **SFT (Supervised Fine-Tuning)**
+  - **Key**: `method: "sft"`
+  - **Packing**: set `sft.packing: true` to pack multiple short examples into a single sequence (recommended for efficiency)
+  - **Sequence length**: controlled by `sft.max_seq_length`
+
+- **DPO (Direct Preference Optimization)**
+  - **Key**: `method: "dpo"`
+  - **Loss type**: set `dpo.loss_type` (e.g., `sigmoid`, `hinge`, `ipo`)
+  - **Reference model**: set `dpo.ref_model_name_or_path`
+    - If `null`, TRL creates an implicit copy of the active model
+    - If using **ZeRO Stage 3**, consider specifying the reference model explicitly (implicit copy creation can be unstable with Stage 3)
+
+### 2. Data Pipeline
+
+The data pipeline is modularized into four distinct stages.
+
+#### A. Dataset registry & mixing
+
+Define multiple datasets in `data.datasets`. The loader automatically interleaves them based on the `weight` parameter (normalized automatically).
+
+```yaml
+data:
+  datasets:
+    - name: "my_dataset"
+      path: "org/dataset"
+      split: "train"
+      weight: 1.0  # Mixing weight (normalized automatically)
+```
+
+#### B. Data transformations
+
+Raw datasets often come in varying formats. Transforms normalize them into a standard `messages` list format before templating.
+
+- **Config**: `transform: "transform_name"` (in the dataset entry)
+- **Registry**: `src/post_training/data/transforms.py`
+- **Customization**: decorate a function with `@register_transform("name")` to add your own logic
+
+Example (normalize raw fields into `messages`):
+
+```python
+from post_training.data.transforms import register_transform
+
+@register_transform("my_transform")
+def my_transform(example: dict) -> dict:
+    return {
+        "messages": [
+            {"role": "user", "content": example["prompt"]},
+            {"role": "assistant", "content": example["answer"]},
+        ]
+    }
+```
+
+#### C. Chat templates
+
+Templates convert the list of messages into a single string for the model.
+
+- **Config**: `data.chat_template: "name"`
+- **Source**: Jinja files located in `src/post_training/chat_templates/templates/`
+
+#### D. Data inspection
+
+Use the inspection script to debug the pipeline stages (Raw → Transformed → Formatted → Tokenized).
+
+```bash
+python scripts/inspect_data.py --config configs/sft.yaml --show-formatted --num-samples 3
+```
+
+### 3. Training Length
+
+You must specify exactly one determining factor for training duration in the `training` section:
+
+- **Step-based**: `training.max_steps` (fixed number of optimizer steps)
+- **Sample-based**: `training.num_training_samples` (steps = `ceil(samples / global_batch_size)`)
+- **Token-based**: `training.num_training_tokens` (steps based on total token count)
+  - Only valid when `method: "sft"` and `sft.packing: true`
+
+### 4. Infrastructure & Compute
+
+- **DeepSpeed**: configured via `deepspeed.config_path` (e.g., `configs/deepspeed/zero3.yaml`)
+- **Accelerate flags**: the `accelerate` section in the YAML mirrors the CLI flags required for multi-node setups (`mixed_precision`, `dynamo_backend`, `rdzv_backend`, etc.).
+  These are used by the SLURM launcher to generate the correct job script.
+- **Self-healing**: the SLURM launcher (`src/post_training/slurm/`) supports auto-requeueing.
+  - `slurm.signal_time_seconds` ensures the job saves a checkpoint and requeues itself before the wall time expires
+
+### 5. Checkpointing
+
+#### Resume checkpoints (full training state)
+
+- **What**: full training state (optimizer + model)
+- **Location**: `checkpoints/checkpoint-*`
+- **Logic**: training automatically resumes from the latest checkpoint found here
+
+#### Inference checkpoints (lightweight)
+
+- **What**: model + tokenizer only
+- **Location**: `inference_checkpoints/step-*`
+- **Config**: `checkpointing.inference_checkpoint_steps` (set to `null` to disable)
+
+### 6. Environment Modes
+
+- **Offline**: `offline: true`  
+  Disables Hugging Face Hub / Weights & Biases network calls (essential for air-gapped nodes).
+- **Debug**: `debug.enabled: true`  
+  Forces `report_to: none`, uses a separate output directory, and allows overwriting existing runs.
+
+## 📦 Run Outputs & Directory Layout
+
+Each run generates a unique directory based on `paths.output_base` (or `paths.debug_base`) and a run name auto-generated from the model, method, and dataset mix.
 
 ```text
-<paths.output_base>/<run_name>/
-  config.yaml
-  checkpoints/
-    checkpoint-*/
-  inference_checkpoints/
-    step-*/
-  logs/
-  slurm/
-    job.sh
-    slurm-<jobid>.out
-    slurm-<jobid>.err
-    failure_count
+<output_base>/<run_name>/
+├── config.yaml               # Frozen configuration for reproducibility
+├── checkpoints/              # Full TRL training state (resumable)
+│   └── checkpoint-500/
+├── inference_checkpoints/    # Lightweight model + tokenizer only
+│   └── step-500/
+├── logs/                     # TensorBoard / Weights & Biases logs
+└── slurm/                    # SLURM artifacts
+    ├── job.sh                # The generated submission script
+    ├── slurm-<id>.out        # Standard output
+    ├── slurm-<id>.err        # Standard error
+    └── failure_count         # Tracks retries for self-healing
 ```
 
-What each artifact is for:
+## 📘 Configuration Reference: `configs/sft.yaml`
 
-- `config.yaml`: frozen config for the run (includes CLI overrides).
-- `checkpoints/`: full TRL checkpoints (`checkpoint-*`) used for resume.
-- `inference_checkpoints/`: lightweight model+tokenizer saves (`step-*`) for inference/eval.
-- `logs/`: TensorBoard logs (via `TENSORBOARD_LOGGING_DIR`).
-- `slurm/`: generated SLURM script and SLURM stdout/stderr logs.
+Full reference configuration for the default SFT setup:
 
-Auto-resume:
+```yaml
+# ============================================================================
+# SFT (Supervised Fine-Tuning) Configuration
+# ============================================================================
+# Override any value via CLI dot-notation:
+#   accelerate launch \
+#      --num_machines 1 \
+#      --num_processes 4 \
+#      --dynamo_backend=inductor \
+#      --use_deepspeed \
+#      --same_network \
+#      --rdzv_backend static \
+#      --mixed_precision bf16 \
+#      scripts/train.py \
+#      --config configs/sft.yaml \
+#      training.max_steps=100 \
+#      offline=true
+# ============================================================================
 
-- On startup, `scripts/train.py` scans `checkpoints/checkpoint-*` and resumes from the latest checkpoint if present.
+method: sft
+run_name: null                               # auto-generated from model + datasets if null
+offline: false                               # set true to disable all HuggingFace / wandb network calls
 
-## Configuration reference (by YAML section)
+# -- Model -------------------------------------------------------------------
+model:
+  name_or_path: "allenai/Olmo-3-1025-7B"
+  attn_implementation: "flash_attention_3"
+  dtype: "bfloat16"
 
-This section pairs each feature with its configuration keys and explains the impact.
+# -- Training hyper-parameters -----------------------------------------------
+training:
+  max_steps: null                            # Set explicitly, OR use num_training_samples below
+  num_training_samples: null                 # If set: max_steps = ceil(num_samples / effective_batch_size)
+  # num_training_tokens: null                # Only valid when sft.packing=true (max_steps = ceil(tokens / (effective_batch_size * sft.max_seq_length)))
 
-### Top-level
+  learning_rate: 2.0e-5
+  effective_batch_size: 32                   # per_device * grad_accum * world_size
+  per_device_train_batch_size: 8
+  warmup_ratio: 0.03
+  lr_scheduler_type: "cosine_with_min_lr"
+  lr_scheduler_kwargs:
+    min_lr_rate: 0.1
+  gradient_checkpointing: true
+  bf16: true
+  seed: 42
+  use_liger_kernel: true
 
-- `method`: selects trainer (`sft` or `dpo`).
-- `run_name`: optional explicit run name; otherwise auto-generated.
-- `offline`: when true, disables Hugging Face + wandb network calls. This must be set to true when training on a cluster where the internet is not reachable from the compute nodes.
+# -- SFT method parameters ---------------------------------------------------
+sft:
+  max_seq_length: 4096
+  packing: true
 
-### `model`
+# -- Checkpointing -----------------------------------------------------------
+checkpointing:
+  save_steps: 200
+  save_total_limit: 2                        # Full checkpoints to keep
+  inference_checkpoint_steps: 157            # Minimal inference model interval (set to null to disable)
+  inference_checkpoint_path: "inference_checkpoints"   # Relative to run dir
 
-- `model.name_or_path`: Hugging Face model ID or local path.
-- `model.attn_implementation`: attention backend (e.g. `flash_attention_3`).
-- `model.dtype`: must match `accelerate launch --mixed_precision`.
+# -- Data mix ----------------------------------------------------------------
+data:
+  chat_template: "olmo3"                     # Name from chat template registry
+  num_proc: null                             # null = auto-detect, capped at 32
+  datasets:
+    - name: "nemotron_pt_v2"
+      path: "nvidia/Nemotron-Post-Training-Dataset-v2"
+      split: "stem"
+      weight: 1.0
+      transform: null                        # null = already conversational
 
-### `training`
+# -- DeepSpeed ---------------------------------------------------------------
+deepspeed:
+  config_path: "configs/deepspeed/zero2.yaml"
 
-**Training length (mutually exclusive)**
+# -- Accelerate launch flags (explicit multi-node control) -------------------
+accelerate:
+  mixed_precision: "bf16"
+  use_deepspeed: true
+  deepspeed_multinode_launcher: "standard"   # "standard" | "pdsh" | etc.
+  same_network: true                         # All nodes on same network
+  rdzv_backend: "static"                     # "static" | "c10d" | "etcd"
+  dynamo_backend: "inductor"                 # "inductor" | "no" | etc.
 
-You must specify **exactly one** of:
+# -- Logging & tracking ------------------------------------------------------
+logging:
+  report_to:
+    - "wandb"
+    - "tensorboard"
+  wandb_project: "sft-training"
+  logging_steps: 1
+  include_num_input_tokens_seen: "non_padding"
 
-- `training.max_steps`: explicit optimizer steps.
-- `training.num_training_samples`: derives steps as `ceil(samples / effective_batch_size)`.
-- `training.num_training_tokens`: derives steps as `ceil(tokens / (effective_batch_size * sft.max_seq_length))`.
-  - Only valid when `method: sft` and `sft.packing: true`.
+# -- SLURM -------------------------------------------------------------------
+slurm:
+  partition: "booster"
+  num_nodes: 1
+  gpus_per_node: 4
+  cpus_per_gpu: 32
+  wall_time: "02:00:00"
+  job_name: "sft-training"
+  signal_time_seconds: 300                   # SIGUSR1 sent this many seconds before timeout to trigger self-healing
+  max_failures: 3                            # Self-healing retry limit
 
-**Batch sizing**
+# -- Debug mode --------------------------------------------------------------
+debug:
+  enabled: false
+  override_existing: false
 
-- `training.effective_batch_size`: total samples per optimizer step across all GPUs.
-- `training.per_device_train_batch_size`: per-GPU microbatch.
-- Gradient accumulation is derived to match the effective batch size.
-
-**Performance / memory**
-
-- `training.gradient_checkpointing`: reduces activation memory at the cost of compute.
-- `training.use_liger_kernel`: enables Liger kernels (if installed) for performance.
-
-**Optimization**
-
-- `training.learning_rate`, `training.warmup_ratio`
-- `training.lr_scheduler_type`, `training.lr_scheduler_kwargs.min_lr_rate`
-
-### `sft` (SFT-only)
-
-- `sft.max_seq_length`: maximum sequence length.
-- `sft.packing`: when true, packs multiple examples into sequences (enables `training.num_training_tokens`).
-
-### `dpo` (DPO-only)
-
-- `dpo.beta`: DPO beta.
-- `dpo.loss_type`: loss type (e.g. `sigmoid`).
-- `dpo.ref_model_name_or_path`: optional explicit ref model (null => implicit copy).
-- `dpo.max_seq_length`: maximum sequence length.
-
-### `checkpointing`
-
-- Full checkpoints (`checkpoints/checkpoint-*`):
-  - `checkpointing.save_steps`
-  - `checkpointing.save_total_limit`
-- Inference checkpoints (`inference_checkpoints/step-*`):
-  - `checkpointing.inference_checkpoint_steps`
-    - When set to `null` (or a non-positive value via CLI overrides), inference
-      checkpointing is disabled and no `inference_checkpoints/` directory is
-      created.
-  - `checkpointing.inference_checkpoint_path`
-
-### `data`
-
-- `data.chat_template`: selects a chat template from the registry.
-- `data.num_proc`: workers for `datasets.map/filter` (auto-capped).
-- `data.datasets`: list of dataset entries:
-  - `name`, `path`, `subset`, `split`, `weight`, `transform`
-
-Custom transforms:
-
-- Define a function in `src/post_training/data/transforms.py` with signature
-  `fn(example: dict[str, Any]) -> dict[str, Any]` and register it:
-
-  ```python
-  from post_training.data.transforms import register_transform
-
-  @register_transform("my_transform")
-  def my_transform(example: dict[str, Any]) -> dict[str, Any]:
-      return {
-          "messages": [
-              {"role": "user", "content": example["prompt"]},
-              {"role": "assistant", "content": example["answer"]},
-          ]
-      }
-  ```
-
-- Reference it in your YAML:
-
-  ```yaml
-  data:
-    datasets:
-      - name: "my_dataset"
-        path: "org/my-dataset"
-        split: "train"
-        weight: 1.0
-        transform: "my_transform"
-  ```
-
-Data pipeline debugging:
-
-```bash
-python scripts/inspect_data.py --config configs/sft.yaml --num-samples 5
+# -- Output paths -------------------------------------------------------------
+paths:
+  output_base: "outputs"
+  debug_base: "outputs/debug"
 ```
-
-Advanced: one-off transforms in `scripts/train.py`:
-
-- You can also define experiment-specific transforms directly in `scripts/train.py`
-  as long as they are registered before the config is loaded and the trainer is
-  built:
-
-  ```python
-  from post_training.data.transforms import register_transform
-
-  @register_transform("my_experiment_transform")
-  def my_experiment_transform(example: dict[str, Any]) -> dict[str, Any]:
-      # Custom logic here...
-      return {"messages": example["messages"]}
-  ```
-
-- Then reference it from YAML or via CLI:
-
-  ```bash
-  scripts/train.py \
-    --config configs/sft.yaml \
-    data.datasets[0].transform=my_experiment_transform
-  ```
-
-### `deepspeed`
-
-- `deepspeed.config_path`: path to DeepSpeed YAML.
-  - `configs/deepspeed/zero2.yaml` (ZeRO-2)
-  - `configs/deepspeed/zero3.yaml` (ZeRO-3)
-
-### `accelerate`
-
-These values are used by the SLURM launcher/template and can guide your `accelerate launch` flags:
-
-- `accelerate.mixed_precision`
-- `accelerate.dynamo_backend`
-- `accelerate.use_deepspeed`
-- `accelerate.deepspeed_multinode_launcher`
-- `accelerate.same_network`
-- `accelerate.rdzv_backend`
-
-### `logging`
-
-- `logging.report_to`: list of integrations (e.g. `['wandb', 'tensorboard']`) or set to `['none']`.
-- `logging.wandb_project`
-- `logging.logging_steps`
-- `logging.include_num_input_tokens_seen`
-
-### `slurm`
-
-- `slurm.partition`
-- `slurm.num_nodes`
-- `slurm.gpus_per_node`
-- `slurm.cpus_per_gpu`
-- `slurm.wall_time`
-- `slurm.signal_time_seconds`: triggers signal-based requeue before wall time expires.
-- `slurm.max_failures`: retry limit on failure.
-
-Self-healing behavior (high level):
-
-1. Sends `SIGUSR1` before wall time.
-2. Requeues so training resumes from latest checkpoint.
-3. Resubmits on failure up to `slurm.max_failures`.
-
-### `paths`
-
-- `paths.output_base`: base directory for run outputs.
-- `paths.debug_base`: base directory used when `debug.enabled=true`.
-
-### `debug`
-
-- `debug.enabled`: enables debug mode behavior.
-- `debug.override_existing`: if true, can wipe an existing debug run directory before starting.
 
 
