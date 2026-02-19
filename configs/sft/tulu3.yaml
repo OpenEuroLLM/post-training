@@ -15,6 +15,8 @@ gradient_accumulation_steps: 16
 # Other settings
 bf16: true
 gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
 logging_steps: 10
 save_steps: 500
 save_total_limit: 100

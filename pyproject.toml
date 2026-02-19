@@ -1,0 +1,11 @@
+[project]
+name = "post-training"
+version = "0.1.0"
+requires-python = "==3.12"
+
+dependencies = [
+    "trl==0.27.0",
+    "transformers==5.0.0",
+    "deepspeed==0.18.5",
+]
+
