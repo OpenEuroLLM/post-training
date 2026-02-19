@@ -1,24 +1,30 @@
 #!/usr/bin/env python3
-"""Inspect intermediate data values for debugging.
+"""Data inspection and analysis utilities.
 
-Each output stage is togglable via a CLI flag so you can focus on exactly
-the information you need.
+Commands:
+    inspect      - Inspect intermediate data values for debugging
+    token-stats - Count the total number of tokens in a dataset
 
 Usage
 -----
-python scripts/inspect_data.py --config configs/sft.yaml \\
+# Inspect data
+python scripts/data.py inspect --config configs/sft.yaml \\
     --show-raw --show-transformed --show-formatted --show-tokens \\
     --num-samples 3
 
+# Count tokens using config file
+python scripts/data.py token-stats --config configs/sft.yaml
+
 Any extra arguments are forwarded as OmegaConf dot-list overrides::
 
-    python scripts/inspect_data.py --config configs/sft.yaml \\
+    python scripts/data.py inspect --config configs/sft.yaml \\
         --show-stats training.max_steps=5 offline=true
 """
 
 from __future__ import annotations
 
 import argparse
+import statistics
 import sys
 from pathlib import Path
 from typing import Any
@@ -33,7 +39,7 @@ from post_training.utils.logging import setup_logging
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 # Columns to check when extracting a message list from a row (in priority order).
-_MESSAGE_COLUMNS = ("messages", "chosen", "conversations", "conversation", "dialog")
+_MESSAGE_COLUMNS = ("messages",)
 
 
 def _extract_messages(row: dict) -> list | None:
@@ -69,16 +75,11 @@ def _print_sample(idx: int, data: Any) -> None:
         print(f"    {data}")
 
 
-# ── Argument parsing ────────────────────────────────────────────────────────
+# ── Inspect command ────────────────────────────────────────────────────────
 
 
-def _parse_args() -> tuple[argparse.Namespace, list[str]]:
-    """Parse known args and collect remaining args as OmegaConf overrides."""
-    parser = argparse.ArgumentParser(
-        description="Inspect data pipeline outputs.",
-        # Allow unknown args → they become OmegaConf dot-list overrides.
-        allow_abbrev=False,
-    )
+def _parse_inspect_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Add arguments for the inspect command."""
     parser.add_argument("--config", default="configs/sft.yaml")
     parser.add_argument(
         "--num-samples", type=int, default=3, help="Number of samples to inspect."
@@ -104,35 +105,11 @@ def _parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser.add_argument(
         "--show-stats", action="store_true", help="Show dataset-level statistics."
     )
-
-    args, unknown = parser.parse_known_args()
-
-    # If nothing is toggled on, turn everything on by default.
-    any_toggled = (
-        args.show_raw
-        or args.show_transformed
-        or args.show_formatted
-        or args.show_tokens
-        or args.show_stats
-    )
-    if not any_toggled:
-        args.show_raw = True
-        args.show_transformed = True
-        args.show_formatted = True
-        args.show_tokens = True
-        args.show_stats = True
-
-    return args, unknown
+    return parser
 
 
-# ── Main ────────────────────────────────────────────────────────────────────
-
-
-def main() -> None:
-    setup_logging()
-
-    args, cli_overrides = _parse_args()
-
+def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
+    """Run the inspect command."""
     config = PostTrainingConfig.load(args.config, cli_overrides)
 
     # ── Lazy imports (heavy) ────────────────────────────────────────
@@ -263,6 +240,128 @@ def main() -> None:
                 avg = sum(lengths) / len(lengths)
                 print(f"  Token length (sampled {sample_size} rows):")
                 print(f"    min={min(lengths)}, max={max(lengths)}, mean={avg:.1f}")
+
+
+# ── token-stats command ────────────────────────────────────────────────────
+
+
+def _parse_count_tokens_args(
+    parser: argparse.ArgumentParser,
+) -> argparse.ArgumentParser:
+    """Add arguments for the token-stats command."""
+    parser.add_argument(
+        "--config",
+        required=True,
+        help="Path to config file.",
+    )
+    return parser
+
+
+def _run_count_tokens(args: argparse.Namespace, cli_overrides: list[str]) -> None:
+    """Run the token-stats command."""
+    # ── Lazy imports (heavy) ────────────────────────────────────────
+    from post_training.data.loader import _resolve_num_proc, load_and_mix_datasets
+    from post_training.methods.common import build_tokenizer
+
+    # Load config
+    config = PostTrainingConfig.load(args.config, cli_overrides)
+
+    # Load tokenizer
+    tokenizer = build_tokenizer(config)
+    print(f"Using chat template: {config.data.chat_template}")
+
+    # Load dataset mix
+    ds = load_and_mix_datasets(config.data)
+    print(f"Number of loaded rows: {len(ds)}")
+
+    # Tokenize dataset
+    tokenized_ds = ds.map(
+        lambda x: tokenizer.apply_chat_template(
+            x["messages"],
+            tokenize=True,
+            add_generation_prompt=False,
+            desc="Tokenizing dataset",
+        ),
+        num_proc=_resolve_num_proc(config.data.num_proc),
+    )
+    print(f"Number of tokenized rows: {len(tokenized_ds)}")
+
+    # Total number of tokens
+    lengths = [len(x) for x in tokenized_ds["input_ids"]]
+    total_tokens = sum(lengths)
+    avg_tokens = total_tokens / len(lengths)
+    min_tokens = min(lengths)
+    max_tokens = max(lengths)
+    std_tokens = statistics.stdev(lengths)
+    print(f"Total number of tokens: {total_tokens}")
+    print(f"Average number of tokens: {avg_tokens}")
+    print(f"Minimum number of tokens: {min_tokens}")
+    print(f"Maximum number of tokens: {max_tokens}")
+    print(f"Standard deviation of tokens: {std_tokens}")
+
+
+# ── Argument parsing ────────────────────────────────────────────────────────
+
+
+def _parse_args() -> tuple[argparse.Namespace, list[str]]:
+    """Parse known args and collect remaining args as OmegaConf overrides."""
+    parser = argparse.ArgumentParser(
+        description="Data inspection and analysis utilities.",
+        # Allow unknown args → they become OmegaConf dot-list overrides.
+        allow_abbrev=False,
+    )
+
+    subparsers = parser.add_subparsers(
+        dest="command", help="Command to run", required=True
+    )
+
+    # Inspect command
+    inspect_parser = subparsers.add_parser(
+        "inspect", help="Inspect intermediate data values for debugging"
+    )
+    _parse_inspect_args(inspect_parser)
+
+    # token-stats command
+    count_tokens_parser = subparsers.add_parser(
+        "token-stats", help="Count the total number of tokens in a dataset"
+    )
+    _parse_count_tokens_args(count_tokens_parser)
+
+    args, unknown = parser.parse_known_args()
+
+    # For inspect command, if nothing is toggled on, turn everything on by default.
+    if args.command == "inspect":
+        any_toggled = (
+            args.show_raw
+            or args.show_transformed
+            or args.show_formatted
+            or args.show_tokens
+            or args.show_stats
+        )
+        if not any_toggled:
+            args.show_raw = True
+            args.show_transformed = True
+            args.show_formatted = True
+            args.show_tokens = True
+            args.show_stats = True
+
+    return args, unknown
+
+
+# ── Main ────────────────────────────────────────────────────────────────────
+
+
+def main() -> None:
+    setup_logging()
+
+    args, cli_overrides = _parse_args()
+
+    if args.command == "inspect":
+        _run_inspect(args, cli_overrides)
+    elif args.command == "token-stats":
+        _run_count_tokens(args, cli_overrides)
+    else:
+        raise ValueError(f"Unknown command: {args.command}")
 
 
 if __name__ == "__main__":

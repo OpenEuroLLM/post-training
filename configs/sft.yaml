@@ -28,9 +28,9 @@ model:
 
 # -- Training hyper-parameters -----------------------------------------------
 training:
-  max_steps: null                            # Set explicitly, OR use num_training_samples below
+  max_steps: 10                              # Set explicitly, OR use num_training_samples below
   num_training_samples: null                 # If set: max_steps = ceil(num_samples / effective_batch_size)
-  # num_training_tokens: null                # Only valid when sft.packing=true (max_steps = ceil(tokens / (effective_batch_size * sft.max_seq_length)))
+  num_training_tokens: null                  # Only valid when sft.packing=true (max_steps = ceil(tokens / (effective_batch_size * sft.max_seq_length)))
 
   learning_rate: 2.0e-5
   effective_batch_size: 32                   # per_device * grad_accum * world_size

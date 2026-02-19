@@ -51,6 +51,10 @@ def main() -> None:
     run_dir = setup_run_directory(config)
     logger.info("Run directory: %s", run_dir)
 
+    # CRITICAL: Set run_name so it's preserved in the frozen config.
+    # This ensures train.py uses the same directory when it loads the config.
+    config.run_name = run_dir.name
+
     # Freeze a copy of the config.
     frozen = run_dir / "config.yaml"
     config.save(frozen)

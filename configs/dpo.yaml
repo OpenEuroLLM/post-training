@@ -28,7 +28,7 @@ model:
 
 # -- Training hyper-parameters -----------------------------------------------
 training:
-  max_steps: null
+  max_steps: 10                              # Set explicitly, OR use num_training_samples below
   num_training_samples: null
 
   learning_rate: 5.0e-7

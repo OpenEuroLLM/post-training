@@ -14,6 +14,7 @@ A modular, configuration-driven framework for **SFT** (Supervised Fine-Tuning) a
   - [Infrastructure & Compute](#infrastructure--compute)
   - [Checkpointing](#checkpointing)
   - [Environment Modes](#environment-modes)
+  - [Logging & Experiment Tracking](#logging--experiment-tracking)
 - [Run Outputs & Directory Layout](#run-outputs--directory-layout)
 
 ## ⚡ Quick Start
@@ -98,7 +99,8 @@ post-training/
 ├── scripts/
 │   ├── train.py                  # Training entrypoint (supports CLI overrides)
 │   ├── submit.py                 # SLURM submission entrypoint
-│   └── inspect_data.py           # Data pipeline debugger
+│   ├── data.py                   # Data pipeline debugger + token-stats
+│   └── wandb.py                  # Weights & Biases utilities
 └── pyproject.toml
 ```
 
@@ -190,10 +192,11 @@ Templates convert the list of messages into a single string for the model.
 
 #### D. Data inspection
 
-Use the inspection script to debug the pipeline stages (Raw → Transformed → Formatted → Tokenized).
+Use the data script to debug the pipeline stages (Raw → Transformed → Formatted → Tokenized) and to compute token statistics.
 
 ```bash
-python scripts/inspect_data.py --config configs/sft.yaml --show-formatted --num-samples 3
+python scripts/data.py --config configs/sft.yaml --show-formatted --num-samples 3
+python scripts/data.py --config configs/sft.yaml token-stats
 ```
 
 ### 3. Training Length
@@ -233,6 +236,30 @@ You must specify exactly one determining factor for training duration in the `tr
   Disables Hugging Face Hub / Weights & Biases network calls (essential for air-gapped nodes).
 - **Debug**: `debug.enabled: true`  
   Forces `report_to: none`, uses a separate output directory, and allows overwriting existing runs.
+
+### 7. Logging & Experiment Tracking
+
+The framework supports multiple logging backends and handles offline environments (e.g., air-gapped clusters).
+
+#### SLURM Logs
+For multi-node runs, SLURM output and error logs are stored within each run's specific directory:
+- `<run_directory>/slurm/slurm-<job_id>.out`: Standard output (including console logs and progress bars)
+- `<run_directory>/slurm/slurm-<job_id>.err`: Standard error (including stack traces and warnings)
+
+#### Weights & Biases (WandB)
+- **Online**: Logs are streamed directly to the WandB cloud. The project name is controlled by `logging.wandb_project`.
+- **Offline**: When `offline: true` is set, WandB logs are saved locally to the `wandb/` directory in the project root.
+
+#### Syncing Offline Runs
+To upload offline runs to the cloud (e.g., from a login node with internet access), use the utility script:
+
+```bash
+# Interactive mode - view and select runs to sync
+python scripts/wandb.py sync --interactive
+
+# Sync a specific run by its training run name
+python scripts/wandb.py sync --run-name <run_name>
+```
 
 ## 📦 Run Outputs & Directory Layout
 
