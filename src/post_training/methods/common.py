@@ -73,32 +73,39 @@ def build_common_training_kwargs(
     grad_accum = config.resolve_gradient_accumulation_steps(world_size)
     logger.info("world_size=%d, gradient_accumulation_steps=%d", world_size, grad_accum)
 
-    warmup_steps = int(config.training.warmup_ratio * (config.training.max_steps or 0))
-    logger.info(
-        "warmup_steps=%d (from warmup_ratio=%.4f)",
-        warmup_steps,
-        config.training.warmup_ratio,
-    )
-
+    t = config.training
     ds_config = config.load_deepspeed_config() if config.deepspeed.config_path else None
 
     os.environ.setdefault("TENSORBOARD_LOGGING_DIR", str(run_dir / "logs"))
 
+    # Determine training duration kwargs. When num_train_epochs is set, max_steps
+    # must be -1 (disabled) so the Trainer uses epoch-based stopping. Otherwise,
+    # max_steps is always set (possibly derived from num_training_samples/tokens).
+    if t.num_train_epochs is not None:
+        duration_kwargs: dict[str, Any] = {
+            "num_train_epochs": t.num_train_epochs,
+            "max_steps": -1,
+        }
+        logger.info("Training duration: %.2f epochs", t.num_train_epochs)
+    else:
+        duration_kwargs = {"max_steps": t.max_steps}
+        logger.info("Training duration: %d steps", t.max_steps)
+
     return dict(
         output_dir=str(run_dir / "checkpoints"),
-        max_steps=config.training.max_steps,
-        learning_rate=config.training.learning_rate,
-        per_device_train_batch_size=config.training.per_device_train_batch_size,
+        **duration_kwargs,
+        learning_rate=t.learning_rate,
+        per_device_train_batch_size=t.per_device_train_batch_size,
         gradient_accumulation_steps=grad_accum,
-        warmup_steps=warmup_steps,
-        lr_scheduler_type=config.training.lr_scheduler_type,
+        warmup_steps=t.warmup_ratio,
+        lr_scheduler_type=t.lr_scheduler_type,
         lr_scheduler_kwargs={
-            "min_lr_rate": config.training.lr_scheduler_kwargs.min_lr_rate,
+            "min_lr_rate": t.lr_scheduler_kwargs.min_lr_rate,
         },
-        gradient_checkpointing=config.training.gradient_checkpointing,
-        use_liger_kernel=config.training.use_liger_kernel,
-        bf16=config.training.bf16,
-        seed=config.training.seed,
+        gradient_checkpointing=t.gradient_checkpointing,
+        use_liger_kernel=t.use_liger_kernel,
+        bf16=t.bf16,
+        seed=t.seed,
         # Checkpointing
         save_strategy="steps",
         save_steps=config.checkpointing.save_steps,
