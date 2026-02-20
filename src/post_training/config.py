@@ -154,6 +154,8 @@ class SlurmConfig:
     job_name: str = "post-training"
     signal_time_seconds: int = 300
     max_failures: int = 3
+    modules: list[str] = field(default_factory=list)
+    module_purge: bool = True
 
 
 @dataclass
