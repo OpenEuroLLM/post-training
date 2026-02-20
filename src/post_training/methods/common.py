@@ -103,6 +103,12 @@ def build_common_training_kwargs(
             "min_lr_rate": t.lr_scheduler_kwargs.min_lr_rate,
         },
         gradient_checkpointing=t.gradient_checkpointing,
+        gradient_checkpointing_kwargs={
+            "use_reentrant": t.gradient_checkpointing_kwargs.use_reentrant,
+            "determinism_check": t.gradient_checkpointing_kwargs.determinism_check,
+            "debug": t.gradient_checkpointing_kwargs.debug,
+            "early_stop": t.gradient_checkpointing_kwargs.early_stop,
+        },
         use_liger_kernel=t.use_liger_kernel,
         bf16=t.bf16,
         seed=t.seed,

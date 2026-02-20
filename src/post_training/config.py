@@ -36,6 +36,16 @@ class LRSchedulerKwargs:
 
 
 @dataclass
+class GradientCheckpointingKwargs:
+    """Extra keyword arguments forwarded to ``gradient_checkpointing_enable()``."""
+
+    use_reentrant: bool = False
+    determinism_check: str = "default"
+    debug: bool = False
+    early_stop: bool = True
+
+
+@dataclass
 class TrainingConfig:
     """Core training hyper-parameters shared across all methods."""
 
@@ -52,6 +62,7 @@ class TrainingConfig:
     lr_scheduler_kwargs: LRSchedulerKwargs = field(default_factory=LRSchedulerKwargs)
 
     gradient_checkpointing: bool = True
+    gradient_checkpointing_kwargs: GradientCheckpointingKwargs = field(default_factory=GradientCheckpointingKwargs)
     bf16: bool = True
     seed: int = 42
     use_liger_kernel: bool = True
