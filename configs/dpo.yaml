@@ -96,7 +96,7 @@ slurm:
   partition: "booster"
   num_nodes: 1
   gpus_per_node: 4
-  cpus_per_gpu: 32
+  cpus_per_task: 32
   wall_time: "02:00:00"
   job_name: "dpo-training"
   signal_time_seconds: 300                   # SIGUSR1 sent this many seconds before timeout to trigger self-healing
