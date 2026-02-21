@@ -4,11 +4,11 @@
 Usage
 -----
 # Sync a specific run (non-interactive)
-python scripts/wandb.py sync --run-name sft-olmo-3-1025-7b-nemotron_pt_v2-20260218-172238
-python scripts/wandb.py sync --wandb-folder offline-run-20260218_172330-7ukg3tch
+python scripts/wb.py sync --run-name sft-olmo-3-1025-7b-nemotron_pt_v2-20260218-172238
+python scripts/wb.py sync --wandb-folder offline-run-20260218_172330-7ukg3tch
 
 # Interactive mode - choose which runs to sync
-python scripts/wandb.py sync --interactive
+python scripts/wb.py sync --interactive
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Optional
 
 # Ensure the project root is on ``sys.path`` so that ``post_training`` is
-# importable when running directly (``python scripts/wandb.py``).
+# importable when running directly (``python scripts/wb.py``).
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT / "src"))

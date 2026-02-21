@@ -100,7 +100,7 @@ post-training/
 │   ├── train.py                  # Training entrypoint (supports CLI overrides)
 │   ├── submit.py                 # SLURM submission entrypoint
 │   ├── data.py                   # Data pipeline debugger + token-stats
-│   └── wandb.py                  # Weights & Biases utilities
+│   └── wb.py                  # Weights & Biases utilities
 └── pyproject.toml
 ```
 
@@ -255,10 +255,10 @@ To upload offline runs to the cloud (e.g., from a login node with internet acces
 
 ```bash
 # Interactive mode - view and select runs to sync
-python scripts/wandb.py sync --interactive
+python scripts/wb.py sync --interactive
 
 # Sync a specific run by its training run name
-python scripts/wandb.py sync --run-name <run_name>
+python scripts/wb.py sync --run-name <run_name>
 ```
 
 ## 📦 Run Outputs & Directory Layout

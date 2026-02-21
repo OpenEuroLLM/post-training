@@ -107,8 +107,7 @@ def main() -> None:
 
     # Freeze a copy of the config into the run directory.
     frozen_path = run_dir / "config.yaml"
-    with open(frozen_path, "w") as f:
-        yaml.dump(config.__dict__, f, default_flow_style=False, sort_keys=False)
+    config.save(frozen_path)
 
     # ── Build trainer & launch ──────────────────────────────────────
     trainer = build_trainer(config, run_dir)

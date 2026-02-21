@@ -21,7 +21,7 @@ dependencies = [
     "psutil",
     "xielu",
     "liger-kernel",
-    "tensorboard>=2.20.0",
+    "tensorboard",
 ]
 
 [project.optional-dependencies]
