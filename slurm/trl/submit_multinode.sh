@@ -47,6 +47,8 @@ MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 MASTER_PORT=9001
 ######################
 
+export HF_HUB_OFFLINE=1
+
 export LAUNCHER="accelerate launch \
     --config_file $ACCELERATE_CONFIG \
     --num_processes $((SLURM_NNODES * GPUS_PER_NODE)) \
@@ -57,8 +59,8 @@ export LAUNCHER="accelerate launch \
     --machine_rank \$SLURM_PROCID \
     "
 
-export SCRIPT="scripts/train/${TASK}.py"
-export SCRIPT_ARGS="--config $CONFIG_FILE --dataset_num_proc $SLURM_CPUS_PER_TASK"
+export SCRIPT="scripts/trl/train/${TASK}.py"
+export SCRIPT_ARGS="--config $CONFIG_FILE --dataset_num_proc $((SLURM_CPUS_PER_TASK / GPUS_PER_NODE))"
 
 # This step is necessary because accelerate launch does not handle multiline arguments properly
 export CMD="$LAUNCHER $SCRIPT $SCRIPT_ARGS"

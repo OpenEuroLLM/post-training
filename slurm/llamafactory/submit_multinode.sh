@@ -73,7 +73,8 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
   bash -lc "
     set -e
 
-    # Prevent host Python packages from interfering
+    # Prevent host Python/PATH from interfering with container
+    export PATH=\"/usr/local/bin:/usr/bin:/bin\"
     export PYTHONPATH=\"\"
     export PYTHONNOUSERSITE=1
     export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
