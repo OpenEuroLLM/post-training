@@ -13,20 +13,37 @@ From: /e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals/eval_env-ju
     export PYTHONNOUSERSITE=1
     export MAX_JOBS=16
 
-    # Upgrade pip and install build tools
-    pip install --no-cache-dir --upgrade pip packaging wheel setuptools
+    # Install system deps needed for some Python packages
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        && rm -rf /var/lib/apt/lists/*
 
-    # Install uv for fast, reproducible dependency resolution
-    pip install --no-cache-dir uv
+    pip install --no-cache-dir --upgrade pip packaging wheel setuptools "hatchling>=1.18.0" editables
 
-    # Copy project into container and install with TRL extras
-    # The project root must be bind-mounted or copied at build time.
-    # We install from the lockfile for reproducibility.
-    cd /opt/post-training
-    uv sync --extra trl --no-dev --frozen
+    # Core ML deps (skip torch, torchvision, torchaudio - already in base container)
+    pip install --no-cache-dir \
+        "transformers>=4.51.0,<=5.0.0" \
+        "accelerate>=1.3.0,<=1.11.0" \
+        "datasets>=2.16.0,<=4.0.0" \
+        "trl>=0.18.0,<=0.24.0" \
+        "peft>=0.18.0,<=0.18.1"
+
+    # Install deepspeed 
+    pip install --no-cache-dir --no-deps deepspeed
+    pip install --no-cache-dir hjson py-cpuinfo pynvml
+
+    # Additional deps for TRL training
+    pip install --no-cache-dir \
+        "liger-kernel>=0.5.0" \
+        sentencepiece tiktoken safetensors \
+        omegaconf pyyaml pydantic \
+        wandb tensorboard
+
+    mkdir -p /usr/local/lib/python3.12/dist-packages/torchaudio
+    echo '__version__ = "0.0.0-stub"' > /usr/local/lib/python3.12/dist-packages/torchaudio/__init__.py
 
     # Verify key imports
-    python -c "import trl; import accelerate; import deepspeed; print('TRL stack OK')"
+    python -c "import trl; import accelerate; import deepspeed; import transformers; print('TRL stack OK')"
 
 %environment
     export PYTHONNOUSERSITE=1

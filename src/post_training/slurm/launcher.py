@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 _TEMPLATE_DIR = Path(__file__).resolve().parent
 _TEMPLATE_NAME = "job.sh.jinja"
 _LLAMAFACTORY_TEMPLATE_NAME = "job_llamafactory.sh.jinja"
+_TRL_CONTAINER_TEMPLATE_NAME = "job_trl_container.sh.jinja"
 
 
 def render_trl_slurm_script(
@@ -80,6 +81,58 @@ def render_trl_slurm_script(
     script_path.chmod(0o755)
 
     logger.info("SLURM script written to %s", script_path)
+    return script_path
+
+
+def render_trl_container_slurm_script(
+    config: PostTrainingConfig,
+    run_dir: Path,
+    config_path: str,
+) -> Path:
+    """Render the containerized TRL SLURM batch script into *run_dir/slurm/job.sh*.
+
+    Uses ``singularity exec`` to run ``accelerate launch`` inside a container,
+    following the same patterns as the LlamaFactory containerized template.
+    """
+    env = Environment(
+        loader=FileSystemLoader(str(_TEMPLATE_DIR)),
+        keep_trailing_newline=True,
+    )
+    template = env.get_template(_TRL_CONTAINER_TEMPLATE_NAME)
+
+    rendered = template.render(
+        # SLURM parameters
+        job_name=config.slurm.job_name,
+        partition=config.slurm.partition,
+        num_nodes=config.slurm.num_nodes,
+        gpus_per_node=config.slurm.gpus_per_node,
+        cpus_per_gpu=config.slurm.cpus_per_gpu,
+        wall_time=config.slurm.wall_time,
+        signal_time_seconds=config.slurm.signal_time_seconds,
+        max_failures=config.slurm.max_failures,
+        run_dir=str(run_dir),
+        config_path=config_path,
+        # Accelerate flags
+        mixed_precision=config.accelerate.mixed_precision,
+        dynamo_backend=config.accelerate.dynamo_backend,
+        use_deepspeed=config.accelerate.use_deepspeed,
+        deepspeed_multinode_launcher=config.accelerate.deepspeed_multinode_launcher,
+        same_network=config.accelerate.same_network,
+        rdzv_backend=config.accelerate.rdzv_backend,
+        # Container
+        container_image=config.container.image,
+        bind_mounts=config.container.bind_mounts,
+        env_file=config.container.env_file,
+        repo_dir=str(Path.cwd()),
+    )
+
+    slurm_dir = run_dir / "slurm"
+    slurm_dir.mkdir(parents=True, exist_ok=True)
+    script_path = slurm_dir / "job.sh"
+    script_path.write_text(rendered)
+    script_path.chmod(0o755)
+
+    logger.info("Containerized TRL SLURM script written to %s", script_path)
     return script_path
 
 

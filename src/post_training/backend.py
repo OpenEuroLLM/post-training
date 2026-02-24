@@ -80,6 +80,18 @@ class TRLBackend(Backend):
                 f"Supported methods: {', '.join(_SUPPORTED_METHODS)}"
             )
 
+        # Container validation (only when container.image is set)
+        if config.container.image:
+            if not config.container.bind_mounts:
+                raise ValueError(
+                    "container.bind_mounts must be non-empty when "
+                    "container.image is set."
+                )
+            if not config.container.env_file:
+                raise ValueError(
+                    "container.env_file must be set when container.image is set."
+                )
+
         t = config.training
 
         if t.effective_batch_size <= 0:
@@ -141,6 +153,13 @@ class TRLBackend(Backend):
         return ["checkpoints", "inference_checkpoints"]
 
     def render_slurm_script(self, config, run_dir, frozen_config_path):
+        if config.container.image:
+            from post_training.slurm.launcher import render_trl_container_slurm_script
+
+            return render_trl_container_slurm_script(
+                config, run_dir, frozen_config_path
+            )
+
         from post_training.slurm.launcher import render_trl_slurm_script
 
         return render_trl_slurm_script(config, run_dir, frozen_config_path)
