@@ -1,0 +1,23 @@
+# LlamaFactory submission config (infrastructure only).
+# Usage: python scripts/submit.py --config configs/llamafactory/submit.yaml llamafactory_config=configs/llamafactory/long-context.yaml
+
+backend: llamafactory
+offline: true
+
+container:
+  image: /e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals/llamafactory-jupiter.sif
+  bind_mounts:
+    - /e/project1/jureap59/raj3:/e/project1/jureap59/raj3
+    - /e/scratch/jureap59/raj3:/e/scratch/jureap59/raj3
+    - /e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals:/e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals
+  env_file: env/jupiter.env
+
+slurm:
+  partition: booster
+  num_nodes: 2
+  gpus_per_node: 4
+  cpus_per_gpu: 18
+  wall_time: "02:00:00"
+  job_name: llamafactory-long-ctx
+  signal_time_seconds: 300
+  max_failures: 3

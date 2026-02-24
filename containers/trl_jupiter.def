@@ -1,0 +1,36 @@
+Bootstrap: localimage
+From: /e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals/eval_env-jupiter.sif
+
+%labels
+    Author raj3
+    Description TRL post-training container for Jupiter JSC cluster (ARM64 / GH200)
+
+%post
+    set -e
+
+    export DEBIAN_FRONTEND=noninteractive
+    export PIP_ROOT_USER_ACTION=ignore
+    export PYTHONNOUSERSITE=1
+    export MAX_JOBS=16
+
+    # Upgrade pip and install build tools
+    pip install --no-cache-dir --upgrade pip packaging wheel setuptools
+
+    # Install uv for fast, reproducible dependency resolution
+    pip install --no-cache-dir uv
+
+    # Copy project into container and install with TRL extras
+    # The project root must be bind-mounted or copied at build time.
+    # We install from the lockfile for reproducibility.
+    cd /opt/post-training
+    uv sync --extra trl --no-dev --frozen
+
+    # Verify key imports
+    python -c "import trl; import accelerate; import deepspeed; print('TRL stack OK')"
+
+%environment
+    export PYTHONNOUSERSITE=1
+    export PATH="/opt/conda/bin:/usr/local/bin:$PATH"
+
+%runscript
+    exec python "$@"

@@ -2,6 +2,10 @@
 
 A modular, configuration-driven framework for **SFT** (Supervised Fine-Tuning) and **DPO** (Direct Preference Optimization). Built on **TRL**, **DeepSpeed**, and **Accelerate** with multi-node **SLURM** support.
 
+This repo supports two training backends:
+- **TRL** -- SFT and DPO via `accelerate launch`
+- **LlamaFactory** -- SFT, DPO, long-context tuning via Singularity containers
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)
@@ -279,6 +283,31 @@ Each run generates a unique directory based on `paths.output_base` (or `paths.de
     ├── slurm-<id>.err        # Standard error
     └── failure_count         # Tracks retries for self-healing
 ```
+
+## LlamaFactory Backend
+
+An alternative backend using [LlamaFactory](https://github.com/hiyouga/LlamaFactory) for training, running inside a Singularity container.
+
+### Setup
+
+1. Build the Singularity container:
+   ```bash
+   singularity build --fakeroot llamafactory.sif containers/llamafactory_jupiter.def
+   ```
+2. Set the container path in `env/jupiter.env`:
+   ```bash
+   export CONTAINER=/path/to/llamafactory.sif
+   ```
+
+### Long-Context SFT (example)
+
+```bash
+sbatch slurm/llamafactory/submit_multinode.sh configs/llamafactory/long-context.yaml
+```
+
+- Config: `configs/llamafactory/long-context.yaml`
+- DeepSpeed: `configs/llamafactory/deepspeed/ds_z3_partial_offload.json`
+- Dataset registry: `data/llamafactory/dataset_info.json`
 
 ## 📘 Configuration Reference: `configs/sft.yaml`
 

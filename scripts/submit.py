@@ -59,6 +59,11 @@ def main() -> None:
     frozen = run_dir / "config.yaml"
     config.save(frozen)
 
+    # Copy any backend-specific artifacts for reproducibility.
+    from post_training.backend import get_backend
+
+    get_backend(config.backend).post_freeze(config, run_dir)
+
     job_id = generate_and_submit(config, run_dir, str(frozen))
     logger.info("SLURM job submitted: %s", job_id)
 
