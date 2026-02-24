@@ -6,6 +6,7 @@ contain **no** method-specific logic.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import os
 from pathlib import Path
@@ -99,16 +100,9 @@ def build_common_training_kwargs(
         gradient_accumulation_steps=grad_accum,
         warmup_steps=t.warmup_ratio,
         lr_scheduler_type=t.lr_scheduler_type,
-        lr_scheduler_kwargs={
-            "min_lr_rate": t.lr_scheduler_kwargs.min_lr_rate,
-        },
+        lr_scheduler_kwargs=dataclasses.asdict(t.lr_scheduler_kwargs),
         gradient_checkpointing=t.gradient_checkpointing,
-        gradient_checkpointing_kwargs={
-            "use_reentrant": t.gradient_checkpointing_kwargs.use_reentrant,
-            "determinism_check": t.gradient_checkpointing_kwargs.determinism_check,
-            "debug": t.gradient_checkpointing_kwargs.debug,
-            "early_stop": t.gradient_checkpointing_kwargs.early_stop,
-        },
+        gradient_checkpointing_kwargs=dataclasses.asdict(t.gradient_checkpointing_kwargs),
         use_liger_kernel=t.use_liger_kernel,
         bf16=t.bf16,
         seed=t.seed,
