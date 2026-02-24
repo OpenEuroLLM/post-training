@@ -79,6 +79,7 @@ class SFTMethodConfig:
 
     max_seq_length: int = 4096
     packing: bool = True
+    dataset_num_proc: Optional[int] = None
 
 
 @dataclass
@@ -89,6 +90,7 @@ class DPOMethodConfig:
     loss_type: str = "sigmoid"
     ref_model_name_or_path: Optional[str] = None
     max_seq_length: int = 2048
+    dataset_num_proc: Optional[int] = None
 
 
 @dataclass

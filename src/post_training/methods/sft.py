@@ -51,6 +51,7 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
         **build_common_training_kwargs(config, run_dir),
         max_length=mc.max_seq_length,
         packing=mc.packing,
+        dataset_num_proc=mc.dataset_num_proc,
         model_init_kwargs=build_model_init_kwargs(config),
     )
 
