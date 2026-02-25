@@ -164,7 +164,7 @@ def render_llamafactory_slurm_script(
         bind_mounts=config.container.bind_mounts,
         env_file=config.container.env_file,
         # LlamaFactory
-        llamafactory_config=config.llamafactory_config,
+        llamafactory_config=str(run_dir / "llamafactory_config.yaml"),
         repo_dir=str(Path.cwd()),
     )
 

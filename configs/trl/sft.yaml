@@ -17,8 +17,9 @@
 # ============================================================================
 
 method: sft
+backend: trl
 run_name: null                               # auto-generated from model + datasets if null
-offline: true                               
+offline: true
 
 # Container (remove or set image: null for bare-metal)
 container:

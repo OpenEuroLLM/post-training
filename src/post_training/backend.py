@@ -7,10 +7,11 @@ import hashlib
 import json
 import math
 import re
-import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+import yaml
 
 if TYPE_CHECKING:
     from post_training.config import PostTrainingConfig
@@ -175,9 +176,9 @@ class TRLBackend(Backend):
 
 class LlamaFactoryBackend(Backend):
     def validate(self, config: PostTrainingConfig) -> None:
-        if not config.llamafactory_config:
+        if not config.llamafactory:
             raise ValueError(
-                "llamafactory_config must be set when backend='llamafactory'."
+                "llamafactory must be set when backend='llamafactory'."
             )
         if not config.container.image:
             raise ValueError(
@@ -185,8 +186,7 @@ class LlamaFactoryBackend(Backend):
             )
 
     def generate_run_name(self, config: PostTrainingConfig, timestamp: str) -> str:
-        config_stem = Path(config.llamafactory_config).stem
-        return f"llamafactory-{config_stem}-{timestamp}"
+        return f"llamafactory-{config.method}-{timestamp}"
 
     def run_dir_subdirs(self) -> list[str]:
         return []
@@ -197,7 +197,9 @@ class LlamaFactoryBackend(Backend):
         return render_llamafactory_slurm_script(config, run_dir)
 
     def post_freeze(self, config, run_dir):
-        shutil.copy2(config.llamafactory_config, run_dir / "llamafactory_config.yaml")
+        lf_config_path = run_dir / "llamafactory_config.yaml"
+        with open(lf_config_path, "w") as f:
+            yaml.dump(config.llamafactory, f, default_flow_style=False)
 
 
 # ---------------------------------------------------------------------------

@@ -1,47 +1,80 @@
-### model
-model_name_or_path: ontocord/1.7b-MixtureVitae-300BT-v1-decontaminated-16k
-trust_remote_code: true
-rope_scaling: yarn
-enable_liger_kernel: false
+# ============================================================================
+# LlamaFactory Long-Context SFT Configuration
+# ============================================================================
+# Usage: python scripts/submit.py --config configs/llamafactory/long-context.yaml
+# ============================================================================
 
-### method
-stage: sft
-do_train: true
-finetuning_type: full
-deepspeed: configs/llamafactory/deepspeed/ds_z3_partial_offload.json
+backend: llamafactory
+method: sft
+offline: true
 
-### dataset
-dataset_dir: data/llamafactory
-dataset: long_sft
-template: gemma
-mask_history: true
-cutoff_len: 16384
-max_samples: null
-overwrite_cache: true
-preprocessing_num_workers: 16
-dataloader_num_workers: 2
-dataloader_prefetch_factor: 1
-dataloader_persistent_workers: false
-dataloader_pin_memory: false
-group_by_length: true
+# -- Container ---------------------------------------------------------------
+container:
+  image: /e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals/llamafactory-jupiter.sif
+  bind_mounts:
+    - /e/project1/jureap59/raj3:/e/project1/jureap59/raj3
+    - /e/scratch/jureap59/raj3:/e/scratch/jureap59/raj3
+    - /e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals:/e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals
+  env_file: env/jupiter.env
 
-### output
-output_dir: output/long-context
-logging_steps: 5
-plot_loss: true
-overwrite_output_dir: true
-save_only_model: false
-report_to: none
+# -- SLURM -------------------------------------------------------------------
+slurm:
+  partition: booster
+  num_nodes: 2
+  gpus_per_node: 4
+  cpus_per_gpu: 18
+  wall_time: "02:00:00"
+  job_name: llamafactory-long-ctx
+  signal_time_seconds: 300
+  max_failures: 3
 
-### train
-per_device_train_batch_size: 2
-gradient_accumulation_steps: 2
-learning_rate: 2.0e-4
-num_train_epochs: 1.0
-lr_scheduler_type: cosine
-warmup_ratio: 0.05
-weight_decay: 0.03
-max_grad_norm: 1.0e-3
-bf16: true
-gradient_checkpointing: true
-ddp_timeout: 180000000
+# -- LlamaFactory-native training config ------------------------------------
+# Dumped as-is to a YAML file for llamafactory-cli at runtime.
+llamafactory:
+  # model
+  model_name_or_path: ontocord/1.7b-MixtureVitae-300BT-v1-decontaminated-16k
+  trust_remote_code: true
+  rope_scaling: yarn
+  enable_liger_kernel: false
+
+  # method
+  stage: sft
+  do_train: true
+  finetuning_type: full
+  deepspeed: configs/deepspeed/z3_partial_offload.json
+
+  # dataset
+  dataset_dir: data/llamafactory
+  dataset: long_sft
+  template: gemma
+  mask_history: true
+  cutoff_len: 16384
+  max_samples: null
+  overwrite_cache: true
+  preprocessing_num_workers: 16
+  dataloader_num_workers: 2
+  dataloader_prefetch_factor: 1
+  dataloader_persistent_workers: false
+  dataloader_pin_memory: false
+  group_by_length: true
+
+  # output
+  output_dir: output/long-context
+  logging_steps: 5
+  plot_loss: true
+  overwrite_output_dir: true
+  save_only_model: false
+  report_to: none
+
+  # train
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 2
+  learning_rate: 2.0e-4
+  num_train_epochs: 1.0
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.05
+  weight_decay: 0.03
+  max_grad_norm: 1.0e-3
+  bf16: true
+  gradient_checkpointing: true
+  ddp_timeout: 180000000

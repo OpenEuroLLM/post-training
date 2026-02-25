@@ -33,7 +33,7 @@ def _parse_args() -> tuple[str, list[str]]:
     parser.add_argument(
         "--config",
         type=str,
-        default="configs/sft.yaml",
+        default="configs/trl/sft.yaml",
         help="Path to the YAML config file.",
     )
     known, unknown = parser.parse_known_args()

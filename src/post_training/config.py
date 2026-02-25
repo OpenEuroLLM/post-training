@@ -193,7 +193,7 @@ class PostTrainingConfig:
     run_name: Optional[str] = None
     offline: bool = False
     backend: str = "trl"  
-    llamafactory_config: Optional[str] = None 
+    llamafactory: Optional[dict] = None
     container: ContainerConfig = field(default_factory=ContainerConfig)
 
     model: ModelConfig = field(default_factory=ModelConfig)
