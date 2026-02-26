@@ -9,19 +9,19 @@ This repo supports two training backends:
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [Project Structure](#project-structure)
-- [Configuration Philosophy](#configuration-philosophy)
-- [Feature Guide](#feature-guide)
-  - [Training Methods](#training-methods)
-  - [Data Pipeline](#data-pipeline)
-  - [Training Length](#training-length)
-  - [Infrastructure & Compute](#infrastructure--compute)
-  - [Checkpointing](#checkpointing)
-  - [Environment Modes](#environment-modes)
-  - [Logging & Experiment Tracking](#logging--experiment-tracking)
-- [Run Outputs & Directory Layout](#run-outputs--directory-layout)
+- [Project Structure](#-project-structure)
+- [Configuration Philosophy](#-configuration-philosophy)
+- [Feature Guide](#-feature-guide)
+  - [Training Methods](#1-training-methods)
+  - [Data Pipeline](#2-data-pipeline)
+  - [Training Length](#3-training-length)
+  - [Infrastructure & Compute](#4-infrastructure--compute)
+  - [Checkpointing](#5-checkpointing)
+  - [Environment Modes](#6-environment-modes)
+  - [Logging & Experiment Tracking](#7-logging--experiment-tracking)
+- [Run Outputs & Directory Layout](#-run-outputs--directory-layout)
 
-## ⚡ Quick Start
+## Quick Start
 
 ### Installation
 
