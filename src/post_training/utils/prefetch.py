@@ -42,13 +42,9 @@ def _prefetch_model(name_or_path: str) -> None:
 
 def _prefetch_dataset(entry: DatasetEntry) -> None:
     if _is_local(entry.path):
-        logger.info(
-            "Dataset '%s' is a local path, skipping download.", entry.name
-        )
+        logger.info("Dataset '%s' is a local path, skipping download.", entry.name)
         return
-    logger.info(
-        "Downloading dataset '%s' ('%s') to HF cache...", entry.name, entry.path
-    )
+    logger.info("Downloading dataset '%s' ('%s') to HF cache...", entry.name, entry.path)
     load_kwargs: dict = {}
     if entry.data_dir is not None:
         load_kwargs["data_dir"] = entry.data_dir

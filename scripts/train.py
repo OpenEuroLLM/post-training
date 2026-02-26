@@ -43,8 +43,6 @@ import os
 import sys
 from pathlib import Path
 
-import yaml
-
 # Ensure the project root is on ``sys.path`` so that ``post_training`` is
 # importable when running directly (``python scripts/train.py``).
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -84,9 +82,7 @@ def main() -> None:
 
     # ── Offline mode ────────────────────────────────────────────────
     if config.offline:
-        logger.info(
-            "Offline mode ON — disabling all HuggingFace and wandb network calls."
-        )
+        logger.info("Offline mode ON — disabling all HuggingFace and wandb network calls.")
         os.environ["HF_HUB_OFFLINE"] = "1"
         os.environ["HF_DATASETS_OFFLINE"] = "1"
         os.environ["TRANSFORMERS_OFFLINE"] = "1"

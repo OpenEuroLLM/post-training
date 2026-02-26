@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Registry
@@ -52,9 +53,7 @@ def get_transform(name: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
     """
     if name not in TRANSFORM_REGISTRY:
         available = ", ".join(sorted(TRANSFORM_REGISTRY.keys())) or "(none)"
-        raise KeyError(
-            f"Transform '{name}' not found. Available transforms: {available}"
-        )
+        raise KeyError(f"Transform '{name}' not found. Available transforms: {available}")
     return TRANSFORM_REGISTRY[name]
 
 
@@ -73,9 +72,7 @@ def rename_to_messages(example: dict[str, Any]) -> dict[str, Any]:
     for key in ("conversation", "conversations", "dialog"):
         if key in example:
             return {"messages": example[key]}
-    raise KeyError(
-        f"Could not find a conversation column in keys: {list(example.keys())}"
-    )
+    raise KeyError(f"Could not find a conversation column in keys: {list(example.keys())}")
 
 
 @register_transform("instruction_response_to_messages")
@@ -108,12 +105,8 @@ def smoltalk2(example: dict[str, Any]) -> dict[str, Any]:
     """
     chat_template_kwargs = example.get("chat_template_kwargs", {})
     if (
-        chat_template_kwargs.get("python_tools")
-        and len(chat_template_kwargs["python_tools"]) > 0
-    ) or (
-        chat_template_kwargs.get("xml_tools")
-        and len(chat_template_kwargs["xml_tools"]) > 0
-    ):
+        chat_template_kwargs.get("python_tools") and len(chat_template_kwargs["python_tools"]) > 0
+    ) or (chat_template_kwargs.get("xml_tools") and len(chat_template_kwargs["xml_tools"]) > 0):
         return {"messages": []}
 
     messages = [example["messages"][0]]
@@ -324,11 +317,7 @@ def comparia_votes(example: dict[str, Any]) -> dict[str, Any]:
             merged_messages.append(message)
 
     # Keep only content and role keys.
-    return {
-        "messages": [
-            {"content": m["content"], "role": m["role"]} for m in merged_messages
-        ]
-    }
+    return {"messages": [{"content": m["content"], "role": m["role"]} for m in merged_messages]}
 
 
 @register_transform("ultrafeedback")

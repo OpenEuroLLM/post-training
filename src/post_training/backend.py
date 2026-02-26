@@ -1,5 +1,4 @@
-"""Training backend dispatch.
-"""
+"""Training backend dispatch."""
 
 from __future__ import annotations
 
@@ -85,13 +84,10 @@ class TRLBackend(Backend):
         if config.container.image:
             if not config.container.bind_mounts:
                 raise ValueError(
-                    "container.bind_mounts must be non-empty when "
-                    "container.image is set."
+                    "container.bind_mounts must be non-empty when container.image is set."
                 )
             if not config.container.env_file:
-                raise ValueError(
-                    "container.env_file must be set when container.image is set."
-                )
+                raise ValueError("container.env_file must be set when container.image is set.")
 
         t = config.training
 
@@ -133,9 +129,7 @@ class TRLBackend(Backend):
                     "when sft.packing=true."
                 )
             if t.num_training_tokens <= 0:
-                raise ValueError(
-                    "training.num_training_tokens must be a positive integer."
-                )
+                raise ValueError("training.num_training_tokens must be a positive integer.")
             if config.sft.max_seq_length <= 0:
                 raise ValueError("sft.max_seq_length must be positive.")
 
@@ -144,9 +138,7 @@ class TRLBackend(Backend):
 
         if t.num_training_samples is not None:
             if t.num_training_samples <= 0:
-                raise ValueError(
-                    "training.num_training_samples must be a positive integer."
-                )
+                raise ValueError("training.num_training_samples must be a positive integer.")
             t.max_steps = math.ceil(t.num_training_samples / t.effective_batch_size)
 
     def generate_run_name(self, config: PostTrainingConfig, timestamp: str) -> str:
@@ -165,9 +157,7 @@ class TRLBackend(Backend):
         if config.container.image:
             from post_training.slurm.launcher import render_trl_container_slurm_script
 
-            return render_trl_container_slurm_script(
-                config, run_dir, frozen_config_path
-            )
+            return render_trl_container_slurm_script(config, run_dir, frozen_config_path)
 
         from post_training.slurm.launcher import render_trl_slurm_script
 
@@ -185,13 +175,9 @@ class TRLBackend(Backend):
 class LlamaFactoryBackend(Backend):
     def validate(self, config: PostTrainingConfig) -> None:
         if not config.llamafactory:
-            raise ValueError(
-                "llamafactory must be set when backend='llamafactory'."
-            )
+            raise ValueError("llamafactory must be set when backend='llamafactory'.")
         if not config.container.image:
-            raise ValueError(
-                "container.image must be set when backend='llamafactory'."
-            )
+            raise ValueError("container.image must be set when backend='llamafactory'.")
 
     def generate_run_name(self, config: PostTrainingConfig, timestamp: str) -> str:
         return f"llamafactory-{config.method}-{timestamp}"
@@ -223,7 +209,5 @@ _BACKENDS: dict[str, Backend] = {
 def get_backend(name: str) -> Backend:
     """Return the backend implementation for *name*."""
     if name not in _BACKENDS:
-        raise ValueError(
-            f"Unknown backend '{name}'. Supported: {', '.join(_BACKENDS)}"
-        )
+        raise ValueError(f"Unknown backend '{name}'. Supported: {', '.join(_BACKENDS)}")
     return _BACKENDS[name]

@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING, Callable, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from datasets import Dataset, interleave_datasets, load_dataset
 
@@ -38,8 +39,8 @@ def _resolve_num_proc(configured: int | None) -> int:
 
 
 def load_and_mix_datasets(
-    config: "DataConfig",
-    row_filter: Optional[Callable[[dict], bool]] = None,
+    config: DataConfig,
+    row_filter: Callable[[dict], bool] | None = None,
 ) -> Dataset:
     """Load, transform, and optionally filter/mix datasets.
 

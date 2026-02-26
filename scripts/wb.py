@@ -19,7 +19,6 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 # Ensure the project root is on ``sys.path`` so that ``post_training`` is
 # importable when running directly (``python scripts/wb.py``).
@@ -32,7 +31,7 @@ from post_training.utils.logging import setup_logging  # noqa: E402
 logger = logging.getLogger(__name__)
 
 
-def extract_run_name_from_log(debug_log: Path) -> Optional[str]:
+def extract_run_name_from_log(debug_log: Path) -> str | None:
     """Extract run_name from wandb debug.log file.
 
     The run_name is stored in the config dictionary logged to debug.log.
@@ -54,9 +53,7 @@ def extract_run_name_from_log(debug_log: Path) -> Optional[str]:
     return None
 
 
-def map_wandb_runs_to_training_runs(
-    wandb_dir: Path, outputs_dir: Path
-) -> list[dict[str, str]]:
+def map_wandb_runs_to_training_runs(wandb_dir: Path, outputs_dir: Path) -> list[dict[str, str]]:
     """Map wandb offline runs to training output runs.
 
     Returns a list of mappings with keys:
@@ -177,9 +174,7 @@ def sync_command(args: argparse.Namespace) -> None:
             print()
 
         print("=" * 80)
-        print(
-            "Enter run numbers to sync (comma-separated, e.g., 1,3,5) or 'all' for all:"
-        )
+        print("Enter run numbers to sync (comma-separated, e.g., 1,3,5) or 'all' for all:")
         selection = input("> ").strip()
 
         if selection.lower() == "all":
@@ -188,13 +183,9 @@ def sync_command(args: argparse.Namespace) -> None:
             try:
                 selected_indices = [int(x.strip()) - 1 for x in selection.split(",")]
                 # Validate indices
-                selected_indices = [
-                    i for i in selected_indices if 0 <= i < len(mappings)
-                ]
+                selected_indices = [i for i in selected_indices if 0 <= i < len(mappings)]
             except ValueError:
-                logger.error(
-                    "Invalid selection. Please enter numbers separated by commas."
-                )
+                logger.error("Invalid selection. Please enter numbers separated by commas.")
                 return
 
         if not selected_indices:
@@ -242,9 +233,7 @@ def sync_command(args: argparse.Namespace) -> None:
 
     else:
         # This should not happen due to the default logic above, but keep as safety check
-        logger.error(
-            "Invalid arguments. Use --interactive, --run-name, or --wandb-folder."
-        )
+        logger.error("Invalid arguments. Use --interactive, --run-name, or --wandb-folder.")
         sys.exit(1)
 
 

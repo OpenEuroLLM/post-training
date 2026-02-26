@@ -18,4 +18,3 @@ def setup_logging(level: int = logging.INFO) -> None:
         handlers=[logging.StreamHandler(sys.stdout)],
         force=True,
     )
-

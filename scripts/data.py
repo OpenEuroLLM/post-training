@@ -81,9 +81,7 @@ def _print_sample(idx: int, data: Any) -> None:
 def _parse_inspect_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Add arguments for the inspect command."""
     parser.add_argument("--config", default="configs/trl/sft.yaml")
-    parser.add_argument(
-        "--num-samples", type=int, default=3, help="Number of samples to inspect."
-    )
+    parser.add_argument("--num-samples", type=int, default=3, help="Number of samples to inspect.")
     parser.add_argument(
         "--show-raw",
         action="store_true",
@@ -102,9 +100,7 @@ def _parse_inspect_args(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
     parser.add_argument(
         "--show-tokens", action="store_true", help="Show token IDs and decoded tokens."
     )
-    parser.add_argument(
-        "--show-stats", action="store_true", help="Show dataset-level statistics."
-    )
+    parser.add_argument("--show-stats", action="store_true", help="Show dataset-level statistics.")
     return parser
 
 
@@ -165,9 +161,7 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
                     row = get_transform(entry.transform)(row)
                 messages = _extract_messages(row)
                 if messages is None:
-                    print(
-                        f"\n  [Sample {i}] <no message column found in: {list(row.keys())}>"
-                    )
+                    print(f"\n  [Sample {i}] <no message column found in: {list(row.keys())}>")
                     continue
                 try:
                     formatted = tokenizer.apply_chat_template(
@@ -311,9 +305,7 @@ def _parse_args() -> tuple[argparse.Namespace, list[str]]:
         allow_abbrev=False,
     )
 
-    subparsers = parser.add_subparsers(
-        dest="command", help="Command to run", required=True
-    )
+    subparsers = parser.add_subparsers(dest="command", help="Command to run", required=True)
 
     # Inspect command
     inspect_parser = subparsers.add_parser(

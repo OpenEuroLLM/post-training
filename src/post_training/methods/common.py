@@ -33,9 +33,7 @@ _TORCH_DTYPE_MAP: dict[str, torch.dtype] = {
 def resolve_torch_dtype(name: str) -> torch.dtype:
     """Map a string like ``"bfloat16"`` to a :class:`torch.dtype`."""
     if name not in _TORCH_DTYPE_MAP:
-        raise ValueError(
-            f"Unknown torch_dtype '{name}'. Choose from {list(_TORCH_DTYPE_MAP)}"
-        )
+        raise ValueError(f"Unknown torch_dtype '{name}'. Choose from {list(_TORCH_DTYPE_MAP)}")
     return _TORCH_DTYPE_MAP[name]
 
 

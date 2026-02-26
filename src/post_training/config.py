@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 from omegaconf import MISSING, DictConfig, OmegaConf
@@ -48,10 +48,10 @@ class GradientCheckpointingKwargs:
 class TrainingConfig:
     """Core training hyper-parameters shared across all methods."""
 
-    max_steps: Optional[int] = None
-    num_train_epochs: Optional[float] = None
-    num_training_samples: Optional[int] = None
-    num_training_tokens: Optional[int] = None
+    max_steps: int | None = None
+    num_train_epochs: float | None = None
+    num_training_samples: int | None = None
+    num_training_tokens: int | None = None
 
     learning_rate: float = 2.0e-5
     effective_batch_size: int = 512
@@ -61,7 +61,9 @@ class TrainingConfig:
     lr_scheduler_kwargs: LRSchedulerKwargs = field(default_factory=LRSchedulerKwargs)
 
     gradient_checkpointing: bool = True
-    gradient_checkpointing_kwargs: GradientCheckpointingKwargs = field(default_factory=GradientCheckpointingKwargs)
+    gradient_checkpointing_kwargs: GradientCheckpointingKwargs = field(
+        default_factory=GradientCheckpointingKwargs
+    )
     bf16: bool = True
     seed: int = 42
     use_liger_kernel: bool = True
@@ -78,7 +80,7 @@ class SFTMethodConfig:
 
     max_seq_length: int = 4096
     packing: bool = True
-    dataset_num_proc: Optional[int] = None
+    dataset_num_proc: int | None = None
 
 
 @dataclass
@@ -87,9 +89,9 @@ class DPOMethodConfig:
 
     beta: float = 5.0
     loss_type: str = "sigmoid"
-    ref_model_name_or_path: Optional[str] = None
+    ref_model_name_or_path: str | None = None
     max_seq_length: int = 2048
-    dataset_num_proc: Optional[int] = None
+    dataset_num_proc: int | None = None
 
 
 @dataclass
@@ -100,7 +102,7 @@ class CheckpointingConfig:
     save_total_limit: int = 2
     # When set to ``None`` (or a non-positive value via CLI overrides), inference
     # checkpoints are disabled and no `inference_checkpoints/` directory is created.
-    inference_checkpoint_steps: Optional[int] = 200
+    inference_checkpoint_steps: int | None = 200
     inference_checkpoint_path: str = "inference_checkpoints"
 
 
@@ -110,11 +112,11 @@ class DatasetEntry:
 
     name: str = MISSING
     path: str = MISSING
-    data_dir: Optional[str] = None
-    subset: Optional[str] = None
+    data_dir: str | None = None
+    subset: str | None = None
     split: str = "train"
     weight: float = 1.0
-    transform: Optional[str] = None
+    transform: str | None = None
 
 
 @dataclass
@@ -122,7 +124,7 @@ class DataConfig:
     """Dataset mixing and chat template selection."""
 
     chat_template: str = "default"
-    num_proc: Optional[int] = None  # None = auto (capped at 32)
+    num_proc: int | None = None  # None = auto (capped at 32)
     datasets: list[DatasetEntry] = field(default_factory=list)
 
 
@@ -130,7 +132,7 @@ class DataConfig:
 class DeepSpeedConfig:
     """Pointer to the DeepSpeed YAML config file.  Set to ``null`` to disable."""
 
-    config_path: Optional[str] = "configs/deepspeed/zero2.yaml"
+    config_path: str | None = "configs/deepspeed/zero2.yaml"
 
 
 @dataclass
@@ -159,9 +161,9 @@ class LoggingConfig:
 class ContainerConfig:
     """Singularity / Apptainer container settings."""
 
-    image: Optional[str] = None  
+    image: str | None = None
     bind_mounts: list[str] = field(default_factory=list)
-    env_file: Optional[str] = None 
+    env_file: str | None = None
 
 
 @dataclass
@@ -206,10 +208,10 @@ class PostTrainingConfig:
     """Root configuration that composes every sub-config."""
 
     method: str = "sft"
-    run_name: Optional[str] = None
+    run_name: str | None = None
     offline: bool = False
-    backend: str = "trl"  
-    llamafactory: Optional[dict] = None
+    backend: str = "trl"
+    llamafactory: dict | None = None
     container: ContainerConfig = field(default_factory=ContainerConfig)
 
     model: ModelConfig = field(default_factory=ModelConfig)
@@ -238,7 +240,7 @@ class PostTrainingConfig:
         cls,
         yaml_path: str | Path,
         cli_overrides: list[str] | None = None,
-    ) -> "PostTrainingConfig":
+    ) -> PostTrainingConfig:
         """Load config from *yaml_path*, merge CLI dot-list overrides, validate.
 
         Parameters

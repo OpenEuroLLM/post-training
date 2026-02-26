@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from post_training.config import PostTrainingConfig
 
 
-def build_trainer(config: "PostTrainingConfig", run_dir: Path) -> "Trainer":
+def build_trainer(config: PostTrainingConfig, run_dir: Path) -> Trainer:
     """Build the trainer for the configured method.
 
     Parameters

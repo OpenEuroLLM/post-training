@@ -142,8 +142,7 @@ def render_llamafactory_slurm_script(
     config: PostTrainingConfig,
     run_dir: Path,
 ) -> Path:
-    """Render the LlamaFactory SLURM batch script into *run_dir/slurm/job.sh*.
-    """
+    """Render the LlamaFactory SLURM batch script into *run_dir/slurm/job.sh*."""
     env = Environment(
         loader=FileSystemLoader(str(_TEMPLATE_DIR)),
         keep_trailing_newline=True,
@@ -216,7 +215,5 @@ def generate_and_submit(
     """
     from post_training.backend import get_backend
 
-    script_path = get_backend(config.backend).render_slurm_script(
-        config, run_dir, config_path
-    )
+    script_path = get_backend(config.backend).render_slurm_script(config, run_dir, config_path)
     return submit_job(script_path)
