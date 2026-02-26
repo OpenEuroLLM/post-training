@@ -1,7 +1,10 @@
 name: PR Conventional Commit Validation
 
 on:
+  workflow_dispatch:
   pull_request:
+    branches:
+      - main
     types: [opened, synchronize, reopened, edited]
 
 jobs:
