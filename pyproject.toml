@@ -30,7 +30,7 @@ trl = [
     "tensorboard",
 ]
 flash-attn-2 = ["flash-attn"]
-dev = ["jupyter"]
+dev = ["pre-commit"]
 
 [tool.uv.sources]
 torch = { index = "pytorch-cuda" }
@@ -45,6 +45,21 @@ flash_attn_3 = [
     { url = "https://github.com/windreamer/flash-attention3-wheels/releases/download/2026.02.12-d57f6d8/flash_attn_3-3.0.0+20260212.cu130torch2100cxx11abitrue.c4d8b0-cp39-abi3-linux_aarch64.whl", marker = "platform_machine == 'aarch64'" },
     { url = "https://github.com/windreamer/flash-attention3-wheels/releases/download/2026.02.12-d57f6d8/flash_attn_3-3.0.0+20260212.cu130torch2100cxx11abitrue.c4d8b0-cp39-abi3-linux_x86_64.whl", marker = "platform_machine == 'x86_64'" },
 ]
+
+[tool.black]
+line-length = 100
+target-version = ["py313"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501", "E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["post_training"]
 
 [[tool.uv.index]]
 name = "pytorch-cuda"

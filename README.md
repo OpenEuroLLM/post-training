@@ -31,6 +31,26 @@ This project uses `uv` for dependency management. To create the Python environme
 uv sync
 ```
 
+To include dev dependencies (required for pre-commit):
+
+```bash
+uv sync --extra dev
+```
+
+### Pre-commit Hooks
+
+This project uses [pre-commit](https://pre-commit.com) with **ruff** (lint + format) and **black** (format). To install the hooks:
+
+```bash
+uv run pre-commit install
+```
+
+Hooks will now run automatically on every `git commit`. To run them manually against all files:
+
+```bash
+uv run pre-commit run --all-files
+```
+
 ### Local Training (Single-Node)
 
 To run training locally, use `accelerate launch`. You must specify the distributed flags explicitly.
