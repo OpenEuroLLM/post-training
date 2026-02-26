@@ -35,10 +35,21 @@ class LRSchedulerKwargs:
 
 
 @dataclass
+class GradientCheckpointingKwargs:
+    """Extra keyword arguments forwarded to ``gradient_checkpointing_enable()``."""
+
+    use_reentrant: bool = False
+    determinism_check: str = "default"
+    debug: bool = False
+    early_stop: bool = True
+
+
+@dataclass
 class TrainingConfig:
     """Core training hyper-parameters shared across all methods."""
 
     max_steps: Optional[int] = None
+    num_train_epochs: Optional[float] = None
     num_training_samples: Optional[int] = None
     num_training_tokens: Optional[int] = None
 
@@ -50,6 +61,7 @@ class TrainingConfig:
     lr_scheduler_kwargs: LRSchedulerKwargs = field(default_factory=LRSchedulerKwargs)
 
     gradient_checkpointing: bool = True
+    gradient_checkpointing_kwargs: GradientCheckpointingKwargs = field(default_factory=GradientCheckpointingKwargs)
     bf16: bool = True
     seed: int = 42
     use_liger_kernel: bool = True
@@ -66,6 +78,7 @@ class SFTMethodConfig:
 
     max_seq_length: int = 4096
     packing: bool = True
+    dataset_num_proc: Optional[int] = None
 
 
 @dataclass
@@ -76,6 +89,7 @@ class DPOMethodConfig:
     loss_type: str = "sigmoid"
     ref_model_name_or_path: Optional[str] = None
     max_seq_length: int = 2048
+    dataset_num_proc: Optional[int] = None
 
 
 @dataclass
@@ -157,11 +171,13 @@ class SlurmConfig:
     partition: str = "gpu"
     num_nodes: int = 1
     gpus_per_node: int = 4
-    cpus_per_gpu: int = 32
+    cpus_per_task: int = 32
     wall_time: str = "02:00:00"
     job_name: str = "post-training"
     signal_time_seconds: int = 300
     max_failures: int = 3
+    modules: list[str] = field(default_factory=list)
+    module_purge: bool = False
 
 
 @dataclass

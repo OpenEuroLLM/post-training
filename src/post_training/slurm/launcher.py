@@ -59,10 +59,12 @@ def render_trl_slurm_script(
         partition=config.slurm.partition,
         num_nodes=config.slurm.num_nodes,
         gpus_per_node=config.slurm.gpus_per_node,
-        cpus_per_gpu=config.slurm.cpus_per_gpu,
+        cpus_per_task=config.slurm.cpus_per_task,
         wall_time=config.slurm.wall_time,
         signal_time_seconds=config.slurm.signal_time_seconds,
         max_failures=config.slurm.max_failures,
+        modules=config.slurm.modules,
+        module_purge=config.slurm.module_purge,
         run_dir=str(run_dir),
         config_path=config_path,
         # Accelerate flags

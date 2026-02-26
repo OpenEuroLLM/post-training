@@ -24,6 +24,7 @@ from post_training.config import PostTrainingConfig
 from post_training.slurm.launcher import generate_and_submit
 from post_training.utils.logging import setup_logging
 from post_training.utils.paths import setup_run_directory
+from post_training.utils.prefetch import prefetch_assets
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,13 @@ def main() -> None:
     config_path, cli_overrides = _parse_args()
     logger.info("Loading config from %s", config_path)
     config = PostTrainingConfig.load(config_path, cli_overrides)
+
+    if config.offline:
+        logger.info(
+            "offline=True: pre-fetching models and datasets on the login node "
+            "before submitting the job."
+        )
+        prefetch_assets(config)
 
     # Set up the run directory (so the SLURM script can reference it).
     run_dir = setup_run_directory(config)

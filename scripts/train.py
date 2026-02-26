@@ -99,7 +99,7 @@ def main() -> None:
     # ── Debug mode overrides ────────────────────────────────────────
     if config.debug.enabled:
         logger.info("Debug mode ON — training for %d steps.", config.training.max_steps)
-        config.logging.report_to = "none"
+        config.logging.report_to = ["none"]
 
     # ── Set up run directory ────────────────────────────────────────
     run_dir = setup_run_directory(config)

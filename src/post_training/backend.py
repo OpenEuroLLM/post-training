@@ -100,23 +100,31 @@ class TRLBackend(Backend):
         if t.per_device_train_batch_size <= 0:
             raise ValueError("training.per_device_train_batch_size must be positive.")
 
+        # Training length: exactly one of max_steps / num_train_epochs /
+        # num_training_samples / num_training_tokens must be specified.
         length_fields = {
             "training.max_steps": t.max_steps,
+            "training.num_train_epochs": t.num_train_epochs,
             "training.num_training_samples": t.num_training_samples,
             "training.num_training_tokens": t.num_training_tokens,
         }
         specified = [name for name, value in length_fields.items() if value is not None]
         if len(specified) == 0:
             raise ValueError(
-                "Exactly one of training.max_steps, training.num_training_samples, "
-                "or training.num_training_tokens must be specified."
+                "Exactly one of training.max_steps, training.num_train_epochs, "
+                "training.num_training_samples, or training.num_training_tokens "
+                "must be specified."
             )
         if len(specified) > 1:
             raise ValueError(
                 "Training length is over-specified. Choose exactly one of "
-                f"training.max_steps, training.num_training_samples, or "
-                f"training.num_training_tokens. You set: {', '.join(specified)}."
+                "training.max_steps, training.num_train_epochs, "
+                "training.num_training_samples, or training.num_training_tokens. "
+                f"You set: {', '.join(specified)}."
             )
+
+        if t.num_train_epochs is not None and t.num_train_epochs <= 0:
+            raise ValueError("training.num_train_epochs must be a positive number.")
 
         if t.num_training_tokens is not None:
             if config.method != "sft" or not config.sft.packing:

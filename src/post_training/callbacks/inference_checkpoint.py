@@ -43,7 +43,7 @@ class InferenceCheckpointCallback(TrainerCallback):
         state: TrainerState,
         control: TrainerControl,
         model=None,
-        tokenizer=None,
+        processing_class=None,
         **kwargs,
     ) -> None:
         # Treat non-positive save interval as \"disabled\" (extra safety in case of
@@ -72,5 +72,5 @@ class InferenceCheckpointCallback(TrainerCallback):
 
         if model is not None:
             model.save_pretrained(save_path)
-        if tokenizer is not None:
-            tokenizer.save_pretrained(save_path)
+        if processing_class is not None:
+            processing_class.save_pretrained(save_path)

@@ -9,13 +9,23 @@
 #SBATCH --nodes={{ num_nodes }}
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:{{ gpus_per_node }}
-#SBATCH --cpus-per-gpu={{ cpus_per_gpu }}
+#SBATCH --cpus-per-task={{ cpus_per_task }}
 #SBATCH --time={{ wall_time }}
 #SBATCH --signal=B:USR1@{{ signal_time_seconds }}
 #SBATCH --output={{ run_dir }}/slurm/slurm-%j.out
 #SBATCH --error={{ run_dir }}/slurm/slurm-%j.err
 #SBATCH --open-mode=append
 
+{% if modules %}
+# ── Environment modules ────────────────────────────────────────────────────
+{% if module_purge %}
+module purge
+{% endif %}
+{% for mod in modules %}
+module load {{ mod }}
+{% endfor %}
+
+{% endif %}
 # ── Explicit multi-node setup ──────────────────────────────────────────────
 export MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 export MASTER_PORT=29500
