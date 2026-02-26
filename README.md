@@ -10,7 +10,7 @@ This repo supports two training backends:
 
 - [Quick Start](#quick-start)
 - [Project Structure](#-project-structure)
-- [Configuration Philosophy](#-configuration-philosophy)
+- [Design Philosophy](#-design-philosophy)
 - [Feature Guide](#-feature-guide)
   - [Training Methods](#1-training-methods)
   - [Data Pipeline](#2-data-pipeline)
@@ -131,18 +131,23 @@ post-training/
 └── pyproject.toml
 ```
 
-## 🛠 Configuration Philosophy
+## 🛠 Design Philosophy
 
-### The golden rule
+### 1. One YAML to config them all
 
-All run configuration lives in a **single YAML file**.
+This is the golden rule: *all run configuration lives in a **single YAML file**.*
 
-You do not need to edit Python scripts to change hyperparameters, models, or data mixtures.
+This YAML file specifies:
+- The hyper-parameters of the target script
+- The SLURM configuration, which might be cluster-specific
+- The Singularity container to use, if applicable
+
+You do not need to edit Python scripts to change these settings. Either:
 
 - Override any YAML value via the CLI using **dot-notation**
 - Or create a new YAML config specific to your run
 
-### Example: overriding the config via CLI
+####  Example: overriding the config via CLI
 
 ```bash
 scripts/train.py \
@@ -151,6 +156,28 @@ scripts/train.py \
     training.learning_rate=5e-6 \
     sft.packing=false
 ```
+
+#### Job submission
+
+A job submission on the HPC should be a single line as follows:
+```bash
+python scripts/submit.py --config /path/to/config.yaml
+```
+
+### 2. Use Containers Where Possible
+Given the heterogeneity of cluster environments, training jobs should, where possible, run inside a [Singularity](https://docs.sylabs.io/guides/latest/user-guide/) (or Apptainer) container that bundles all required dependencies—such as PyTorch, CUDA, Flash Attention, and any cluster-specific backend libraries—into a single, portable environment, simplifying both setup and reproducibility across systems.
+
+Container images are specified in the config under `container.image`. The SLURM launcher passes the image to `singularity exec` and bind-mounts the repository into the container at runtime, so no rebuild is needed when the code changes.
+
+```yaml
+container:
+  image: /path/to/image.sif
+  bind_mounts:
+    - /data:/data
+  env_file: env/cluster.env  # optional: sourced before launch
+```
+
+Both the LlamaFactory and containerized TRL backends use this mechanism. Building containers for different HPCs is a work in progress, so if your cluster specific container is not available yet, please use the `uv` environment instead (or raise a pull request with a recipe for your cluster-specific container!). To use the `uv` environment, simply set `image` to `null`.
 
 ## 🧩 Feature Guide
 
