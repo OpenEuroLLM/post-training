@@ -11,12 +11,13 @@
 #      --rdzv_backend static \
 #      --mixed_precision bf16 \
 #      scripts/train.py \
-#      --config configs/dpo.yaml \
+#      --config configs/trl/dpo.yaml \
 #      training.max_steps=100 \
 #      offline=true
 # ============================================================================
 
 method: dpo
+backend: trl
 run_name: null                               # auto-generated from model + datasets if null
 offline: false                               # set true to disable all HuggingFace / wandb network calls
 

@@ -1,6 +1,6 @@
 {
   "long_sft": {
-    "hf_hub_url": "Harsh1729/long_sft",
+    "file_name": "path/to/Harsh1729/long_sft",
     "formatting": "sharegpt",
     "columns": {
       "messages": "messages"

@@ -22,19 +22,19 @@ From: /e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals/eval_env-ju
 
     # Core ML deps (skip torch, torchvision, torchaudio - already in base container)
     pip install --no-cache-dir \
-        "transformers>=4.51.0,<=5.0.0" \
-        "accelerate>=1.3.0,<=1.11.0" \
-        "datasets>=2.16.0,<=4.0.0" \
-        "trl>=0.18.0,<=0.24.0" \
-        "peft>=0.18.0,<=0.18.1"
+        transformers==4.51.3 \
+        accelerate==1.6.0 \
+        datasets==3.6.0 \
+        trl==0.18.1 \
+        peft==0.18.1
 
-    # Install deepspeed 
-    pip install --no-cache-dir --no-deps deepspeed
+    # Install deepspeed
+    pip install --no-cache-dir --no-deps deepspeed==0.16.7
     pip install --no-cache-dir hjson py-cpuinfo pynvml
 
     # Additional deps for TRL training
     pip install --no-cache-dir \
-        "liger-kernel>=0.5.0" \
+        liger-kernel==0.5.8 \
         sentencepiece tiktoken safetensors \
         omegaconf pyyaml pydantic \
         wandb tensorboard
