@@ -1,5 +1,5 @@
 # ============================================================================
-# DPO (Direct Preference Optimisation) Configuration
+# SFT (Supervised Fine-Tuning) Configuration
 # ============================================================================
 # Override any value via CLI dot-notation:
 #   accelerate launch \
@@ -11,14 +11,24 @@
 #      --rdzv_backend static \
 #      --mixed_precision bf16 \
 #      scripts/train.py \
-#      --config configs/dpo.yaml \
+#      --config configs/sft.yaml \
 #      training.max_steps=100 \
 #      offline=true
 # ============================================================================
 
-method: dpo
+method: sft
+backend: trl
 run_name: null                               # auto-generated from model + datasets if null
-offline: false                               # set true to disable all HuggingFace / wandb network calls
+offline: true
+
+# Container (remove or set image: null for bare-metal)
+container:
+  image: /e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals/trl-jupiter.sif
+  bind_mounts:
+    - /e/project1/jureap59/raj3:/e/project1/jureap59/raj3
+    - /e/scratch/jureap59/raj3:/e/scratch/jureap59/raj3
+    - /e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals:/e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals
+  env_file: env/jupiter.env
 
 # -- Model -------------------------------------------------------------------
 model:
@@ -29,12 +39,13 @@ model:
 # -- Training hyper-parameters -----------------------------------------------
 training:
   max_steps: 10                              # Set explicitly, OR use num_training_samples below
-  num_training_samples: null
+  num_training_samples: null                 # If set: max_steps = ceil(num_samples / effective_batch_size)
+  num_training_tokens: null                  # Only valid when sft.packing=true (max_steps = ceil(tokens / (effective_batch_size * sft.max_seq_length)))
 
-  learning_rate: 5.0e-7
-  effective_batch_size: 4
-  per_device_train_batch_size: 1
-  warmup_ratio: 0.1
+  learning_rate: 2.0e-5
+  effective_batch_size: 32                   # per_device * grad_accum * world_size
+  per_device_train_batch_size: 8
+  warmup_ratio: 0.03
   lr_scheduler_type: "cosine_with_min_lr"
   lr_scheduler_kwargs:
     min_lr_rate: 0.1
@@ -43,18 +54,16 @@ training:
   seed: 42
   use_liger_kernel: true
 
-# -- DPO method parameters ---------------------------------------------------
-dpo:
-  beta: 5.0
-  loss_type: "sigmoid"                       # "sigmoid" | "hinge" | "ipo" | etc.
-  ref_model_name_or_path: null               # null → TRL creates an implicit copy
-  max_seq_length: 2048
+# -- SFT method parameters ---------------------------------------------------
+sft:
+  max_seq_length: 4096
+  packing: true
 
 # -- Checkpointing -----------------------------------------------------------
 checkpointing:
   save_steps: 200
   save_total_limit: 2                        # Full checkpoints to keep
-  inference_checkpoint_steps: 200            # Minimal inference model interval (set to null to disable)
+  inference_checkpoint_steps: 157            # Minimal inference model interval (set to null to disable)
   inference_checkpoint_path: "inference_checkpoints"   # Relative to run dir
 
 # -- Data mix ----------------------------------------------------------------
@@ -62,18 +71,17 @@ data:
   chat_template: "olmo3"                     # Name from chat template registry
   num_proc: null                             # null = auto-detect, capped at 32
   datasets:
-    - name: "smoltalk2_preference"
-      path: "HuggingFaceTB/smoltalk2"
-      subset: "Preference"
-      split: "llama_3.1_tulu_3_8b_preference_mixture_no_think"
+    - name: "nemotron_pt_v2"
+      path: "nvidia/Nemotron-Post-Training-Dataset-v2"
+      split: "stem"
       weight: 1.0
-      transform: null                        # null = already "chosen" / "rejected" columns
+      transform: null                        # null = already conversational
 
 # -- DeepSpeed ---------------------------------------------------------------
 deepspeed:
   config_path: "configs/deepspeed/zero2.yaml"
 
-# -- Accelerate launch flags -------------------------------------------------
+# -- Accelerate launch flags (explicit multi-node control) -------------------
 accelerate:
   mixed_precision: "bf16"
   use_deepspeed: true
@@ -87,7 +95,7 @@ logging:
   report_to:
     - "wandb"
     - "tensorboard"
-  wandb_project: "dpo-training"
+  wandb_project: "sft-training"
   logging_steps: 1
   include_num_input_tokens_seen: "non_padding"
 
@@ -98,7 +106,7 @@ slurm:
   gpus_per_node: 4
   cpus_per_task: 32
   wall_time: "02:00:00"
-  job_name: "dpo-training"
+  job_name: "sft-training"
   signal_time_seconds: 300                   # SIGUSR1 sent this many seconds before timeout to trigger self-healing
   max_failures: 3                            # Self-healing retry limit
 
@@ -111,3 +119,6 @@ debug:
 paths:
   output_base: "outputs"
   debug_base: "outputs/debug"
+
+
+

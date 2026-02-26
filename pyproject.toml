@@ -4,27 +4,31 @@ version = "0.1.0"
 description = "A modular post-training framework for LLMs (SFT, DPO)"
 readme = "README.md"
 requires-python = ">=3.13,<3.15"
+# Minimal deps for job submission (scripts/submit.py).
+# Training deps live in [project.optional-dependencies.trl].
 dependencies = [
+    "omegaconf",
+    "jinja2",
+    "pyyaml",
+    "wandb",
+    "huggingface-hub",
+    "psutil",
+]
+
+[project.optional-dependencies]
+trl = [
     "torch",
     "trl",
     "deepspeed",
     "transformers",
     "datasets",
     "accelerate",
-    "omegaconf",
-    "wandb",
-    "jinja2",
-    "pyyaml",
     "kernels",
-    "huggingface-hub",
     "flash_attn_3",
-    "psutil",
     "xielu",
     "liger-kernel",
     "tensorboard",
 ]
-
-[project.optional-dependencies]
 flash-attn-2 = ["flash-attn"]
 dev = ["jupyter"]
 
@@ -48,6 +52,10 @@ url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [tool.uv]
+environments = [
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
 override-dependencies = ["nvidia-cublas==13.0.2.14"]
 
 [tool.uv.extra-build-dependencies]

@@ -16,7 +16,7 @@ accelerate launch \
     --rdzv_backend static \
     --mixed_precision bf16 \
     scripts/train.py \
-    --config configs/sft.yaml \
+    --config configs/trl/sft.yaml \
     training.max_steps=10 \
     offline=true
 
@@ -30,7 +30,7 @@ accelerate launch \
     --rdzv_backend static \
     --mixed_precision bf16 \
     scripts/train.py \
-    --config configs/dpo.yaml \
+    --config configs/trl/dpo.yaml \
     training.max_steps=10 \
     offline=true
 """
@@ -68,7 +68,7 @@ def _parse_args() -> tuple[str, list[str]]:
     parser.add_argument(
         "--config",
         type=str,
-        default="configs/sft.yaml",
+        default="configs/trl/sft.yaml",
         help="Path to the YAML config file.",
     )
     known, unknown = parser.parse_known_args()

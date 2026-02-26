@@ -1,0 +1,53 @@
+Bootstrap: localimage
+From: /e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals/eval_env-jupiter.sif
+
+%labels
+    Author raj3
+    Description TRL post-training container for Jupiter JSC cluster (ARM64 / GH200)
+
+%post
+    set -e
+
+    export DEBIAN_FRONTEND=noninteractive
+    export PIP_ROOT_USER_ACTION=ignore
+    export PYTHONNOUSERSITE=1
+    export MAX_JOBS=16
+
+    # Install system deps needed for some Python packages
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        && rm -rf /var/lib/apt/lists/*
+
+    pip install --no-cache-dir --upgrade pip packaging wheel setuptools "hatchling>=1.18.0" editables
+
+    # Core ML deps (skip torch, torchvision, torchaudio - already in base container)
+    pip install --no-cache-dir \
+        transformers==4.51.3 \
+        accelerate==1.6.0 \
+        datasets==3.6.0 \
+        trl==0.18.1 \
+        peft==0.18.1
+
+    # Install deepspeed
+    pip install --no-cache-dir --no-deps deepspeed==0.16.7
+    pip install --no-cache-dir hjson py-cpuinfo pynvml
+
+    # Additional deps for TRL training
+    pip install --no-cache-dir \
+        liger-kernel==0.5.8 \
+        sentencepiece tiktoken safetensors \
+        omegaconf pyyaml pydantic \
+        wandb tensorboard
+
+    mkdir -p /usr/local/lib/python3.12/dist-packages/torchaudio
+    echo '__version__ = "0.0.0-stub"' > /usr/local/lib/python3.12/dist-packages/torchaudio/__init__.py
+
+    # Verify key imports
+    python -c "import trl; import accelerate; import deepspeed; import transformers; print('TRL stack OK')"
+
+%environment
+    export PYTHONNOUSERSITE=1
+    export PATH="/opt/conda/bin:/usr/local/bin:$PATH"
+
+%runscript
+    exec python "$@"

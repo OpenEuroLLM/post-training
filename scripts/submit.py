@@ -34,7 +34,7 @@ def _parse_args() -> tuple[str, list[str]]:
     parser.add_argument(
         "--config",
         type=str,
-        default="configs/sft.yaml",
+        default="configs/trl/sft.yaml",
         help="Path to the YAML config file.",
     )
     known, unknown = parser.parse_known_args()
@@ -66,6 +66,11 @@ def main() -> None:
     # Freeze a copy of the config.
     frozen = run_dir / "config.yaml"
     config.save(frozen)
+
+    # Copy any backend-specific artifacts for reproducibility.
+    from post_training.backend import get_backend
+
+    get_backend(config.backend).post_freeze(config, run_dir)
 
     job_id = generate_and_submit(config, run_dir, str(frozen))
     logger.info("SLURM job submitted: %s", job_id)

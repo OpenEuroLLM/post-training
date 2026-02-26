@@ -7,7 +7,7 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
+.venv/
 
 # Runtime outputs
 outputs/
@@ -18,8 +18,18 @@ wandb/
 # SLURM logs (the ones inside outputs/ are already covered)
 slurm-*.out
 slurm-*.err
+logs/
 
 # Data selection experiments
 configs/data_selection/
 scripts/data_selection_exp.py
 scripts/playground.ipynb
+
+# Singularity containers
+*.sif
+
+# Core dumps
+core.*
+
+# Data files
+data/**/*.jsonl

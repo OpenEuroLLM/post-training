@@ -2,6 +2,10 @@
 
 A modular, configuration-driven framework for **SFT** (Supervised Fine-Tuning) and **DPO** (Direct Preference Optimization). Built on **TRL**, **DeepSpeed**, and **Accelerate** with multi-node **SLURM** support.
 
+This repo supports two training backends:
+- **TRL** -- SFT and DPO via `accelerate launch`
+- **LlamaFactory** -- SFT, DPO, long-context tuning via Singularity containers
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)
@@ -43,7 +47,7 @@ accelerate launch \
     --rdzv_backend static \
     --mixed_precision bf16 \
     scripts/train.py \
-    --config configs/sft.yaml \
+    --config configs/trl/sft.yaml \
     training.max_steps=100 \
     offline=true
 ```
@@ -60,7 +64,7 @@ accelerate launch \
     --rdzv_backend static \
     --mixed_precision bf16 \
     scripts/train.py \
-    --config configs/dpo.yaml \
+    --config configs/trl/dpo.yaml \
     training.max_steps=100 \
     offline=true
 ```
@@ -75,7 +79,7 @@ For cluster environments, use the submission script. It auto-generates a SLURM b
 - SLURM job template: `src/post_training/slurm/job.sh.jinja`
 
 ```bash
-python scripts/submit.py --config configs/sft.yaml
+python scripts/submit.py --config configs/trl/sft.yaml
 ```
 
 ## 📂 Project Structure
@@ -83,11 +87,14 @@ python scripts/submit.py --config configs/sft.yaml
 ```text
 post-training/
 ├── configs/
-│   ├── sft.yaml                  # SFT example config
-│   ├── dpo.yaml                  # DPO example config
+│   ├── trl/
+│   │   └── sft.yaml              # TRL SFT example config
+│   ├── llamafactory/
+│   │   └── long-context.yaml     # LlamaFactory long-context SFT config
 │   └── deepspeed/
 │       ├── zero2.yaml            # DeepSpeed ZeRO Stage 2 config
-│       └── zero3.yaml            # DeepSpeed ZeRO Stage 3 config
+│       ├── zero3.yaml            # DeepSpeed ZeRO Stage 3 config
+│       └── z3_partial_offload.json  # ZeRO Stage 3 with CPU offloading
 ├── src/post_training/
 │   ├── config.py                 # OmegaConf dataclass schema + validation
 │   ├── methods/                  # Trainer builders (SFT/DPO)
@@ -119,7 +126,7 @@ You do not need to edit Python scripts to change hyperparameters, models, or dat
 
 ```bash
 scripts/train.py \
-    --config configs/sft.yaml \
+    --config configs/trl/sft.yaml \
     model.name_or_path="meta-llama/Llama-3.1-8B" \
     training.learning_rate=5e-6 \
     sft.packing=false
@@ -195,8 +202,8 @@ Templates convert the list of messages into a single string for the model.
 Use the data script to debug the pipeline stages (Raw → Transformed → Formatted → Tokenized) and to compute token statistics.
 
 ```bash
-python scripts/data.py --config configs/sft.yaml --show-formatted --num-samples 3
-python scripts/data.py --config configs/sft.yaml token-stats
+python scripts/data.py --config configs/trl/sft.yaml --show-formatted --num-samples 3
+python scripts/data.py --config configs/trl/sft.yaml token-stats
 ```
 
 ### 3. Training Length
@@ -280,7 +287,32 @@ Each run generates a unique directory based on `paths.output_base` (or `paths.de
     └── failure_count         # Tracks retries for self-healing
 ```
 
-## 📘 Configuration Reference: `configs/sft.yaml`
+## LlamaFactory Backend
+
+An alternative backend using [LlamaFactory](https://github.com/hiyouga/LlamaFactory) for training, running inside a Singularity container.
+
+### Setup
+
+1. Build the Singularity container:
+   ```bash
+   singularity build --fakeroot llamafactory.sif containers/llamafactory_jupiter.def
+   ```
+2. Set the container path in `env/jupiter.env`:
+   ```bash
+   export CONTAINER=/path/to/llamafactory.sif
+   ```
+
+### Long-Context SFT (example)
+
+```bash
+python scripts/submit.py --config configs/llamafactory/long-context.yaml
+```
+
+- Config: `configs/llamafactory/long-context.yaml`
+- DeepSpeed: `configs/deepspeed/z3_partial_offload.json`
+- Dataset registry: `data/llamafactory/dataset_info.json`
+
+## 📘 Configuration Reference: `configs/trl/sft.yaml`
 
 Full reference configuration for the default SFT setup:
 
@@ -298,12 +330,13 @@ Full reference configuration for the default SFT setup:
 #      --rdzv_backend static \
 #      --mixed_precision bf16 \
 #      scripts/train.py \
-#      --config configs/sft.yaml \
+#      --config configs/trl/sft.yaml \
 #      training.max_steps=100 \
 #      offline=true
 # ============================================================================
 
 method: sft
+backend: trl
 run_name: null                               # auto-generated from model + datasets if null
 offline: false                               # set true to disable all HuggingFace / wandb network calls
 

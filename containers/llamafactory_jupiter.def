@@ -1,0 +1,80 @@
+Bootstrap: localimage
+From: /e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals/eval_env-jupiter.sif
+
+%labels
+    Author raj3
+    Description LlamaFactory container for Jupiter JSC cluster (ARM64 / GH200)
+
+%post
+    set -e
+
+    export DEBIAN_FRONTEND=noninteractive
+    export PIP_ROOT_USER_ACTION=ignore
+    export PYTHONNOUSERSITE=1
+    export MAX_JOBS=16
+
+    # Install system deps needed for some Python packages
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        && rm -rf /var/lib/apt/lists/*
+
+    # Upgrade pip and install build tools
+    pip install --no-cache-dir --upgrade pip packaging wheel setuptools "hatchling>=1.18.0" editables
+
+    # Clone LlamaFactory and install from source (pinned commit for reproducibility)
+    git clone https://github.com/hiyouga/LlamaFactory.git /opt/LLaMA-Factory
+    cd /opt/LLaMA-Factory
+    git checkout aab9b400bb9f0582d4b88bc60f41778c3bfc20b3
+
+    # The base container has a custom NVIDIA PyTorch build (2.8.0a0+nv25.6)
+    # that conflicts with torchaudio version pinning from PyPI.
+    # Install LlamaFactory dependencies manually, skipping torch/torchaudio/torchvision
+    # (already provided by the base container), then install LlamaFactory with --no-deps.
+
+    # Core deps (skip torch, torchvision, torchaudio - already in base container)
+    pip install --no-cache-dir \
+        transformers==4.51.3 \
+        accelerate==1.6.0 \
+        peft==0.18.1 \
+        trl==0.18.1 \
+        datasets==3.6.0
+
+    # torchdata (may need special handling)
+    pip install --no-cache-dir --no-deps torchdata==0.10.0 || true
+
+    # GUI, ops, model/tokenizer, python, api deps
+    pip install --no-cache-dir \
+        gradio==5.12.0 \
+        matplotlib==3.10.1 \
+        tyro==0.8.14 \
+        einops numpy pandas scipy \
+        sentencepiece tiktoken modelscope hf-transfer safetensors \
+        av==14.0.0 fire omegaconf packaging protobuf pyyaml pydantic \
+        uvicorn fastapi sse-starlette
+
+    # Install LlamaFactory itself (no deps - already installed above)
+    pip install --no-cache-dir --no-build-isolation --no-deps "."
+
+    # Install deepspeed (needed for ZeRO / FSDP offloading)
+    pip install --no-cache-dir --no-deps deepspeed==0.16.7
+    pip install --no-cache-dir hjson py-cpuinfo pynvml
+
+    # Install metrics requirements
+    pip install --no-cache-dir -r requirements/metrics.txt || true
+
+    mkdir -p /usr/local/lib/python3.12/dist-packages/torchaudio
+    echo '__version__ = "0.0.0-stub"' > /usr/local/lib/python3.12/dist-packages/torchaudio/__init__.py
+
+    # Clean up source to reduce image size
+    cd /
+    rm -rf /opt/LLaMA-Factory
+
+    # Verify installation
+    llamafactory-cli version
+
+%environment
+    export PYTHONNOUSERSITE=1
+    export PATH="/opt/conda/bin:/usr/local/bin:$PATH"
+
+%runscript
+    exec llamafactory-cli "$@"

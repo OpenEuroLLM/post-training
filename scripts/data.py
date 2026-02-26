@@ -8,16 +8,16 @@ Commands:
 Usage
 -----
 # Inspect data
-python scripts/data.py inspect --config configs/sft.yaml \\
+python scripts/data.py inspect --config configs/trl/sft.yaml \\
     --show-raw --show-transformed --show-formatted --show-tokens \\
     --num-samples 3
 
 # Count tokens using config file
-python scripts/data.py token-stats --config configs/sft.yaml
+python scripts/data.py token-stats --config configs/trl/sft.yaml
 
 Any extra arguments are forwarded as OmegaConf dot-list overrides::
 
-    python scripts/data.py inspect --config configs/sft.yaml \\
+    python scripts/data.py inspect --config configs/trl/sft.yaml \\
         --show-stats training.max_steps=5 offline=true
 """
 
@@ -80,7 +80,7 @@ def _print_sample(idx: int, data: Any) -> None:
 
 def _parse_inspect_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Add arguments for the inspect command."""
-    parser.add_argument("--config", default="configs/sft.yaml")
+    parser.add_argument("--config", default="configs/trl/sft.yaml")
     parser.add_argument(
         "--num-samples", type=int, default=3, help="Number of samples to inspect."
     )

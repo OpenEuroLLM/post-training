@@ -6,7 +6,6 @@ YAML loading, merging, and CLI overrides.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -157,6 +156,15 @@ class LoggingConfig:
 
 
 @dataclass
+class ContainerConfig:
+    """Singularity / Apptainer container settings."""
+
+    image: Optional[str] = None  
+    bind_mounts: list[str] = field(default_factory=list)
+    env_file: Optional[str] = None 
+
+
+@dataclass
 class SlurmConfig:
     """SLURM job scheduler parameters."""
 
@@ -193,9 +201,6 @@ class PathsConfig:
 # ---------------------------------------------------------------------------
 
 
-_SUPPORTED_METHODS = ("sft", "dpo")
-
-
 @dataclass
 class PostTrainingConfig:
     """Root configuration that composes every sub-config."""
@@ -203,6 +208,9 @@ class PostTrainingConfig:
     method: str = "sft"
     run_name: Optional[str] = None
     offline: bool = False
+    backend: str = "trl"  
+    llamafactory: Optional[dict] = None
+    container: ContainerConfig = field(default_factory=ContainerConfig)
 
     model: ModelConfig = field(default_factory=ModelConfig)
     training: TrainingConfig = field(default_factory=TrainingConfig)
@@ -271,71 +279,9 @@ class PostTrainingConfig:
 
     def _validate(self) -> None:
         """Run cross-field validation and compute derived values."""
-        # Validate training method.
-        if self.method not in _SUPPORTED_METHODS:
-            raise ValueError(
-                f"Unknown method '{self.method}'. "
-                f"Supported methods: {', '.join(_SUPPORTED_METHODS)}"
-            )
+        from post_training.backend import get_backend
 
-        t = self.training
-
-        # Validate effective batch size.
-        if t.effective_batch_size <= 0:
-            raise ValueError("training.effective_batch_size must be positive.")
-        if t.per_device_train_batch_size <= 0:
-            raise ValueError("training.per_device_train_batch_size must be positive.")
-
-        # Training length: exactly one of max_steps / num_train_epochs /
-        # num_training_samples / num_training_tokens must be specified.
-        length_fields = {
-            "training.max_steps": t.max_steps,
-            "training.num_train_epochs": t.num_train_epochs,
-            "training.num_training_samples": t.num_training_samples,
-            "training.num_training_tokens": t.num_training_tokens,
-        }
-        specified = [name for name, value in length_fields.items() if value is not None]
-        if len(specified) == 0:
-            raise ValueError(
-                "Exactly one of training.max_steps, training.num_train_epochs, "
-                "training.num_training_samples, or training.num_training_tokens "
-                "must be specified."
-            )
-        if len(specified) > 1:
-            raise ValueError(
-                "Training length is over-specified. Choose exactly one of "
-                "training.max_steps, training.num_train_epochs, "
-                "training.num_training_samples, or training.num_training_tokens. "
-                f"You set: {', '.join(specified)}."
-            )
-
-        if t.num_train_epochs is not None and t.num_train_epochs <= 0:
-            raise ValueError("training.num_train_epochs must be a positive number.")
-
-        # Token-based length is only supported for SFT with packing enabled.
-        if t.num_training_tokens is not None:
-            if self.method != "sft" or not self.sft.packing:
-                raise ValueError(
-                    "training.num_training_tokens is only valid for method='sft' "
-                    "when sft.packing=true."
-                )
-            if t.num_training_tokens <= 0:
-                raise ValueError(
-                    "training.num_training_tokens must be a positive integer."
-                )
-            if self.sft.max_seq_length <= 0:
-                raise ValueError("sft.max_seq_length must be positive.")
-
-            tokens_per_step = t.effective_batch_size * self.sft.max_seq_length
-            t.max_steps = math.ceil(t.num_training_tokens / tokens_per_step)
-
-        # Derive max_steps from num_training_samples when applicable.
-        if t.num_training_samples is not None:
-            if t.num_training_samples <= 0:
-                raise ValueError(
-                    "training.num_training_samples must be a positive integer."
-                )
-            t.max_steps = math.ceil(t.num_training_samples / t.effective_batch_size)
+        get_backend(self.backend).validate(self)
 
     def resolve_gradient_accumulation_steps(self, world_size: int) -> int:
         """Compute gradient accumulation steps from the effective batch size.
