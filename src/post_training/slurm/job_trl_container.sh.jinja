@@ -9,7 +9,9 @@
 #SBATCH --nodes={{ num_nodes }}
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:{{ gpus_per_node }}
+{% if cpus_per_gpu is integer and cpus_per_gpu > 0 -%}
 #SBATCH --cpus-per-gpu={{ cpus_per_gpu }}
+{% endif -%}
 #SBATCH --time={{ wall_time }}
 #SBATCH --signal=B:USR1@{{ signal_time_seconds }}
 #SBATCH --output={{ run_dir }}/slurm/slurm-%j.out

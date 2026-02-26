@@ -60,6 +60,7 @@ def render_trl_slurm_script(
         num_nodes=config.slurm.num_nodes,
         gpus_per_node=config.slurm.gpus_per_node,
         cpus_per_task=config.slurm.cpus_per_task,
+        cpus_per_gpu=config.slurm.cpus_per_gpu,
         wall_time=config.slurm.wall_time,
         signal_time_seconds=config.slurm.signal_time_seconds,
         max_failures=config.slurm.max_failures,
