@@ -1,0 +1,33 @@
+name: Bug Report
+description: Report unexpected or incorrect behavior.
+labels: ["Bug report"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the issue. What behavior is incorrect or unexpected?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide minimal steps, commands, or a short snippet to reproduce the issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: Describe the expected outcome.
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment (if relevant)
+      description: OS, Python version, CUDA version, cluster, or other relevant details.

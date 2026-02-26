@@ -1,0 +1,17 @@
+name: Feature Request
+description: Propose new functionality or improvement
+labels: ["Feature request"]
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What problem does this solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Please outline a high-level approach to solve the problem. You may include design considerations, potential challenges, and any alternatives you have considered.
