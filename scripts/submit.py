@@ -22,6 +22,7 @@ if str(_PROJECT_ROOT / "src") not in sys.path:
 
 from post_training.config import PostTrainingConfig
 from post_training.slurm.launcher import generate_and_submit
+from post_training.utils.guardrails import run_guardrails
 from post_training.utils.logging import setup_logging
 from post_training.utils.paths import setup_run_directory
 from post_training.utils.prefetch import prefetch_assets
@@ -29,7 +30,7 @@ from post_training.utils.prefetch import prefetch_assets
 logger = logging.getLogger(__name__)
 
 
-def _parse_args() -> tuple[str, list[str]]:
+def _parse_args() -> tuple[str, list[str], bool]:
     parser = argparse.ArgumentParser(description="Submit a SLURM training job.")
     parser.add_argument(
         "--config",
@@ -37,14 +38,19 @@ def _parse_args() -> tuple[str, list[str]]:
         default="configs/trl/sft.yaml",
         help="Path to the YAML config file.",
     )
+    parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="Skip the interactive guardrails review and submit immediately.",
+    )
     known, unknown = parser.parse_known_args()
-    return known.config, unknown
+    return known.config, unknown, known.confirm
 
 
 def main() -> None:
     setup_logging()
 
-    config_path, cli_overrides = _parse_args()
+    config_path, cli_overrides, confirmed = _parse_args()
     logger.info("Loading config from %s", config_path)
     config = PostTrainingConfig.load(config_path, cli_overrides)
 
@@ -58,6 +64,9 @@ def main() -> None:
     # Set up the run directory (so the SLURM script can reference it).
     run_dir = setup_run_directory(config)
     logger.info("Run directory: %s", run_dir)
+
+    if not confirmed:
+        run_guardrails(config, run_dir)
 
     # CRITICAL: Set run_name so it's preserved in the frozen config.
     # This ensures train.py uses the same directory when it loads the config.
