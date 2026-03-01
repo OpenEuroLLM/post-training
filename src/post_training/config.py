@@ -184,6 +184,26 @@ class SlurmConfig:
 
 
 @dataclass
+class ProfileConfig:
+    """Profile mode — measures GPU utilization, token throughput, and MFU."""
+
+    enabled: bool = False
+    peak_tflops: float | None = (
+        None  # bf16 peak TFLOPS override; auto-detected from GPU name if null
+    )
+
+    # PyTorch Profiler memory tracing (profile.enabled must also be true).
+    # Traces are written to <run_dir>/profiler_traces/ in TensorBoard format.
+    # Only LOCAL_RANK 0 is profiled to limit overhead.
+    memory: bool = False
+    # Profiler schedule: skip `wait` steps, warm up for `warmup` steps, then
+    # record `active` steps.  The profiler stops after one cycle.
+    profiler_wait: int = 1
+    profiler_warmup: int = 1
+    profiler_active: int = 3
+
+
+@dataclass
 class DebugConfig:
     """Debug / quick-iteration mode."""
 
@@ -229,6 +249,7 @@ class PostTrainingConfig:
     accelerate: AccelerateConfig = field(default_factory=AccelerateConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     slurm: SlurmConfig = field(default_factory=SlurmConfig)
+    profile: ProfileConfig = field(default_factory=ProfileConfig)
     debug: DebugConfig = field(default_factory=DebugConfig)
     paths: PathsConfig = field(default_factory=PathsConfig)
 

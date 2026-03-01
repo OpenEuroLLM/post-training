@@ -16,6 +16,7 @@ import torch
 from transformers import AutoTokenizer
 
 from post_training.callbacks.inference_checkpoint import InferenceCheckpointCallback
+from post_training.callbacks.throughput import ThroughputCallback
 from post_training.chat_templates.registry import get_chat_template
 
 if TYPE_CHECKING:
@@ -122,6 +123,10 @@ def build_callbacks(config: PostTrainingConfig, run_dir: Path) -> list:
     """Build the callback list (shared across methods)."""
     callbacks: list = []
 
+    # ThroughputCallback must come first so ProfileCallback can read
+    # throughput/tokens_per_gpu_per_sec from logs when computing MFU.
+    callbacks.append(ThroughputCallback())
+
     steps = config.checkpointing.inference_checkpoint_steps
     # Treat ``None`` or non-positive values as \"disabled\" for inference checkpoints.
     if steps is not None and steps > 0:
@@ -132,6 +137,25 @@ def build_callbacks(config: PostTrainingConfig, run_dir: Path) -> list:
                 save_steps=steps,
                 output_dir=inference_ckpt_dir,
             )
+        )
+
+    if config.profile.enabled:
+        from post_training.callbacks.profile import ProfileCallback
+
+        p = config.profile
+        trace_dir = run_dir / "profiler_traces" if p.memory else None
+        callbacks.append(
+            ProfileCallback(
+                peak_tflops=p.peak_tflops,
+                trace_dir=trace_dir,
+                profiler_wait=p.profiler_wait,
+                profiler_warmup=p.profiler_warmup,
+                profiler_active=p.profiler_active,
+            )
+        )
+        logger.info(
+            "profile: ProfileCallback enabled%s.",
+            f", memory trace → {trace_dir}" if trace_dir else "",
         )
 
     return callbacks

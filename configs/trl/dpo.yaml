@@ -103,6 +103,15 @@ slurm:
   signal_time_seconds: 300                   # SIGUSR1 sent this many seconds before timeout to trigger self-healing
   max_failures: 3                            # Self-healing retry limit
 
+# -- Profile mode (incurs overhead; use only for short profiling runs) -------
+profile:
+  enabled: false          # enable to log GPU utilization, TFLOPS, and MFU
+  peak_tflops: null       # bf16 peak TFLOPS override (auto-detected from GPU name if null)
+  memory: false           # run torch.profiler with profile_memory=True; traces → <run_dir>/profiler_traces/
+  profiler_wait: 1        # steps to skip before the profiler activates
+  profiler_warmup: 1      # steps to warm up (recorded but discarded)
+  profiler_active: 3      # steps to actively record (then the profiler stops)
+
 # -- Debug mode --------------------------------------------------------------
 debug:
   enabled: false
