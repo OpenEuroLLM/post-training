@@ -29,9 +29,14 @@ class ModelConfig:
 
 @dataclass
 class LRSchedulerKwargs:
-    """Extra keyword arguments forwarded to the LR scheduler."""
+    """Extra keyword arguments forwarded to the LR scheduler.
 
-    min_lr_rate: float = 0.1
+    Set ``min_lr_rate`` only for schedulers that support it (e.g.
+    ``cosine_with_min_lr``).  Leave it as ``None`` for schedulers like
+    ``linear`` that do not accept this argument.
+    """
+
+    min_lr_rate: float | None = None
 
 
 @dataclass

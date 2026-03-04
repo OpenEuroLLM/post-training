@@ -98,7 +98,9 @@ def build_common_training_kwargs(
         gradient_accumulation_steps=grad_accum,
         warmup_steps=t.warmup_ratio,
         lr_scheduler_type=t.lr_scheduler_type,
-        lr_scheduler_kwargs=dataclasses.asdict(t.lr_scheduler_kwargs),
+        lr_scheduler_kwargs={
+            k: v for k, v in dataclasses.asdict(t.lr_scheduler_kwargs).items() if v is not None
+        },
         gradient_checkpointing=t.gradient_checkpointing,
         gradient_checkpointing_kwargs=dataclasses.asdict(t.gradient_checkpointing_kwargs),
         use_liger_kernel=t.use_liger_kernel,

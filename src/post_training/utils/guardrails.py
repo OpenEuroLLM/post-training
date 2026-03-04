@@ -205,7 +205,8 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path) -> None:
     _row("Learning rate", f"{config.training.learning_rate:.2e}")
     lr_sched = config.training.lr_scheduler_type
     min_lr = config.training.lr_scheduler_kwargs.min_lr_rate
-    _row("LR scheduler", f"{lr_sched}  (min_lr_rate={min_lr})")
+    lr_sched_str = lr_sched if min_lr is None else f"{lr_sched}  (min_lr_rate={min_lr})"
+    _row("LR scheduler", lr_sched_str)
     _row("Warmup ratio", str(config.training.warmup_ratio))
     batch_line, _ = _batch_summary(config, total_gpus)
     _row("Batch sizes", batch_line)
