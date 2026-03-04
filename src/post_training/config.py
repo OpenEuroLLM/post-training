@@ -64,6 +64,10 @@ class TrainingConfig:
     warmup_ratio: float = 0.03
     lr_scheduler_type: str = "cosine_with_min_lr"
     lr_scheduler_kwargs: LRSchedulerKwargs = field(default_factory=LRSchedulerKwargs)
+    adam_beta1: float = 0.9
+    adam_beta2: float = 0.999
+    weight_decay: float = 0.0
+    adam_epsilon: float = 1e-8
 
     gradient_checkpointing: bool = True
     gradient_checkpointing_kwargs: GradientCheckpointingKwargs = field(
