@@ -3,7 +3,7 @@ name = "post-training"
 version = "0.1.0"
 description = "A modular post-training framework for LLMs (SFT, DPO)"
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.12,<3.13"
 # Minimal deps for job submission (scripts/submit.py).
 # Training deps live in [project.optional-dependencies.trl].
 dependencies = [
@@ -17,29 +17,34 @@ dependencies = [
 
 [project.optional-dependencies]
 trl = [
-    "torch==2.6.0",
-    "trl==0.29.0",
-    "deepspeed==0.18.6",
-    "transformers==5.2.0",
-    "datasets",
-    "accelerate==1.12.0",
+    "torch==2.9.1+cu126",
+    "trl",
+    "deepspeed",
+    "transformers",
+    "datasets>4.5.0",
+    "accelerate",
     "kernels",
+    "flash_attn",
+    "liger-kernel",
     "tensorboard",
-    "flash-attn",
 ]
+flash-attn-2 = ["flash-attn"]
 dev = ["pre-commit"]
 
+[tool.uv]
+extra-index-url = ["https://download.pytorch.org/whl/cu126"]
+index-strategy = "unsafe-best-match"
+
 [tool.uv.sources]
-torch = { index = "pytorch-cuda" }
-flash-attn = { url = "https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.7.16/flash_attn-2.8.3%2Bcu126torch2.6-cp313-cp313-linux_x86_64.whl" }
+flash-attn = { url = "https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.7.16/flash_attn-2.8.3%2Bcu126torch2.9-cp312-cp312-linux_x86_64.whl" }
 
 [tool.black]
 line-length = 100
-target-version = ["py313"]
+target-version = ["py312"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
@@ -48,13 +53,8 @@ ignore = ["E501", "E402"]
 [tool.ruff.lint.isort]
 known-first-party = ["post_training"]
 
-[[tool.uv.index]]
-name = "pytorch-cuda"
-url = "https://download.pytorch.org/whl/cu126"
-explicit = true
-
 [tool.uv]
 environments = [
-    "sys_platform == 'linux' and platform_machine == 'aarch64'",
-    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'"
 ]
+
