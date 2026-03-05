@@ -16,6 +16,7 @@ import torch
 from transformers import AutoTokenizer
 
 from post_training.callbacks.inference_checkpoint import InferenceCheckpointCallback
+from post_training.callbacks.mfu import MFUCallback
 from post_training.callbacks.throughput import ThroughputCallback
 from post_training.chat_templates.registry import get_chat_template
 
@@ -130,6 +131,7 @@ def build_callbacks(config: PostTrainingConfig, run_dir: Path) -> list:
     callbacks: list = []
 
     callbacks.append(ThroughputCallback())
+    callbacks.append(MFUCallback())
 
     steps = config.checkpointing.inference_checkpoint_steps
     # Treat ``None`` or non-positive values as \"disabled\" for inference checkpoints.
