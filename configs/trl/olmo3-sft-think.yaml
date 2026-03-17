@@ -1,0 +1,121 @@
+# ============================================================================
+# SFT (Supervised Fine-Tuning) Configuration
+# ============================================================================
+# Override any value via CLI dot-notation:
+#   accelerate launch \
+#      --num_machines 1 \
+#      --num_processes 4 \
+#      --dynamo_backend=inductor \
+#      --use_deepspeed \
+#      --same_network \
+#      --rdzv_backend static \
+#      --mixed_precision bf16 \
+#      scripts/train.py \
+#      --config configs/sft.yaml \
+#      training.max_steps=100 \
+#      offline=true
+# ============================================================================
+
+method: sft
+backend: trl
+run_name: null                               # auto-generated from model + datasets if null
+offline: true
+
+# Container (remove or set image: null for bare-metal)
+container:
+  image: null
+  bind_mounts:
+    - /e/project1/jureap59/raj3:/e/project1/jureap59/raj3
+    - /e/scratch/jureap59/raj3:/e/scratch/jureap59/raj3
+    - /e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals:/e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals
+  env_file: env/jupiter.env
+
+# -- Model -------------------------------------------------------------------
+model:
+  name_or_path: "allenai/Olmo-3-1025-7B"
+  attn_implementation: "flash_attention_2"
+  dtype: "bfloat16"
+
+# -- Training hyper-parameters -----------------------------------------------
+training:
+  num_train_epochs: 2
+
+  learning_rate: 5.0e-5
+  effective_batch_size: 32                   # per_device * grad_accum * world_size
+  per_device_train_batch_size: 1
+  warmup_ratio: 0.03
+  lr_scheduler_type: "linear"
+  gradient_checkpointing: true
+  bf16: true
+  seed: 42
+  use_liger_kernel: false
+
+# -- SFT method parameters ---------------------------------------------------
+sft:
+  max_seq_length: 32768
+  packing: true
+  dataset_num_proc: 28
+
+# -- Checkpointing -----------------------------------------------------------
+checkpointing:
+  save_steps: 500
+  save_total_limit: 3                        # Full checkpoints to keep
+  inference_checkpoint_steps: null           # Minimal inference model interval (set to null to disable)
+  inference_checkpoint_path: "inference_checkpoints"   # Relative to run dir
+
+# -- Data mix ----------------------------------------------------------------
+data:
+  chat_template: "olmo3"                     # Name from chat template registry
+  num_proc: null                             # null = auto-detect, capped at 32
+  datasets:
+    - name: "dolci-think-sft-7b"
+      path: "allenai/Dolci-Think-SFT-7B"
+      split: "train"
+      weight: 1.0
+      transform: null                        # null = already conversational
+
+# -- DeepSpeed ---------------------------------------------------------------
+deepspeed:
+  config_path: "configs/deepspeed/zero3.yaml"
+
+# -- Accelerate launch flags (explicit multi-node control) -------------------
+accelerate:
+  mixed_precision: "bf16"
+  use_deepspeed: true
+  deepspeed_multinode_launcher: "standard"   # "standard" | "pdsh" | etc.
+  same_network: true                         # All nodes on same network
+  rdzv_backend: "static"                     # "static" | "c10d" | "etcd"
+  dynamo_backend: "inductor"                 # "inductor" | "no" | etc.
+
+# -- Logging & tracking ------------------------------------------------------
+logging:
+  report_to:
+    - "wandb"
+    - "tensorboard"
+  wandb_project: "olmo-3-sft"
+  logging_steps: 25
+  include_num_input_tokens_seen: "non_padding"
+
+# -- SLURM -------------------------------------------------------------------
+slurm:
+  partition: "boost_usr_prod"
+  num_nodes: 1
+  gpus_per_node: 4
+  cpus_per_task: 32
+  wall_time: "02:00:00"
+  job_name: "Olmo-3-Think-SFT"
+  signal_time_seconds:  120                  # SIGUSR1 sent this many seconds before timeout to trigger self-healing
+  max_failures: 1                            # Self-healing retry limit
+  modules:
+    - cuda/12.6
+    - gcc
+
+# -- Debug mode --------------------------------------------------------------
+debug:
+  enabled: false
+  override_existing: false
+
+# -- Output paths -------------------------------------------------------------
+paths:
+  output_base: "outputs"
+  debug_base: "outputs/debug"
