@@ -59,6 +59,10 @@ def main() -> None:
     logger.info("Loading config from %s", config_path)
     config = PostTrainingConfig.load(config_path, cli_overrides)
 
+    if tokenize_only:
+        config.slurm.num_nodes = 1
+        config.slurm.gpus_per_node = 1
+
     if config.offline:
         logger.info(
             "offline=True: pre-fetching models and datasets on the login node "
