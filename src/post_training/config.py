@@ -154,6 +154,7 @@ class AccelerateConfig:
     same_network: bool = True
     rdzv_backend: str = "static"
     dynamo_backend: str = "inductor"
+    timeout_seconds: int = 1800
 
 
 @dataclass

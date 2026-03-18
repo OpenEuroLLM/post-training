@@ -63,6 +63,7 @@ export LAUNCHER="accelerate launch \
     --deepspeed_multinode_launcher {{ deepspeed_multinode_launcher }} \
 {% if same_network %}    --same_network \{% endif %}
     --rdzv_backend {{ rdzv_backend }} \
+    --timeout {{ timeout_seconds }} \
     --max_restarts 0 \
     --role \$(hostname -s): \
     scripts/train.py --config {{ config_path }}"

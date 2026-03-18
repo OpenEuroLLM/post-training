@@ -75,6 +75,7 @@ def render_trl_slurm_script(
         deepspeed_multinode_launcher=config.accelerate.deepspeed_multinode_launcher,
         same_network=config.accelerate.same_network,
         rdzv_backend=config.accelerate.rdzv_backend,
+        timeout_seconds=config.accelerate.timeout_seconds,
     )
 
     slurm_dir = run_dir / "slurm"
@@ -122,6 +123,7 @@ def render_trl_container_slurm_script(
         deepspeed_multinode_launcher=config.accelerate.deepspeed_multinode_launcher,
         same_network=config.accelerate.same_network,
         rdzv_backend=config.accelerate.rdzv_backend,
+        timeout_seconds=config.accelerate.timeout_seconds,
         # Container
         container_image=config.container.image,
         bind_mounts=config.container.bind_mounts,
