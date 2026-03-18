@@ -126,7 +126,7 @@ def _batch_summary(config: PostTrainingConfig, total_gpus: int) -> tuple[str, st
 # ---------------------------------------------------------------------------
 
 
-def run_guardrails(config: PostTrainingConfig, run_dir: Path) -> None:
+def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: bool = False) -> None:
     """Print a full config summary and ask for confirmation.
 
     Parameters
@@ -261,6 +261,12 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path) -> None:
         _row("Debug mode", _red("*** ENABLED — output dir may be overwritten ***"), warn=True)
     else:
         _row("Debug mode", "disabled")
+    if tokenize_only:
+        _row(
+            "Tokenize only",
+            _yellow("*** ENABLED — will exit after trainer init, no training ***"),
+            warn=True,
+        )
 
     # ------------------------------------------------------------------
     # Final confirmation
