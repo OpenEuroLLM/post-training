@@ -35,6 +35,8 @@ export MASTER_PORT=29500
 export NUM_NODES={{ num_nodes }}
 export GPUS_PER_NODE={{ gpus_per_node }}
 export WORLD_SIZE=$(( $NUM_NODES * $GPUS_PER_NODE ))
+export NCCL_TIMEOUT=$(( {{ timeout_seconds }} * 1000 ))  # milliseconds
+export NCCL_ASYNC_ERROR_HANDLING=1
 
 # ── Self-healing machinery ─────────────────────────────────────────────────
 FAILURE_COUNT_FILE="{{ run_dir }}/slurm/failure_count"
@@ -63,7 +65,6 @@ export LAUNCHER="accelerate launch \
     --deepspeed_multinode_launcher {{ deepspeed_multinode_launcher }} \
 {% if same_network %}    --same_network \{% endif %}
     --rdzv_backend {{ rdzv_backend }} \
-    --timeout {{ timeout_seconds }} \
     --max_restarts 0 \
     --role \$(hostname -s): \
     scripts/train.py --config {{ config_path }}"
