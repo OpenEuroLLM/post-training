@@ -43,14 +43,19 @@ def _parse_args() -> tuple[str, list[str], bool]:
         action="store_true",
         help="Skip the interactive guardrails review and submit immediately.",
     )
+    parser.add_argument(
+        "--tokenize-only",
+        action="store_true",
+        help="Pass --tokenize-only to train.py — exits after trainer initialization.",
+    )
     known, unknown = parser.parse_known_args()
-    return known.config, unknown, known.confirm
+    return known.config, unknown, known.confirm, known.tokenize_only
 
 
 def main() -> None:
     setup_logging()
 
-    config_path, cli_overrides, confirmed = _parse_args()
+    config_path, cli_overrides, confirmed, tokenize_only = _parse_args()
     logger.info("Loading config from %s", config_path)
     config = PostTrainingConfig.load(config_path, cli_overrides)
 
@@ -66,7 +71,7 @@ def main() -> None:
     logger.info("Run directory: %s", run_dir)
 
     if not confirmed:
-        run_guardrails(config, run_dir)
+        run_guardrails(config, run_dir, tokenize_only=tokenize_only)
 
     # CRITICAL: Set run_name so it's preserved in the frozen config.
     # This ensures train.py uses the same directory when it loads the config.
