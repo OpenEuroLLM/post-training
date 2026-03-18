@@ -69,14 +69,19 @@ def _parse_args() -> tuple[str, list[str]]:
         default="configs/trl/sft.yaml",
         help="Path to the YAML config file.",
     )
+    parser.add_argument(
+        "--tokenize-only",
+        action="store_true",
+        help="Exit after initializing the trainer (useful for verifying tokenization).",
+    )
     known, unknown = parser.parse_known_args()
-    return known.config, unknown
+    return known.config, known.tokenize_only, unknown
 
 
 def main() -> None:
     setup_logging()
 
-    config_path, cli_overrides = _parse_args()
+    config_path, tokenize_only, cli_overrides = _parse_args()
     logger.info("Loading config from %s", config_path)
     config = PostTrainingConfig.load(config_path, cli_overrides)
 
@@ -107,6 +112,10 @@ def main() -> None:
 
     # ── Build trainer & launch ──────────────────────────────────────
     trainer = build_trainer(config, run_dir)
+
+    if tokenize_only:
+        logger.info("--tokenize-only set — exiting after trainer initialization.")
+        return
 
     # Auto-resume from the latest checkpoint if one exists.
     checkpoints_dir = run_dir / "checkpoints"
