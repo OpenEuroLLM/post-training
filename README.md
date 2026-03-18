@@ -286,10 +286,16 @@ You must specify exactly one determining factor for training duration in the `tr
 
 ### 6. Environment Modes
 
-- **Offline**: `offline: true`  
+- **Offline**: `offline: true`
   Disables Hugging Face Hub / Weights & Biases network calls (essential for air-gapped nodes).
-- **Debug**: `debug.enabled: true`  
+- **Debug**: `debug.enabled: true`
   Forces `report_to: none`, uses a separate output directory, and allows overwriting existing runs.
+- **Tokenize only**: `--tokenize-only` (CLI flag on `train.py` / `submit.py`)
+  Exits immediately after the trainer is initialized — dataset loading, tokenization, and packing all run, but the training loop is never entered. Useful for pretokenizing the dataset before committing to a full run. When passed to `submit.py`, the job is automatically constrained to 1 node and 1 GPU.
+
+  ```bash
+  python scripts/submit.py --config configs/trl/sft.yaml --tokenize-only
+  ```
 
 ### 7. Logging & Experiment Tracking
 
