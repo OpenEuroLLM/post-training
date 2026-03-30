@@ -17,7 +17,6 @@ dependencies = [
 
 [project.optional-dependencies]
 trl = [
-    "torch==2.9.1+cu126",
     "trl",
     "deepspeed",
     "transformers",
@@ -39,7 +38,7 @@ environments = [
 ]
 
 [tool.uv.sources]
-flash-attn = { url = "https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.7.16/flash_attn-2.8.3%2Bcu126torch2.9-cp312-cp312-linux_x86_64.whl" }
+flash-attn = { url = "https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.9.0/flash_attn-2.8.3+cu130torch2.9-cp312-cp312-linux_x86_64.whl" }
 
 [tool.black]
 line-length = 100
