@@ -6,7 +6,8 @@
 
 #SBATCH --job-name={{ job_name }}
 #SBATCH --partition={{ partition }}
-#SBATCH --nodes={{ num_nodes }}
+{% if account %}#SBATCH --account={{ account }}
+{% endif %}#SBATCH --nodes={{ num_nodes }}
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:{{ gpus_per_node }}
 #SBATCH --cpus-per-task={{ cpus_per_task }}
