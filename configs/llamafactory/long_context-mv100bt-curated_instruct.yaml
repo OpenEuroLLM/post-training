@@ -20,6 +20,7 @@ container:
 # -- SLURM -------------------------------------------------------------------
 slurm:
   partition: booster
+  account: reformo
   num_nodes: 2
   gpus_per_node: 4
   cpus_per_gpu: 18
@@ -32,7 +33,7 @@ slurm:
 # Dumped as-is to a YAML file for llamafactory-cli at runtime.
 llamafactory:
   # model
-  model_name_or_path: ontocord/1.7b-MixtureVitae-300BT-v1-decontaminated-16k
+  model_name_or_path: ontocord/1.7b-MixtureVitae-curated_instruct-100BT
   trust_remote_code: true
   rope_scaling: yarn
   enable_liger_kernel: false
@@ -50,7 +51,7 @@ llamafactory:
   mask_history: true
   cutoff_len: 16384
   max_samples: null
-  overwrite_cache: true
+  overwrite_cache: false
   preprocessing_num_workers: 16
   dataloader_num_workers: 2
   dataloader_prefetch_factor: 1
@@ -59,7 +60,7 @@ llamafactory:
   group_by_length: true
 
   # output
-  output_dir: output/long-context
+  output_dir: outputs/long-context-mv100bt-curated_instruct
   logging_steps: 5
   plot_loss: true
   overwrite_output_dir: true

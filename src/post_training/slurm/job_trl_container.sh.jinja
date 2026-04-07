@@ -6,7 +6,8 @@
 
 #SBATCH --job-name={{ job_name }}
 #SBATCH --partition={{ partition }}
-#SBATCH --nodes={{ num_nodes }}
+{% if account %}#SBATCH --account={{ account }}
+{% endif %}#SBATCH --nodes={{ num_nodes }}
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:{{ gpus_per_node }}
 {% if cpus_per_gpu is integer and cpus_per_gpu > 0 -%}
@@ -81,11 +82,11 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     export HF_HOME=${HF_HOME}
     export HF_HUB_CACHE=${HF_HUB_CACHE}
     export HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE}
-    export HF_DATASETS_CACHE=${HF_HOME}/datasets
+    export HF_DATASETS_CACHE=${HF_DATASETS_CACHE}
+    unset TRANSFORMERS_CACHE  # conflicts with HF_HUB_CACHE — would redirect model lookups to wrong path
     export HF_DATASETS_OFFLINE=1
     export TRANSFORMERS_OFFLINE=1
     export HF_HUB_OFFLINE=1
-    export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
     cd {{ repo_dir }}
 

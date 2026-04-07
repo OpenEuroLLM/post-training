@@ -6,6 +6,8 @@
 
 #SBATCH --job-name={{ job_name }}
 #SBATCH --partition={{ partition }}
+{% if account %}#SBATCH --account={{ account }}
+{% endif -%}
 #SBATCH --nodes={{ num_nodes }}
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:{{ gpus_per_node }}
@@ -80,7 +82,10 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     export HF_HOME=${HF_HOME}
     export HF_HUB_CACHE=${HF_HUB_CACHE}
     export HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE}
-    export HF_DATASETS_CACHE=${HF_HOME}/datasets
+    export TRANSFORMERS_CACHE=${HF_HUB_CACHE}
+    # Use node-local tmpdir for dataset Arrow cache to avoid
+    # cross-node race conditions on the shared filesystem.
+    export HF_DATASETS_CACHE=/tmp/hf_datasets_cache_${SLURM_JOB_ID}
     export HF_DATASETS_OFFLINE=1
     export TRANSFORMERS_OFFLINE=1
     export HF_HUB_OFFLINE=1

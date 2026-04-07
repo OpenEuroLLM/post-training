@@ -107,6 +107,7 @@ def render_trl_container_slurm_script(
         # SLURM parameters
         job_name=config.slurm.job_name,
         partition=config.slurm.partition,
+        account=config.slurm.account,
         num_nodes=config.slurm.num_nodes,
         gpus_per_node=config.slurm.gpus_per_node,
         cpus_per_gpu=config.slurm.cpus_per_gpu,
@@ -154,6 +155,7 @@ def render_llamafactory_slurm_script(
         # SLURM parameters
         job_name=config.slurm.job_name,
         partition=config.slurm.partition,
+        account=config.slurm.account,
         num_nodes=config.slurm.num_nodes,
         gpus_per_node=config.slurm.gpus_per_node,
         cpus_per_gpu=config.slurm.cpus_per_gpu,

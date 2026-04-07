@@ -1,6 +1,6 @@
 {
   "long_sft": {
-    "file_name": "path/to/Harsh1729/long_sft",
+    "file_name": "Harsh1729/long_sft",
     "formatting": "sharegpt",
     "columns": {
       "messages": "messages"

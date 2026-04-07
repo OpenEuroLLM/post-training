@@ -40,9 +40,18 @@ def resolve_torch_dtype(name: str) -> torch.dtype:
 
 def build_tokenizer(config: PostTrainingConfig) -> AutoTokenizer:
     """Load the tokenizer and apply the configured chat template."""
-    tokenizer = AutoTokenizer.from_pretrained(config.model.name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(
+        config.model.name_or_path,
+        trust_remote_code=config.model.trust_remote_code,
+    )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+
+    if config.data.additional_special_tokens:
+        tokenizer.add_special_tokens(
+            {"additional_special_tokens": list(config.data.additional_special_tokens)}
+        )
+        logger.info("Added special tokens: %s", config.data.additional_special_tokens)
 
     template_str = get_chat_template(config.data.chat_template)
     tokenizer.chat_template = template_str
@@ -60,7 +69,8 @@ def build_model_init_kwargs(config: PostTrainingConfig) -> dict[str, Any]:
     )
     return {
         "attn_implementation": config.model.attn_implementation,
-        "dtype": dtype,
+        "torch_dtype": dtype,
+        "trust_remote_code": config.model.trust_remote_code,
     }
 
 
@@ -101,7 +111,7 @@ def build_common_training_kwargs(
         weight_decay=t.weight_decay,
         adam_epsilon=t.adam_epsilon,
         gradient_accumulation_steps=grad_accum,
-        warmup_steps=t.warmup_ratio,
+        warmup_ratio=t.warmup_ratio,
         lr_scheduler_type=t.lr_scheduler_type,
         lr_scheduler_kwargs={
             k: v for k, v in dataclasses.asdict(t.lr_scheduler_kwargs).items() if v is not None

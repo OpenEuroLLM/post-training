@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -52,6 +53,8 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
         max_length=mc.max_seq_length,
         packing=mc.packing,
         dataset_num_proc=mc.dataset_num_proc,
+        remove_unused_columns=mc.remove_unused_columns,
+        dataset_kwargs=dataclasses.asdict(mc.dataset_kwargs),
         model_init_kwargs=build_model_init_kwargs(config),
     )
 

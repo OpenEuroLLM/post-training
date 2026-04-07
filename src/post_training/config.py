@@ -25,6 +25,7 @@ class ModelConfig:
     name_or_path: str = "allenai/Olmo-3-1025-7B"
     attn_implementation: str = "flash_attention_3"
     dtype: str = "bfloat16"
+    trust_remote_code: bool = False
 
 
 @dataclass
@@ -44,9 +45,6 @@ class GradientCheckpointingKwargs:
     """Extra keyword arguments forwarded to ``gradient_checkpointing_enable()``."""
 
     use_reentrant: bool = False
-    determinism_check: str = "default"
-    debug: bool = False
-    early_stop: bool = True
 
 
 @dataclass
@@ -84,12 +82,22 @@ class TrainingConfig:
 
 
 @dataclass
+class DatasetKwargsConfig:
+    """kwargs forwarded to the dataset tokenisation step in TRL's SFTTrainer."""
+
+    add_special_tokens: bool = True
+    append_concat_token: bool = True
+
+
+@dataclass
 class SFTMethodConfig:
     """Parameters unique to supervised fine-tuning."""
 
     max_seq_length: int = 4096
     packing: bool = True
     dataset_num_proc: int | None = None
+    remove_unused_columns: bool = True
+    dataset_kwargs: DatasetKwargsConfig = field(default_factory=DatasetKwargsConfig)
 
 
 @dataclass
@@ -135,6 +143,7 @@ class DataConfig:
     chat_template: str = "default"
     num_proc: int | None = None  # None = auto (capped at 32)
     datasets: list[DatasetEntry] = field(default_factory=list)
+    additional_special_tokens: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -163,7 +172,7 @@ class LoggingConfig:
     report_to: list[str] = field(default_factory=lambda: ["wandb", "tensorboard"])
     wandb_project: str = "post-training"
     logging_steps: int = 1
-    include_num_input_tokens_seen: str = "non_padding"
+    include_num_input_tokens_seen: str | None = None
 
 
 @dataclass
@@ -180,6 +189,7 @@ class SlurmConfig:
     """SLURM job scheduler parameters."""
 
     partition: str = "gpu"
+    account: str | None = None
     num_nodes: int = 1
     gpus_per_node: int = 4
     cpus_per_task: int = 32
