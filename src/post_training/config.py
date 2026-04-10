@@ -62,6 +62,7 @@ class TrainingConfig:
     effective_batch_size: int = 512
     per_device_train_batch_size: int = 4
     warmup_ratio: float = 0.03
+    warmup_steps: int = 0
     lr_scheduler_type: str = "cosine_with_min_lr"
     lr_scheduler_kwargs: LRSchedulerKwargs = field(default_factory=LRSchedulerKwargs)
     adam_beta1: float = 0.9
@@ -107,6 +108,7 @@ class DPOMethodConfig:
 class CheckpointingConfig:
     """Checkpoint saving strategy."""
 
+    save_strategy: str = "steps"   # "steps" | "epoch" | "no"
     save_steps: int = 500
     save_total_limit: int = 2
     # When set to ``None`` (or a non-positive value via CLI overrides), inference
@@ -180,10 +182,12 @@ class SlurmConfig:
     """SLURM job scheduler parameters."""
 
     partition: str = "gpu"
+    qos: str | None = None
     num_nodes: int = 1
     gpus_per_node: int = 4
     cpus_per_task: int = 32
     cpus_per_gpu: int | None = None
+    mem: str | None = None
     wall_time: str = "02:00:00"
     job_name: str = "post-training"
     signal_time_seconds: int = 300

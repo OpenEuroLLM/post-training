@@ -6,11 +6,18 @@
 
 #SBATCH --job-name={{ job_name }}
 #SBATCH --partition={{ partition }}
+{% if qos -%}
+#SBATCH --qos={{ qos }}
+{% endif -%}
 #SBATCH --nodes={{ num_nodes }}
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:{{ gpus_per_node }}
+#SBATCH --cpus-per-task={{ cpus_per_task }}
 {% if cpus_per_gpu is integer and cpus_per_gpu > 0 -%}
 #SBATCH --cpus-per-gpu={{ cpus_per_gpu }}
+{% endif -%}
+{% if mem -%}
+#SBATCH --mem={{ mem }}
 {% endif -%}
 #SBATCH --time={{ wall_time }}
 #SBATCH --signal=B:USR1@{{ signal_time_seconds }}
@@ -34,7 +41,9 @@ export WORLD_SIZE=$(( SLURM_NNODES * GPUS_PER_NODE ))
 # NCCL tuning for multi-node stability
 export NCCL_IB_TIMEOUT=120
 export NCCL_DEBUG=INFO
-export CUDA_DEVICE_MAX_CONNECTIONS=1
+# Note: CUDA_DEVICE_MAX_CONNECTIONS=1 is a Megatron-LM tensor-parallel
+# optimization. It serializes CUDA streams and HURTS DeepSpeed ZeRO-2's
+# overlap_comm. Do not re-add it without a verified reason.
 export OMP_NUM_THREADS=1
 
 echo "=========================================="
@@ -70,7 +79,7 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
 
     # Prevent host Python/PATH from interfering with container
     export PATH=\"/usr/local/bin:/usr/bin:/bin\"
-    export PYTHONPATH=\"\"
+    export PYTHONPATH=\"{{ repo_dir }}/src\"
     export PYTHONNOUSERSITE=1
 
     export NODE_RANK=\"\$SLURM_NODEID\"

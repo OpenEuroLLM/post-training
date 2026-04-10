@@ -33,7 +33,7 @@ def generate_run_name(config: PostTrainingConfig) -> str:
     return get_backend(config.backend).generate_run_name(config, timestamp)
 
 
-def setup_run_directory(config: PostTrainingConfig) -> Path:
+def setup_run_directory(config: PostTrainingConfig, allow_override: bool = False) -> Path:
     """Create the run output directory tree and return the run root.
 
     Directory layout::
@@ -59,7 +59,12 @@ def setup_run_directory(config: PostTrainingConfig) -> Path:
     run_dir = base / run_name
 
     # Handle debug override.
-    if config.debug.enabled and config.debug.override_existing and run_dir.exists():
+    if (
+        allow_override
+        and config.debug.enabled
+        and config.debug.override_existing
+        and run_dir.exists()
+    ):
         shutil.rmtree(run_dir)
 
     from post_training.backend import get_backend

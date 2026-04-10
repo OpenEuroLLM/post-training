@@ -102,7 +102,8 @@ def build_common_training_kwargs(
         weight_decay=t.weight_decay,
         adam_epsilon=t.adam_epsilon,
         gradient_accumulation_steps=grad_accum,
-        warmup_steps=t.warmup_ratio,
+        warmup_steps=t.warmup_steps,
+        warmup_ratio=t.warmup_ratio,
         lr_scheduler_type=t.lr_scheduler_type,
         lr_scheduler_kwargs={
             k: v for k, v in dataclasses.asdict(t.lr_scheduler_kwargs).items() if v is not None
@@ -113,7 +114,7 @@ def build_common_training_kwargs(
         bf16=t.bf16,
         seed=t.seed,
         # Checkpointing
-        save_strategy="steps",
+        save_strategy=config.checkpointing.save_strategy,
         save_steps=config.checkpointing.save_steps,
         save_total_limit=config.checkpointing.save_total_limit,
         # Logging

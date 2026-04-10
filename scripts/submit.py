@@ -71,7 +71,7 @@ def main() -> None:
         prefetch_assets(config)
 
     # Set up the run directory (so the SLURM script can reference it).
-    run_dir = setup_run_directory(config)
+    run_dir = setup_run_directory(config, allow_override=True)
     logger.info("Run directory: %s", run_dir)
 
     if not confirmed:
