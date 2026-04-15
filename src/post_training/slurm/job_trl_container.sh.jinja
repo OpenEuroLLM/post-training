@@ -98,6 +98,9 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
 
     cd {{ repo_dir }}
 
+    # Store wandb offline runs inside the run directory (absolute path)
+    export WANDB_DIR={{ repo_dir }}/{{ run_dir }}
+
     accelerate launch \
       --num_machines \$NNODES \
       --num_processes $WORLD_SIZE \

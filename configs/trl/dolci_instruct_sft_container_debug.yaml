@@ -1,0 +1,102 @@
+# ============================================================================
+# Dolci Instruct SFT — DEBUG config (container-based)
+# ============================================================================
+
+method: sft
+backend: trl
+run_name: null
+offline: true
+
+# -- Container ---------------------------------------------------------------
+container:
+  image: /leonardo_work/OELLM_prod2026/container_images/post-training-flash-attn-3.sif
+  bind_mounts:
+    - /leonardo_scratch/large/userexternal/knikolao:/leonardo_scratch/large/userexternal/knikolao
+    - /leonardo_work/OELLM_prod2026:/leonardo_work/OELLM_prod2026
+  env_file: env/leonardo.env
+
+# -- Model -------------------------------------------------------------------
+model:
+  name_or_path: "allenai/Olmo-3-7B-Think-SFT"
+  attn_implementation: "flash_attention_3"
+  dtype: "bfloat16"
+
+# -- Training (100 steps ≈ 2.8% of full run — LR schedule sanity check) -----
+training:
+  max_steps: 100
+  learning_rate: 8.0e-5
+  effective_batch_size: 32        # production setting; with 16 GPUs (4 nodes) → grad_accum = 2
+  per_device_train_batch_size: 1
+  warmup_ratio: 0.1              # 10 warmup steps — enough to see ramp-up in WandB
+  lr_scheduler_type: "linear"
+  adam_beta2: 0.95
+  gradient_checkpointing: true
+  bf16: true
+  seed: 42
+  use_liger_kernel: true
+
+# -- SFT method parameters ---------------------------------------------------
+sft:
+  max_seq_length: 32768           # match the real run to test multi-node compute/comm ratio
+  packing: true
+
+# -- Checkpointing -----------------------------------------------------------
+checkpointing:
+  save_strategy: "steps"
+  save_steps: 50
+  save_total_limit: 2
+  inference_checkpoint_steps: null
+
+# -- Data mix ----------------------------------------------------------------
+data:
+  chat_template: "olmo3"
+  num_proc: null
+  datasets:
+    - name: "dolci_instruct_sft"
+      path: "/leonardo_scratch/large/userexternal/knikolao/propella_annotation/data/Dolci-Instruct-SFT-Decont/data"
+      split: "train[:100000]"                   # enough rows for 100 steps × 32 packed seq × 32k tokens
+      weight: 1.0
+      transform: null
+
+# -- DeepSpeed ---------------------------------------------------------------
+deepspeed:
+  config_path: "configs/deepspeed/zero2.yaml"
+
+# -- Accelerate launch flags -------------------------------------------------
+accelerate:
+  mixed_precision: "bf16"
+  use_deepspeed: true
+  deepspeed_multinode_launcher: "standard"
+  same_network: true
+  rdzv_backend: "static"
+  dynamo_backend: "inductor"
+
+# -- Logging & tracking ------------------------------------------------------
+logging:
+  report_to:
+    - "wandb"
+  wandb_project: "propella-olmo-sft-debug"
+  logging_steps: 1
+  include_num_input_tokens_seen: "non_padding"
+
+# -- SLURM -------------------------------------------------------------------
+slurm:
+  partition: "boost_usr_prod"
+  qos: "normal"
+  num_nodes: 4
+  gpus_per_node: 4
+  cpus_per_task: 32
+  wall_time: "01:00:00"
+  job_name: "propella-olmo-sft-debug"
+  signal_time_seconds: 120
+  max_failures: 1
+
+# -- Debug mode --------------------------------------------------------------
+debug:
+  enabled: false
+  override_existing: true
+
+# -- Output paths -------------------------------------------------------------
+paths:
+  output_base: "outputs"
+  debug_base: "outputs/debug"

@@ -1,0 +1,103 @@
+# ============================================================================
+# Dolci Instruct SFT — OLMo-3-7B-Think-SFT on Dolci-Instruct-SFT
+# Container-based (Flash Attention 3, CUDA 13.0)
+# ============================================================================
+
+method: sft
+backend: trl
+run_name: null
+offline: true
+
+# -- Container ---------------------------------------------------------------
+container:
+  image: /leonardo_work/OELLM_prod2026/container_images/post-training-flash-attn-3.sif
+  bind_mounts:
+    - /leonardo_scratch/large/userexternal/knikolao:/leonardo_scratch/large/userexternal/knikolao
+    - /leonardo_work/OELLM_prod2026:/leonardo_work/OELLM_prod2026
+  env_file: env/leonardo.env
+
+# -- Model -------------------------------------------------------------------
+model:
+  name_or_path: "allenai/Olmo-3-7B-Think-SFT"
+  attn_implementation: "flash_attention_3"
+  dtype: "bfloat16"
+
+# -- Training hyper-parameters (from OLMo-3 paper Table 47) -----------------
+training:
+  num_train_epochs: 2
+  learning_rate: 8.0e-5
+  effective_batch_size: 32
+  per_device_train_batch_size: 1
+  warmup_ratio: 0.03
+  lr_scheduler_type: "linear"
+  adam_beta2: 0.95
+  gradient_checkpointing: true
+  bf16: true
+  seed: 42
+  use_liger_kernel: true
+
+# -- SFT method parameters ---------------------------------------------------
+sft:
+  max_seq_length: 32768
+  packing: true
+
+# -- Checkpointing -----------------------------------------------------------
+checkpointing:
+  save_steps: 500
+  save_total_limit: 3
+  inference_checkpoint_steps: 250
+  inference_checkpoint_path: "inference_checkpoints"
+
+# -- Data mix ----------------------------------------------------------------
+data:
+  chat_template: "olmo3"
+  num_proc: null
+  datasets:
+    - name: "dolci_instruct_sft"
+      path: "/leonardo_scratch/large/userexternal/knikolao/propella_annotation/data/Dolci-Instruct-SFT-Decont/data"
+      split: "train"
+      weight: 1.0
+      transform: null
+
+# -- DeepSpeed ---------------------------------------------------------------
+deepspeed:
+  config_path: "configs/deepspeed/zero2.yaml"
+
+# -- Accelerate launch flags -------------------------------------------------
+accelerate:
+  mixed_precision: "bf16"
+  use_deepspeed: true
+  deepspeed_multinode_launcher: "standard"
+  same_network: true
+  rdzv_backend: "static"
+  dynamo_backend: "inductor"
+
+# -- Logging & tracking ------------------------------------------------------
+logging:
+  report_to:
+    - "wandb"
+    - "tensorboard"
+  wandb_project: "propella-olmo-sft"
+  logging_steps: 1
+  include_num_input_tokens_seen: "non_padding"
+
+# -- SLURM -------------------------------------------------------------------
+slurm:
+  partition: "boost_usr_prod"
+  num_nodes: 4
+  gpus_per_node: 4
+  cpus_per_task: 32
+  wall_time: "24:00:00"
+  job_name: "propella-olmo-sft"
+  signal_time_seconds: 300
+  max_failures: 3
+
+# -- Debug mode --------------------------------------------------------------
+debug:
+  enabled: false
+  override_existing: false
+
+# -- Output paths -------------------------------------------------------------
+paths:
+  output_base: "outputs"
+  debug_base: "outputs/debug"
