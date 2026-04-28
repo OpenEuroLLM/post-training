@@ -62,6 +62,7 @@ class TrainingConfig:
     effective_batch_size: int = 512
     per_device_train_batch_size: int = 4
     warmup_ratio: float = 0.03
+    warmup_steps: int = 0
     lr_scheduler_type: str = "cosine_with_min_lr"
     lr_scheduler_kwargs: LRSchedulerKwargs = field(default_factory=LRSchedulerKwargs)
     adam_beta1: float = 0.9
