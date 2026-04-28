@@ -113,7 +113,7 @@ def build_common_training_kwargs(
         bf16=t.bf16,
         seed=t.seed,
         # Checkpointing
-        save_strategy="steps",
+        save_strategy=config.checkpointing.save_strategy,
         save_steps=config.checkpointing.save_steps,
         save_total_limit=config.checkpointing.save_total_limit,
         # Logging
