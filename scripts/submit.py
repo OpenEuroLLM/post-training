@@ -50,8 +50,7 @@ def _apply_hf_env_from_file(env_file: str) -> None:
     """
     path = Path(env_file)
     if not path.exists():
-        logger.warning("container.env_file '%s' not found, skipping.", env_file)
-        return
+        raise FileNotFoundError(f"container.env_file '{env_file}' not found.")
 
     parsed: dict[str, str] = {}
     export_re = re.compile(r"^export\s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
