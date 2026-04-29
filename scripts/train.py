@@ -92,6 +92,12 @@ def main() -> None:
         os.environ["HF_DATASETS_OFFLINE"] = "1"
         os.environ["TRANSFORMERS_OFFLINE"] = "1"
         os.environ["WANDB_MODE"] = "offline"
+    else:
+        # Explicitly clear offline flags so any value inherited from the
+        # container environment (e.g. a stale host env var) doesn't take effect.
+        os.environ["HF_HUB_OFFLINE"] = "0"
+        os.environ["HF_DATASETS_OFFLINE"] = "0"
+        os.environ["TRANSFORMERS_OFFLINE"] = "0"
 
     # Lazy import: must come after offline env vars are set so that
     # huggingface_hub caches HF_HUB_OFFLINE=1 on first import.
