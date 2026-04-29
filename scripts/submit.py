@@ -27,7 +27,6 @@ from post_training.slurm.launcher import generate_and_submit
 from post_training.utils.guardrails import run_guardrails
 from post_training.utils.logging import setup_logging
 from post_training.utils.paths import setup_run_directory
-from post_training.utils.prefetch import prefetch_assets
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +115,10 @@ def main() -> None:
             "offline=True: pre-fetching models and datasets on the login node "
             "before submitting the job."
         )
+        # Lazy import: must come after _apply_hf_env_from_file so that
+        # huggingface_hub and datasets read the correct HF_HOME on first import.
+        from post_training.utils.prefetch import prefetch_assets
+
         prefetch_assets(config)
 
     # Set up the run directory (so the SLURM script can reference it).
