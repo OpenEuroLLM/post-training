@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from accelerate import PartialState
 from trl import DPOConfig, DPOTrainer
 
 from post_training.data.loader import load_and_mix_datasets
@@ -45,7 +46,8 @@ def build_dpo_trainer(config: PostTrainingConfig, run_dir: Path) -> DPOTrainer:
     mc = config.dpo  # method-specific config
 
     tokenizer = build_tokenizer(config)
-    dataset = load_and_mix_datasets(config.data, row_filter=_dpo_row_filter)
+    with PartialState().main_process_first():
+        dataset = load_and_mix_datasets(config.data, row_filter=_dpo_row_filter)
 
     dpo_config = DPOConfig(
         **build_common_training_kwargs(config, run_dir),
