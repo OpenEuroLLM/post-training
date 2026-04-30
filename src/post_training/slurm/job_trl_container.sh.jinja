@@ -88,7 +88,7 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
 
     cd {{ repo_dir }}
 
-    export WANDB_DIR={{ repo_dir }}/{{ run_dir }}
+    export WANDB_DIR={{ run_dir }}
 
     accelerate launch \
       --num_machines \$NNODES \
