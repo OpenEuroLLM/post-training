@@ -1,0 +1,105 @@
+# ============================================================================
+# SFT Throughput Benchmark — OLMo-3 32B Think SFT
+# ============================================================================
+# Designed for large-scale (64–256 node) throughput sweeps at 32k+ seq len.
+# ZeRO-3 is required at this model size.
+#
+# Effective batch size target is 128; at ≥32 nodes (128 GPUs) pbs=1 and
+# GAS=1, so actual effective_batch_size equals world_size. The sweep script
+# sets per_device_train_batch_size and gradient_accumulation_steps explicitly.
+#
+# Usage (single run):
+#   python scripts/submit.py --config configs/trl/sft_throughput_32b_think.yaml \
+#       slurm.num_nodes=64 sft.max_seq_length=32768
+#
+# Use scripts/sweep_32b_think_throughput.sh to fan out across node counts.
+# ============================================================================
+
+method: sft
+backend: trl
+run_name: null
+offline: true
+
+# -- Model -------------------------------------------------------------------
+model:
+  name_or_path: "allenai/Olmo-3-1125-32B"
+  attn_implementation: "flash_attention_2"
+  dtype: "bfloat16"
+
+# -- Training hyper-parameters -----------------------------------------------
+training:
+  max_steps: 50                              # enough to warm up + get stable readings
+  learning_rate: 2.0e-5
+  effective_batch_size: 128                  # overridden per node count by sweep script
+  per_device_train_batch_size: 1             # pbs=1 is safe at 32k seq len for 32B
+  warmup_ratio: 0.0                          # no warmup — measure steady-state throughput
+  lr_scheduler_type: "constant"
+  gradient_checkpointing: true
+  bf16: true
+  seed: 42
+  use_liger_kernel: false
+
+# -- SFT method parameters ---------------------------------------------------
+sft:
+  max_seq_length: 32768                      # overridden per job by sweep script
+  packing: true
+
+# -- Checkpointing (disabled for benchmarking) --------------------------------
+checkpointing:
+  save_steps: 9999
+  save_total_limit: 1
+  inference_checkpoint_steps: null
+
+# -- Data mix ----------------------------------------------------------------
+data:
+  chat_template: "olmo3"
+  num_proc: null
+  datasets:
+    - name: "dolci_instruct_sft"
+      path: "allenai/Dolci-Instruct-SFT"
+      subset: null
+      split: "train"
+      weight: 1.0
+      transform: dolci_instruct
+
+# -- DeepSpeed — ZeRO-3 required for 32B ------------------------------------
+deepspeed:
+  config_path: "configs/deepspeed/zero3.yaml"
+
+# -- Accelerate launch flags -------------------------------------------------
+accelerate:
+  mixed_precision: "bf16"
+  use_deepspeed: true
+  deepspeed_multinode_launcher: "standard"
+  same_network: true
+  rdzv_backend: "static"
+  dynamo_backend: "inductor"
+
+# -- Logging & tracking ------------------------------------------------------
+logging:
+  report_to:
+    - "wandb"
+  wandb_project: "sft-throughput-jupiter"
+  logging_steps: 1
+  include_num_input_tokens_seen: "non_padding"
+
+# -- SLURM -------------------------------------------------------------------
+slurm:
+  partition: "booster"
+  num_nodes: 64                              # overridden per job by sweep script
+  gpus_per_node: 4
+  cpus_per_task: 32
+  wall_time: "00:30:00"
+  job_name: "sft-tp-32b-think"
+  signal_time_seconds: 60
+  max_failures: 1
+
+# -- Debug mode --------------------------------------------------------------
+debug:
+  enabled: false
+  override_existing: false
+
+# -- Output paths -------------------------------------------------------------
+paths:
+  output_base: "outputs/throughput"
+  debug_base: "outputs/debug"

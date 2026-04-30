@@ -1,0 +1,106 @@
+# ============================================================================
+# DPO Throughput Benchmark Configuration
+# ============================================================================
+# Short run designed to measure tokens/sec and MFU across different node
+# counts.  Use with scripts/throughput_sweep.py to submit one job per node
+# count; that script scales effective_batch_size so GAS=1 on each run.
+#
+# Direct usage (single run):
+#   python scripts/submit.py --config configs/trl/dpo_throughput.yaml \
+#       slurm.num_nodes=2 training.effective_batch_size=8
+# ============================================================================
+
+method: dpo
+backend: trl
+run_name: null
+offline: true
+
+# -- Model -------------------------------------------------------------------
+# Olmo-3-7B: dense 7B decoder. ~14GB bf16 weights; policy+ref fits comfortably
+# on 4×H100 with ZeRO-2.
+model:
+  name_or_path: "allenai/Olmo-3-7B-Think-SFT"
+  attn_implementation: "flash_attention_2"
+  dtype: "bfloat16"
+
+# -- Training hyper-parameters -----------------------------------------------
+training:
+  max_steps: 50                              # enough to warm up + get stable readings
+  learning_rate: 5.0e-7
+  effective_batch_size: 128                    # overridden per node count by throughput_sweep.py
+  per_device_train_batch_size: 16
+  warmup_ratio: 0.0                          # no warmup — measure steady-state throughput
+  lr_scheduler_type: "constant"
+  gradient_checkpointing: true
+  bf16: true
+  seed: 42
+  use_liger_kernel: false
+
+# -- DPO method parameters ---------------------------------------------------
+dpo:
+  beta: 5.0
+  loss_type: "sigmoid"
+  ref_model_name_or_path: null
+  max_seq_length: 2048
+
+# -- Checkpointing (disabled for benchmarking) --------------------------------
+checkpointing:
+  save_steps: 9999
+  save_total_limit: 1
+  inference_checkpoint_steps: null
+
+# -- Data mix ----------------------------------------------------------------
+data:
+  chat_template: "olmo3"                     # Olmo-3 chat template
+  num_proc: null
+  datasets:
+    - name: "smoltalk2_preference"
+      path: "/e/scratch/e-sta-openeurollm/jha1/smoltalk2_pref"
+      subset: null
+      split: "llama_3.1_tulu_3_8b_preference_mixture_no_think"
+      weight: 1.0
+      transform: smoltalk2_preference_dpo
+
+# -- DeepSpeed ---------------------------------------------------------------
+# ZeRO-2 is sufficient for 7B: policy+ref ≈ 28GB bf16 weights, fits on 4×H100
+# without weight sharding. Avoids ZeRO-3 all-gather overhead.
+deepspeed:
+  config_path: "configs/deepspeed/zero3.yaml"
+
+# -- Accelerate launch flags -------------------------------------------------
+accelerate:
+  mixed_precision: "bf16"
+  use_deepspeed: true
+  deepspeed_multinode_launcher: "standard"
+  same_network: true
+  rdzv_backend: "static"
+  dynamo_backend: "inductor"
+
+# -- Logging & tracking ------------------------------------------------------
+logging:
+  report_to:
+    - "wandb"
+  wandb_project: "dpo-throughput"
+  logging_steps: 1                           # log every step for dense throughput readings
+  include_num_input_tokens_seen: "non_padding"
+
+# -- SLURM -------------------------------------------------------------------
+slurm:
+  partition: "booster"
+  num_nodes: 1                               # overridden per job by throughput_sweep.py
+  gpus_per_node: 4
+  cpus_per_task: 32
+  wall_time: "00:30:00"                      # 30 min is ample for 50 steps
+  job_name: "dpo-throughput"
+  signal_time_seconds: 60
+  max_failures: 1                            # no retries for benchmarks
+
+# -- Debug mode --------------------------------------------------------------
+debug:
+  enabled: false
+  override_existing: false
+
+# -- Output paths -------------------------------------------------------------
+paths:
+  output_base: "outputs/throughput"
+  debug_base: "outputs/debug"

@@ -1,0 +1,100 @@
+# ============================================================================
+# SFT Throughput Benchmark Configuration
+# ============================================================================
+# Short run designed to measure tokens/sec and MFU across different node
+# counts.  Use with scripts/sweep_sft_throughput.sh to submit one job per
+# node count × seq length; that script fixes GAS=1 on each run.
+#
+# Direct usage (single run):
+#   python scripts/submit.py --config configs/trl/sft_throughput.yaml \
+#       slurm.num_nodes=2 training.effective_batch_size=8
+# ============================================================================
+
+method: sft
+backend: trl
+run_name: null
+offline: true
+
+# -- Model -------------------------------------------------------------------
+model:
+  name_or_path: "allenai/Olmo-3-7B-Think-SFT"
+  attn_implementation: "flash_attention_2"
+  dtype: "bfloat16"
+
+# -- Training hyper-parameters -----------------------------------------------
+training:
+  max_steps: 50                              # enough to warm up + get stable readings
+  learning_rate: 8.0e-5
+  effective_batch_size: 32                   # overridden per node count by sweep script
+  per_device_train_batch_size: 16
+  warmup_ratio: 0.0                          # no warmup — measure steady-state throughput
+  lr_scheduler_type: "constant"
+  gradient_checkpointing: true
+  bf16: true
+  seed: 42
+  use_liger_kernel: true
+
+# -- SFT method parameters ---------------------------------------------------
+sft:
+  max_seq_length: 2048                       # overridden per job by sweep script
+  packing: true
+
+# -- Checkpointing (disabled for benchmarking) --------------------------------
+checkpointing:
+  save_steps: 9999
+  save_total_limit: 1
+  inference_checkpoint_steps: null
+
+# -- Data mix ----------------------------------------------------------------
+data:
+  chat_template: "olmo3"
+  num_proc: null
+  datasets:
+    - name: "dolci_instruct_sft"
+      path: "allenai/Dolci-Instruct-SFT"
+      subset: null
+      split: "train"
+      weight: 1.0
+      transform: dolci_instruct
+
+# -- DeepSpeed ---------------------------------------------------------------
+deepspeed:
+  config_path: "configs/deepspeed/zero2.yaml"
+
+# -- Accelerate launch flags -------------------------------------------------
+accelerate:
+  mixed_precision: "bf16"
+  use_deepspeed: true
+  deepspeed_multinode_launcher: "standard"
+  same_network: true
+  rdzv_backend: "static"
+  dynamo_backend: "inductor"
+
+# -- Logging & tracking ------------------------------------------------------
+logging:
+  report_to:
+    - "wandb"
+  wandb_project: "sft-throughput-jupiter"
+  logging_steps: 1                           # log every step for dense throughput readings
+  include_num_input_tokens_seen: "non_padding"
+
+# -- SLURM -------------------------------------------------------------------
+slurm:
+  partition: "booster"
+  num_nodes: 1                               # overridden per job by sweep script
+  gpus_per_node: 4
+  cpus_per_task: 32
+  wall_time: "00:30:00"
+  job_name: "sft-throughput"
+  signal_time_seconds: 60
+  max_failures: 1                            # no retries for benchmarks
+
+# -- Debug mode --------------------------------------------------------------
+debug:
+  enabled: false
+  override_existing: false
+
+# -- Output paths -------------------------------------------------------------
+paths:
+  output_base: "outputs/throughput"
+  debug_base: "outputs/debug"
