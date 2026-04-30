@@ -93,6 +93,13 @@ def main() -> None:
         os.environ["TRANSFORMERS_OFFLINE"] = "1"
         os.environ["WANDB_MODE"] = "offline"
 
+    # ── W&B: only global rank 0 should log ──────────────────────────
+    # Must come AFTER the offline block: offline sets WANDB_MODE=offline for
+    # all ranks, and this overrides it to disabled for non-zero ranks.
+    # Without this, each node's local rank 0 creates its own W&B run.
+    if os.environ.get("RANK", "0") != "0":
+        os.environ["WANDB_MODE"] = "disabled"
+
     # Lazy import: must come after offline env vars are set so that
     # huggingface_hub caches HF_HUB_OFFLINE=1 on first import.
     from post_training.methods import build_trainer
@@ -112,6 +119,24 @@ def main() -> None:
 
     # ── Build trainer & launch ──────────────────────────────────────
     trainer = build_trainer(config, run_dir)
+
+    from post_training.methods.common import reorder_reporting_callbacks_last
+    reorder_reporting_callbacks_last(trainer)
+
+    # Log sweep dimensions as W&B config so they can be used for grouping and
+    # charting in the W&B UI (tags only support filtering, not axis/group-by).
+    if "wandb" in config.logging.report_to:
+        import wandb
+        if wandb.run is not None:
+            wandb.config.update(
+                {
+                    "sweep/num_nodes": config.slurm.num_nodes,
+                    "sweep/seq_len": config.dpo.max_seq_length if config.method.lower() == "dpo" else None,
+                    "sweep/per_device_batch_size": config.training.per_device_train_batch_size,
+                    "sweep/effective_batch_size": config.training.effective_batch_size,
+                },
+                allow_val_change=True,
+            )
 
     if tokenize_only:
         logger.info("--tokenize-only set — exiting after trainer initialization.")
