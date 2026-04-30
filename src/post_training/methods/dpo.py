@@ -14,6 +14,7 @@ from post_training.methods.common import (
     build_common_training_kwargs,
     build_model_init_kwargs,
     build_tokenizer,
+    sanitize_generation_config,
 )
 
 if TYPE_CHECKING:
@@ -56,7 +57,7 @@ def build_dpo_trainer(config: PostTrainingConfig, run_dir: Path) -> DPOTrainer:
         model_init_kwargs=build_model_init_kwargs(config),
     )
 
-    return DPOTrainer(
+    trainer = DPOTrainer(
         model=config.model.name_or_path,
         ref_model=mc.ref_model_name_or_path,  # None → TRL creates implicit copy
         processing_class=tokenizer,
@@ -64,3 +65,5 @@ def build_dpo_trainer(config: PostTrainingConfig, run_dir: Path) -> DPOTrainer:
         args=dpo_config,
         callbacks=build_callbacks(config, run_dir),
     )
+    sanitize_generation_config(trainer)
+    return trainer
