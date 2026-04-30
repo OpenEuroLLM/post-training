@@ -180,7 +180,7 @@ class SlurmConfig:
     """SLURM job scheduler parameters."""
 
     partition: str = "gpu"
-    account: str | None = "OELLM_prod2026"
+    account: str | None = None
     num_nodes: int = 1
     gpus_per_node: int = 4
     cpus_per_task: int = 32
