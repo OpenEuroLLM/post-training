@@ -153,11 +153,18 @@ def sanitize_generation_config(trainer: Any) -> None:
     gc = getattr(model, "generation_config", None)
     if gc is None:
         return
-    has_sampling_param = (
-        getattr(gc, "temperature", None) is not None
-        or getattr(gc, "top_p", None) is not None
-        or getattr(gc, "top_k", None) not in (None, 0)
+    _FLOAT_SAMPLING_PARAMS = (
+        "temperature",
+        "top_p",
+        "min_p",
+        "top_h",
+        "typical_p",
+        "epsilon_cutoff",
+        "eta_cutoff",
     )
+    has_sampling_param = any(
+        getattr(gc, p, None) is not None for p in _FLOAT_SAMPLING_PARAMS
+    ) or getattr(gc, "top_k", None) not in (None, 0)
     if has_sampling_param and not getattr(gc, "do_sample", False):
         logger.info(
             "Sanitizing generation_config: setting do_sample=True so that "
