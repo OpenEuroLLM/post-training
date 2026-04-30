@@ -70,7 +70,7 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
 
     # Prevent host Python/PATH from interfering with container
     export PATH=\"/usr/local/bin:/usr/bin:/bin\"
-    export PYTHONPATH=\"\"
+    export PYTHONPATH=\"{{ repo_dir }}/src\"
     export PYTHONNOUSERSITE=1
 
     export NODE_RANK=\"\$SLURM_NODEID\"
