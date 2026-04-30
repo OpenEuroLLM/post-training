@@ -107,6 +107,7 @@ class DPOMethodConfig:
 class CheckpointingConfig:
     """Checkpoint saving strategy."""
 
+    save_strategy: str = "steps"
     save_steps: int = 500
     save_total_limit: int = 2
     # When set to ``None`` (or a non-positive value via CLI overrides), inference
@@ -181,10 +182,12 @@ class SlurmConfig:
 
     partition: str = "gpu"
     account: str | None = None
+    qos: str | None = None
     num_nodes: int = 1
     gpus_per_node: int = 4
     cpus_per_task: int = 32
     cpus_per_gpu: int | None = None
+    mem: str | None = None
     wall_time: str = "02:00:00"
     job_name: str = "post-training"
     signal_time_seconds: int = 300
