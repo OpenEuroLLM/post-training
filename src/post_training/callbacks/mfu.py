@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 
 import torch
@@ -18,11 +19,19 @@ logger = logging.getLogger(__name__)
 
 # Peak FLOP/s (BF16/FP16) for common GPU architectures.
 # Keys are substrings matched against torch.cuda.get_device_properties().name.
+# Note: "H200" matches "GH200" via substring, so Grace Hopper chips resolve
+# to the correct H-series peak without a dedicated entry.
 _GPU_PEAK_TFLOPS: dict[str, float] = {
     "H200": 989.0,  # https://www.nvidia.com/en-us/data-center/h200/
     "H100": 989.0,  # https://www.nvidia.com/en-us/data-center/h100/
     "A100": 312.0,  # https://www.nvidia.com/en-us/data-center/a100/
 }
+
+# Matches parameter names belonging to a routed MoE expert, e.g.
+# "model.layers.0.mlp.experts.5.gate_proj.weight".  Shared experts (e.g.
+# ".shared_experts.") are deliberately excluded because they activate on
+# every token and should count as dense.
+_ROUTED_EXPERT_PATTERN = re.compile(r"\.experts\.\d+\.")
 
 
 def _detect_peak_flops() -> float | None:
@@ -41,16 +50,69 @@ def _detect_peak_flops() -> float | None:
     return None
 
 
+def _detect_moe(model) -> tuple[int, int] | None:
+    """Return ``(num_experts, num_experts_per_tok)`` if *model* is MoE, else ``None``.
+
+    Handles the common field-name variants across Mixtral, Qwen-MoE, OLMoE,
+    and DeepSeek-MoE.
+    """
+    config = getattr(model, "config", None)
+    if config is None:
+        return None
+
+    num_experts = (
+        getattr(config, "num_experts", None)
+        or getattr(config, "num_local_experts", None)
+        or getattr(config, "n_routed_experts", None)
+    )
+    num_experts_per_tok = getattr(config, "num_experts_per_tok", None) or getattr(
+        config, "num_experts_per_token", None
+    )
+
+    if num_experts and num_experts_per_tok and int(num_experts_per_tok) < int(num_experts):
+        return int(num_experts), int(num_experts_per_tok)
+    return None
+
+
+def _count_params(model) -> tuple[int, int]:
+    """Return ``(total_params, routed_expert_params)``.
+
+    Uses ``p.ds_numel`` for DeepSpeed ZeRO-3 sharded parameters so the full
+    (unpartitioned) size is reported.
+    """
+    total = 0
+    routed_expert = 0
+    for name, p in model.named_parameters():
+        n = p.ds_numel if hasattr(p, "ds_numel") else p.numel()
+        total += n
+        if _ROUTED_EXPERT_PATTERN.search(name):
+            routed_expert += n
+    return total, routed_expert
+
+
 class MFUCallback(TrainerCallback):
     """Logs ``throughput/mfu`` at every logging step.
 
     MFU (Model FLOP Utilization) measures what fraction of the GPU's
     theoretical peak throughput is being achieved::
 
-        MFU = (tokens_per_sec_per_gpu × 6 × num_params) / peak_flops_per_gpu
+        MFU = (tokens_per_sec_per_gpu × flops_per_token_coeff × active_params) / peak_flops_per_gpu
 
-    The ``6 × num_params`` term is the standard FLOPs-per-token estimate for
-    transformer models (2N forward + 4N backward).
+    The coefficient depends on the training method:
+
+    - **SFT** (default): ``6N`` per token — 2N forward + 4N backward.
+    - **DPO**: ``8N`` per token — policy forward (2N) + policy backward (4N)
+      + reference forward (2N, no backward).
+
+    Gradient-checkpointing rematerialization is intentionally excluded from
+    the numerator; this is the standard MFU convention (HFU would include it).
+
+    For dense models, ``active_params == total_params``.  For MoE models,
+    only a subset of expert weights participate in each token's forward
+    pass, so::
+
+        active_params = dense_params
+                      + routed_expert_params × (num_experts_per_tok / num_experts)
 
     Requires ``include_num_input_tokens_seen=True`` on the trainer so that
     ``num_input_tokens_seen`` is present in the logs at each logging step.
@@ -61,12 +123,21 @@ class MFUCallback(TrainerCallback):
         Theoretical peak FLOP/s for a single GPU.  When *None* (default) the
         value is auto-detected from the GPU device name via a built-in lookup
         table.  Pass an explicit value for unsupported or custom hardware.
+    flops_per_token_coeff:
+        FLOPs-per-token multiplier in units of the active parameter count.
+        Default ``6.0`` (SFT).  Pass ``8.0`` for DPO to account for the
+        reference-model forward pass.
     """
 
-    def __init__(self, peak_flops_per_device: float | None = None) -> None:
+    def __init__(
+        self,
+        peak_flops_per_device: float | None = None,
+        flops_per_token_coeff: float = 6.0,
+    ) -> None:
         self._configured_peak_flops = peak_flops_per_device
+        self._flops_per_token_coeff = flops_per_token_coeff
         self._peak_flops: float | None = None
-        self._num_params: int | None = None
+        self._active_params: int | None = None
         self._last_time: float = 0.0
         self._last_tokens: int = 0
 
@@ -79,14 +150,33 @@ class MFUCallback(TrainerCallback):
         **kwargs,
     ) -> None:
         if model is not None:
-            # With DeepSpeed ZeRO-3 parameters are sharded: p.numel() returns
-            # only the local shard size.  p.ds_numel holds the full count.
-            self._num_params = sum(
-                p.ds_numel if hasattr(p, "ds_numel") else p.numel() for p in model.parameters()
-            )
-            logger.info(
-                "MFUCallback: num_params=%d (%.2fB)", self._num_params, self._num_params / 1e9
-            )
+            total_params, routed_expert_params = _count_params(model)
+            moe = _detect_moe(model)
+
+            if moe is not None and routed_expert_params > 0:
+                num_experts, num_experts_per_tok = moe
+                dense_params = total_params - routed_expert_params
+                active_expert_params = int(
+                    routed_expert_params * num_experts_per_tok / num_experts
+                )
+                self._active_params = dense_params + active_expert_params
+                logger.info(
+                    "MFUCallback: MoE detected — total=%.2fB, active=%.2fB "
+                    "(%d/%d experts per token, dense=%.2fB, routed=%.2fB)",
+                    total_params / 1e9,
+                    self._active_params / 1e9,
+                    num_experts_per_tok,
+                    num_experts,
+                    dense_params / 1e9,
+                    routed_expert_params / 1e9,
+                )
+            else:
+                self._active_params = total_params
+                logger.info(
+                    "MFUCallback: dense model — num_params=%d (%.2fB)",
+                    total_params,
+                    total_params / 1e9,
+                )
 
         self._peak_flops = self._configured_peak_flops or _detect_peak_flops()
         self._last_time = time.perf_counter()
@@ -100,7 +190,7 @@ class MFUCallback(TrainerCallback):
         logs: dict | None = None,
         **kwargs,
     ) -> None:
-        if logs is None or self._num_params is None or self._peak_flops is None:
+        if logs is None or self._active_params is None or self._peak_flops is None:
             return
 
         tokens = logs.get("num_input_tokens_seen")
@@ -115,8 +205,9 @@ class MFUCallback(TrainerCallback):
         world_size = int(os.environ.get("WORLD_SIZE", 1))
         tps_per_gpu = (tokens - self._last_tokens) / elapsed / world_size
 
-        # 6N FLOPs per token: 2N (forward) + 4N (backward)
-        mfu = tps_per_gpu * 6 * self._num_params / self._peak_flops
+        tflops_per_gpu = tps_per_gpu * self._flops_per_token_coeff * self._active_params / 1e12
+        mfu = tflops_per_gpu / (self._peak_flops / 1e12)
+        logs["throughput/tflops_per_gpu"] = round(tflops_per_gpu, 2)
         logs["throughput/mfu"] = round(mfu, 4)
 
         self._last_time = now

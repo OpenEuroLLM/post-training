@@ -25,6 +25,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# FLOPs-per-token coefficient in units of active parameters, by method.
+# SFT: 2N fwd + 4N bwd = 6N.
+# DPO: policy(2N fwd + 4N bwd) + reference(2N fwd, no bwd) = 8N.
+_METHOD_FLOPS_PER_TOKEN: dict[str, float] = {"sft": 6.0, "dpo": 8.0}
+
 _TORCH_DTYPE_MAP: dict[str, torch.dtype] = {
     "bfloat16": torch.bfloat16,
     "float16": torch.float16,
@@ -78,6 +83,8 @@ def build_common_training_kwargs(
     ds_config = config.load_deepspeed_config() if config.deepspeed.config_path else None
 
     os.environ.setdefault("TENSORBOARD_LOGGING_DIR", str(run_dir / "logs"))
+    if "wandb" in config.logging.report_to and config.logging.wandb_project:
+        os.environ.setdefault("WANDB_PROJECT", config.logging.wandb_project)
 
     # Determine training duration kwargs. When num_train_epochs is set, max_steps
     # must be -1 (disabled) so the Trainer uses epoch-based stopping. Otherwise,
@@ -102,7 +109,7 @@ def build_common_training_kwargs(
         weight_decay=t.weight_decay,
         adam_epsilon=t.adam_epsilon,
         gradient_accumulation_steps=grad_accum,
-        warmup_steps=t.warmup_ratio,
+        warmup_ratio=t.warmup_ratio,
         lr_scheduler_type=t.lr_scheduler_type,
         lr_scheduler_kwargs={
             k: v for k, v in dataclasses.asdict(t.lr_scheduler_kwargs).items() if v is not None
@@ -126,12 +133,29 @@ def build_common_training_kwargs(
     )
 
 
+def reorder_reporting_callbacks_last(trainer) -> None:
+    """Move reporting callbacks (TensorBoard, W&B) to the end of the handler.
+
+    HF's Trainer registers integration callbacks *before* user callbacks, so
+    their ``on_log`` fires before ours and any metrics our callbacks inject
+    into ``logs`` never reach the reporter. Re-ordering after construction
+    ensures ThroughputCallback / MFUCallback run first.
+    """
+    handler = trainer.callback_handler
+    reporter_names = {"TensorBoardCallback", "WandbCallback", "CometCallback", "MLflowCallback"}
+    reporters = [cb for cb in handler.callbacks if type(cb).__name__ in reporter_names]
+    for cb in reporters:
+        handler.remove_callback(type(cb))
+        handler.add_callback(cb)
+
+
 def build_callbacks(config: PostTrainingConfig, run_dir: Path) -> list:
     """Build the callback list (shared across methods)."""
     callbacks: list = []
 
     callbacks.append(ThroughputCallback())
-    callbacks.append(MFUCallback())
+    flops_coeff = _METHOD_FLOPS_PER_TOKEN.get(config.method.lower(), 6.0)
+    callbacks.append(MFUCallback(flops_per_token_coeff=flops_coeff))
 
     steps = config.checkpointing.inference_checkpoint_steps
     # Treat ``None`` or non-positive values as \"disabled\" for inference checkpoints.

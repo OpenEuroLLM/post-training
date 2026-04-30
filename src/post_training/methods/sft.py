@@ -55,10 +55,26 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
         model_init_kwargs=build_model_init_kwargs(config),
     )
 
-    return SFTTrainer(
+    trainer = SFTTrainer(
         model=config.model.name_or_path,
         processing_class=tokenizer,
         train_dataset=dataset,
         args=sft_config,
         callbacks=build_callbacks(config, run_dir),
     )
+
+    # Olmo-3-*-Think-SFT ships a generation_config.json with temperature/top_p
+    # set but do_sample=False. Newer transformers validates this strictly on
+    # checkpoint save and raises a ValueError. Set do_sample=True to match the
+    # intended sampling behaviour from the original config.
+    gen_cfg = trainer.model.generation_config
+    if not gen_cfg.do_sample and (gen_cfg.temperature not in (None, 1.0) or gen_cfg.top_p not in (None, 1.0)):
+        logger.info(
+            "Patching model generation_config: setting do_sample=True "
+            "(temperature=%.2f, top_p=%.2f were set without do_sample).",
+            gen_cfg.temperature,
+            gen_cfg.top_p,
+        )
+        gen_cfg.do_sample = True
+
+    return trainer

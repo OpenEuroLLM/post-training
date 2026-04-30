@@ -12,7 +12,7 @@ import os
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from datasets import Dataset, interleave_datasets, load_dataset
+from datasets import Dataset, interleave_datasets, load_dataset, load_from_disk
 
 from post_training.data.transforms import get_transform
 
@@ -82,14 +82,25 @@ def load_and_mix_datasets(
             entry.transform,
         )
 
-        # Build kwargs for load_dataset, only passing optional params when set.
-        load_kwargs: dict = {}
-        if entry.data_dir is not None:
-            load_kwargs["data_dir"] = entry.data_dir
-        if entry.subset is not None:
-            load_kwargs["name"] = entry.subset
+        # A local directory produced by `save_to_disk` contains a
+        # `dataset_dict.json` (DatasetDict) or `dataset_info.json` (Dataset) at
+        # its root. `load_dataset` cannot read those; use `load_from_disk`.
+        is_saved_to_disk = os.path.isdir(entry.path) and (
+            os.path.isfile(os.path.join(entry.path, "dataset_dict.json"))
+            or os.path.isfile(os.path.join(entry.path, "dataset_info.json"))
+        )
 
-        ds = load_dataset(entry.path, split=entry.split, **load_kwargs)
+        if is_saved_to_disk:
+            ds = load_from_disk(entry.path)
+            if entry.split is not None:
+                ds = ds[entry.split]
+        else:
+            load_kwargs: dict = {}
+            if entry.data_dir is not None:
+                load_kwargs["data_dir"] = entry.data_dir
+            if entry.subset is not None:
+                load_kwargs["name"] = entry.subset
+            ds = load_dataset(entry.path, split=entry.split, **load_kwargs)
 
         # Apply optional per-dataset transform.
         if entry.transform is not None:

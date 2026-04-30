@@ -138,6 +138,27 @@ def smoltalk2_preference(example: dict[str, Any]) -> dict[str, Any]:
     return smoltalk2(example_copy)
 
 
+@register_transform("smoltalk2_preference_dpo")
+def smoltalk2_preference_dpo(example: dict[str, Any]) -> dict[str, Any]:
+    """Transform smoltalk2 Preference rows into TRL DPO conversational format.
+
+    Source rows have `prompt` as a string and `chosen`/`rejected` as full
+    `[user, assistant]` message lists. TRL DPO requires all three to be
+    message lists. We wrap `prompt` in a `[{role: user}]` list and keep only
+    the assistant reply in `chosen`/`rejected` (TRL's explicit-prompt form).
+    """
+    chosen_msgs = example["chosen"]
+    rejected_msgs = example["rejected"]
+    prompt_msgs = [{"role": "user", "content": example["prompt"]}]
+    chosen_reply = [m for m in chosen_msgs if m["role"] == "assistant"]
+    rejected_reply = [m for m in rejected_msgs if m["role"] == "assistant"]
+    return {
+        "prompt": prompt_msgs,
+        "chosen": chosen_reply,
+        "rejected": rejected_reply,
+    }
+
+
 @register_transform("perfectblend")
 def perfectblend(example: dict[str, Any]) -> dict[str, Any]:
     """Transform mlabonne/open-perfectblend examples for SFT.
@@ -465,3 +486,18 @@ def lmsys_chat(example: dict[str, Any]) -> dict[str, Any]:
     The ``conversation`` column contains the messages list directly.
     """
     return {"messages": example["conversation"]}
+
+
+@register_transform("dolci_instruct")
+def dolci_instruct(example: dict[str, Any]) -> dict[str, Any]:
+    """Transform allenai/Dolci-Instruct-SFT examples.
+
+    Messages are already in conversational format but include extra keys
+    (``function_calls``, ``functions``) that TRL does not expect; strip them.
+    """
+    return {
+        "messages": [
+            {"role": m["role"], "content": m["content"]}
+            for m in example["messages"]
+        ]
+    }

@@ -59,8 +59,9 @@ export LAUNCHER="accelerate launch \
     --main_process_port $MASTER_PORT \
     --mixed_precision {{ mixed_precision }} \
     --dynamo_backend {{ dynamo_backend }} \
-{% if use_deepspeed %}    --use_deepspeed \{% endif %}
-    --deepspeed_multinode_launcher {{ deepspeed_multinode_launcher }} \
+{% if use_deepspeed %}    --use_deepspeed \
+{% endif %}{% if deepspeed_config_file %}    --deepspeed_config_file {{ deepspeed_config_file }} \
+{% endif %}    --deepspeed_multinode_launcher {{ deepspeed_multinode_launcher }} \
 {% if same_network %}    --same_network \{% endif %}
     --rdzv_backend {{ rdzv_backend }} \
     --max_restarts 0 \
