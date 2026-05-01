@@ -6,6 +6,9 @@
 
 #SBATCH --job-name={{ job_name }}
 #SBATCH --partition={{ partition }}
+{% if account -%}
+#SBATCH --account={{ account }}
+{% endif -%}
 {% if qos -%}
 #SBATCH --qos={{ qos }}
 {% endif -%}

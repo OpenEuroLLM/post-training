@@ -193,6 +193,7 @@ class SlurmConfig:
     """SLURM job scheduler parameters."""
 
     partition: str = "gpu"
+    account: str | None = None
     qos: str | None = None
     num_nodes: int = 1
     gpus_per_node: int = 4
