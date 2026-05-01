@@ -102,7 +102,7 @@ def build_common_training_kwargs(
         weight_decay=t.weight_decay,
         adam_epsilon=t.adam_epsilon,
         gradient_accumulation_steps=grad_accum,
-        warmup_steps=t.warmup_ratio,
+        warmup_steps=t.warmup_steps,
         lr_scheduler_type=t.lr_scheduler_type,
         lr_scheduler_kwargs={
             k: v for k, v in dataclasses.asdict(t.lr_scheduler_kwargs).items() if v is not None

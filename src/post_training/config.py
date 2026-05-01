@@ -6,12 +6,15 @@ YAML loading, merging, and CLI overrides.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
 from omegaconf import MISSING, DictConfig, OmegaConf
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Sub-configs
@@ -61,7 +64,16 @@ class TrainingConfig:
     learning_rate: float = 2.0e-5
     effective_batch_size: int = 512
     per_device_train_batch_size: int = 4
-    warmup_ratio: float = 0.03
+    warmup_steps: float = field(
+        default=0.0,
+        metadata={
+            "help": (
+                "Linear warmup duration. Values in [0, 1) are interpreted as a "
+                "ratio of total training steps; values >= 1 are interpreted as an "
+                "absolute number of steps; 0 disables warmup."
+            )
+        },
+    )
     lr_scheduler_type: str = "cosine_with_min_lr"
     lr_scheduler_kwargs: LRSchedulerKwargs = field(default_factory=LRSchedulerKwargs)
     adam_beta1: float = 0.9
@@ -271,6 +283,19 @@ class PostTrainingConfig:
         """
         schema = OmegaConf.structured(cls)
         file_cfg = OmegaConf.load(yaml_path)
+
+        # Migrate deprecated training.warmup_ratio -> training.warmup_steps
+        file_dict = OmegaConf.to_container(file_cfg, resolve=False)
+        if isinstance(file_dict, dict):
+            training_dict = file_dict.get("training", {})
+            if isinstance(training_dict, dict) and "warmup_ratio" in training_dict:
+                logger.warning(
+                    "training.warmup_ratio is deprecated; use training.warmup_steps "
+                    "(values < 1 are interpreted as a ratio). Auto-migrating."
+                )
+                training_dict.setdefault("warmup_steps", training_dict.pop("warmup_ratio"))
+                file_cfg = OmegaConf.create(file_dict)
+
         merged: DictConfig = OmegaConf.merge(schema, file_cfg)
 
         if cli_overrides:
