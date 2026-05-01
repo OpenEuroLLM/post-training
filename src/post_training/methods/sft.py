@@ -15,6 +15,7 @@ from post_training.methods.common import (
     build_common_training_kwargs,
     build_model_init_kwargs,
     build_tokenizer,
+    sanitize_generation_config,
 )
 
 if TYPE_CHECKING:
@@ -57,10 +58,13 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
         model_init_kwargs=build_model_init_kwargs(config),
     )
 
-    return SFTTrainer(
+    trainer = SFTTrainer(
         model=config.model.name_or_path,
         processing_class=tokenizer,
         train_dataset=dataset,
         args=sft_config,
         callbacks=build_callbacks(config, run_dir),
     )
+
+    sanitize_generation_config(trainer)
+    return trainer
