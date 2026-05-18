@@ -124,12 +124,10 @@ def main() -> None:
         return
 
     # Auto-resume from the latest checkpoint if one exists.
+    from transformers.trainer_utils import get_last_checkpoint
+
     checkpoints_dir = run_dir / "checkpoints"
-    existing = sorted(
-        checkpoints_dir.glob("checkpoint-*"),
-        key=lambda p: int(p.name.split("-")[-1]),
-    )
-    resume_from = str(existing[-1]) if existing else None
+    resume_from = get_last_checkpoint(str(checkpoints_dir)) if checkpoints_dir.exists() else None
     if resume_from:
         logger.info("Resuming from checkpoint: %s", resume_from)
 
