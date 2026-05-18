@@ -23,6 +23,7 @@ CHAT_TEMPLATES: dict[str, str] = {
     "olmo3": "olmo3.jinja",
     "apertus": "apertus.jinja",
     "tulu3": "tulu3.jinja",
+    "datamix": "datamix.jinja",
 }
 
 
