@@ -32,7 +32,7 @@ container:
 
 # -- Model -------------------------------------------------------------------
 model:
-  name_or_path: "allenai/Olmo-3-1025-7B"
+  name_or_path: "openeurollm/datamix-9b-80-20"
   attn_implementation: "flash_attention_3"
   dtype: "bfloat16"
 
@@ -56,7 +56,7 @@ training:
 
 # -- SFT method parameters ---------------------------------------------------
 sft:
-  max_seq_length: 4096
+  max_seq_length: 2048
   packing: true
 
 # -- Checkpointing -----------------------------------------------------------
@@ -68,12 +68,12 @@ checkpointing:
 
 # -- Data mix ----------------------------------------------------------------
 data:
-  chat_template: "olmo3"                     # Name from chat template registry
-  num_proc: null                             # null = auto-detect, capped at 32
+  chat_template: "datamix"                   # Name from chat template registry
+  num_proc: null                             # null = auto-detect, capped at 64
   datasets:
-    - name: "nemotron_pt_v2"
-      path: "nvidia/Nemotron-Post-Training-Dataset-v2"
-      split: "stem"
+    - name: "dolci-think-sft"
+      path: "allenai/Dolci-Instruct-SFT"
+      split: "train"
       weight: 1.0
       transform: null                        # null = already conversational
 
