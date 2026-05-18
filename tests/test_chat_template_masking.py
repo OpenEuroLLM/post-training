@@ -56,10 +56,21 @@ def test_olmo3_instruct_sft_template_has_markers() -> None:
     assert has_generation_markers(get_chat_template("olmo3-instruct-sft"))
 
 
+def test_olmo3_think_sft_template_has_markers() -> None:
+    """The Think-SFT template is the one to use when reproducing
+    AllenAI's Olmo-3-7B-Think-SFT recipe via TRL.  Same masking story as
+    Instruct-SFT — if `{% generation %}` markers go missing, SFT
+    regresses to full-sequence loss.
+    """
+    assert has_generation_markers(get_chat_template("olmo3-think-sft"))
+
+
 def test_olmo3_template_lacks_markers() -> None:
-    """The legacy `olmo3` template (copied from Olmo-3-7B-Think-SFT) does not
-    have `{% generation %}` markers.  Documented here so the runtime guard's
-    behaviour is explicit: starting an SFT run with `chat_template: olmo3`
-    will raise (as intended) until the template is updated or replaced.
+    """The legacy `olmo3` template (a re-formatted copy of
+    Olmo-3-7B-Think-SFT) does not have `{% generation %}` markers.
+    Documented here so the runtime guard's behaviour is explicit:
+    starting an SFT run with `chat_template: olmo3` will raise — use
+    `olmo3-instruct-sft` or `olmo3-think-sft` instead, depending on
+    which checkpoint you are reproducing.
     """
     assert not has_generation_markers(get_chat_template("olmo3"))
