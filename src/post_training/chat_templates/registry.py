@@ -27,20 +27,30 @@ _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
 # Mapping: template name -> jinja filename (relative to _TEMPLATES_DIR).
 #
-# Note on the two ``olmo3*`` entries: they correspond to two *different*
-# AllenAI checkpoints with materially different chat templates.
-#   - ``olmo3``: copied from ``allenai/Olmo-3-7B-Think-SFT``.  Appends
-#     ``<think>`` to ``add_generation_prompt=True`` (Think-style priming).
-#     No ``{% generation %}`` markers, so SFT here cannot mask user/system
-#     tokens out of the loss — the runtime guard in ``methods/sft.py`` will
-#     refuse to start training with this template.
+# Note on the three ``olmo3*`` entries: they correspond to three different
+# views of AllenAI's OLMo-3-7B chat templates.
+#   - ``olmo3``: a cosmetically-reformatted copy of
+#     ``allenai/Olmo-3-7B-Think-SFT``'s chat template (single→double quotes
+#     and whitespace stripping added; rendered output is byte-identical to
+#     the upstream Think template).  Appends ``<think>`` to
+#     ``add_generation_prompt=True``.  No ``{% generation %}`` markers, so
+#     SFT here cannot mask user/system tokens out of the loss — the runtime
+#     guard in ``methods/sft.py`` will refuse to start training with this
+#     template.  Kept for inference parity / backwards compatibility.
 #   - ``olmo3-instruct-sft``: byte-identical (modulo spliced ``{% generation %}``
 #     markers) to ``allenai/OLMo-3-7B-Instruct-SFT``'s ``chat_template.jinja``.
-#     This is the correct template for reproducing the Instruct-SFT recipe.
+#     Use this to reproduce the Instruct-SFT recipe via TRL.
+#   - ``olmo3-think-sft``: byte-identical (modulo spliced ``{% generation %}``
+#     markers) to ``allenai/Olmo-3-7B-Think-SFT``'s ``chat_template`` field
+#     in ``tokenizer_config.json``.  Use this to reproduce the Think-SFT
+#     recipe via TRL.  Same assistant-only masking pattern as Instruct-SFT;
+#     OLMo-core's reference Think pipeline uses identical offline-baked
+#     masks (only learning rate and dataset differ between the two recipes).
 CHAT_TEMPLATES: dict[str, str] = {
     "chatml": "chatml.jinja",
     "olmo3": "olmo3.jinja",
     "olmo3-instruct-sft": "olmo3-instruct-sft.jinja",
+    "olmo3-think-sft": "olmo3-think-sft.jinja",
     "apertus": "apertus.jinja",
     "tulu3": "tulu3.jinja",
 }
