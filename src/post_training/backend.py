@@ -40,6 +40,8 @@ class Backend(ABC):
         config: PostTrainingConfig,
         run_dir: Path,
         frozen_config_path: str,
+        *,
+        tokenize_only: bool = False,
     ) -> Path:
         """Render the SLURM batch script and return its path."""
 
@@ -153,15 +155,19 @@ class TRLBackend(Backend):
     def run_dir_subdirs(self) -> list[str]:
         return ["checkpoints", "inference_checkpoints"]
 
-    def render_slurm_script(self, config, run_dir, frozen_config_path):
+    def render_slurm_script(self, config, run_dir, frozen_config_path, *, tokenize_only=False):
         if config.container.image:
             from post_training.slurm.launcher import render_trl_container_slurm_script
 
-            return render_trl_container_slurm_script(config, run_dir, frozen_config_path)
+            return render_trl_container_slurm_script(
+                config, run_dir, frozen_config_path, tokenize_only=tokenize_only
+            )
 
         from post_training.slurm.launcher import render_trl_slurm_script
 
-        return render_trl_slurm_script(config, run_dir, frozen_config_path)
+        return render_trl_slurm_script(
+            config, run_dir, frozen_config_path, tokenize_only=tokenize_only
+        )
 
     def post_freeze(self, config, run_dir):
         pass
@@ -185,7 +191,9 @@ class LlamaFactoryBackend(Backend):
     def run_dir_subdirs(self) -> list[str]:
         return []
 
-    def render_slurm_script(self, config, run_dir, frozen_config_path):
+    def render_slurm_script(self, config, run_dir, frozen_config_path, *, tokenize_only=False):
+        # LlamaFactory has no --tokenize-only equivalent; submit.py rejects it before this point.
+        del tokenize_only
         from post_training.slurm.launcher import render_llamafactory_slurm_script
 
         return render_llamafactory_slurm_script(config, run_dir)

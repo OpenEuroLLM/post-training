@@ -105,6 +105,11 @@ def main() -> None:
     config = PostTrainingConfig.load(config_path, cli_overrides)
 
     if tokenize_only:
+        if config.backend == "llamafactory":
+            raise ValueError(
+                "--tokenize-only is only supported with backend=trl "
+                "(LlamaFactory uses llamafactory-cli, which has no equivalent flag)."
+            )
         config.slurm.num_nodes = 1
         config.slurm.gpus_per_node = 1
 
@@ -141,7 +146,7 @@ def main() -> None:
 
     get_backend(config.backend).post_freeze(config, run_dir)
 
-    job_id = generate_and_submit(config, run_dir, str(frozen))
+    job_id = generate_and_submit(config, run_dir, str(frozen), tokenize_only=tokenize_only)
     logger.info("SLURM job submitted: %s", job_id)
 
 
