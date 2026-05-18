@@ -55,7 +55,7 @@ from post_training.utils.paths import setup_run_directory
 
 logger = logging.getLogger(__name__)
 
-_TOKENIZE_PREVIEW_SAMPLES = 3
+_TOKENIZE_PREVIEW_SAMPLES = 5
 _TOKENIZE_PREVIEW_SEP = "─" * 72
 
 
