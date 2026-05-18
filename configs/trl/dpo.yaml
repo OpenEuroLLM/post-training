@@ -60,7 +60,7 @@ checkpointing:
 
 # -- Data mix ----------------------------------------------------------------
 data:
-  chat_template: "olmo3"                     # Name from chat template registry
+  chat_template: "olmo3-instruct-sft"        # Name from chat template registry
   num_proc: null                             # null = auto-detect, capped at 32
   datasets:
     - name: "smoltalk2_preference"

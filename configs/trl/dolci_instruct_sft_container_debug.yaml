@@ -49,7 +49,7 @@ checkpointing:
 
 # -- Data mix ----------------------------------------------------------------
 data:
-  chat_template: "olmo3"
+  chat_template: "olmo3-instruct-sft"
   num_proc: null
   datasets:
     - name: "dolci_instruct_sft"

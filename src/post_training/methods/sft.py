@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from accelerate import PartialState
 from trl import SFTConfig, SFTTrainer
 
+from post_training.chat_templates.registry import has_generation_markers
 from post_training.data.loader import load_and_mix_datasets
 from post_training.methods.common import (
     build_callbacks,
@@ -46,6 +47,19 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
     mc = config.sft  # method-specific config
 
     tokenizer = build_tokenizer(config)
+
+    # Fail fast if the chat template can't drive `assistant_only_loss=True`.
+    # Missing markers silently degrade SFT to full-sequence loss — a 21h run
+    # produces a measurably worse model and nothing in the logs shouts.
+    if not has_generation_markers(tokenizer.chat_template):
+        raise ValueError(
+            f"Chat template '{config.data.chat_template}' is missing "
+            "{% generation %}…{% endgeneration %} markers around the assistant "
+            "content emission. Without them, `assistant_only_loss=True` is a "
+            "silent no-op and SFT would compute CE loss on every token "
+            "(system + user + assistant)."
+        )
+
     with PartialState().main_process_first():
         dataset = load_and_mix_datasets(config.data, row_filter=_sft_row_filter)
 
@@ -55,6 +69,10 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
         packing=mc.packing,
         dataset_num_proc=mc.dataset_num_proc,
         model_init_kwargs=build_model_init_kwargs(config),
+        # Mask loss on everything except the assistant content.  Requires the
+        # chat template to wrap assistant turns in {% generation %}…{% endgeneration %}.
+        # Without this, SFTTrainer trains on user + system tokens too.
+        assistant_only_loss=True,
     )
 
     trainer = SFTTrainer(
