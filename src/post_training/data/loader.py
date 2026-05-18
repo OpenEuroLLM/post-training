@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_MAX_NUM_PROC = 32
+_MAX_NUM_PROC = 64
 
 
 def _resolve_num_proc(configured: int | None) -> int:
