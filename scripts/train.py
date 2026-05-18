@@ -125,7 +125,10 @@ def main() -> None:
 
     # Auto-resume from the latest checkpoint if one exists.
     checkpoints_dir = run_dir / "checkpoints"
-    existing = sorted(checkpoints_dir.glob("checkpoint-*"))
+    existing = sorted(
+        checkpoints_dir.glob("checkpoint-*"),
+        key=lambda p: int(p.name.split("-")[-1]),
+    )
     resume_from = str(existing[-1]) if existing else None
     if resume_from:
         logger.info("Resuming from checkpoint: %s", resume_from)
