@@ -90,7 +90,7 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     export HF_HOME=${HF_HOME}
     export HF_HUB_CACHE=${HF_HUB_CACHE}
     export HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE}
-    export HF_DATASETS_CACHE=${HF_HOME}/datasets
+    export HF_DATASETS_CACHE=${HF_DATASETS_CACHE:-${HF_HOME}/datasets}
     export HF_DATASETS_OFFLINE=1
     export TRANSFORMERS_OFFLINE=1
     export HF_HUB_OFFLINE=1

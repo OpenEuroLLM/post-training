@@ -92,7 +92,7 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     export HF_HOME=${HF_HOME}
     export HF_HUB_CACHE=${HF_HUB_CACHE}
     export HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE}
-    export HF_DATASETS_CACHE=${HF_HOME}/datasets
+    export HF_DATASETS_CACHE=${HF_DATASETS_CACHE:-${HF_HOME}/datasets}
     export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
     cd {{ repo_dir }}
@@ -113,7 +113,7 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
 {% endif %}      --rdzv_backend {{ rdzv_backend }} \
       --max_restarts 0 \
       --role \$(hostname -s): \
-      scripts/train.py --config {{ config_path }}
+      scripts/train.py --config {{ config_path }}{% if tokenize_only %} --tokenize-only{% endif %}
   " &
 
 wait $!
