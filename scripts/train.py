@@ -161,8 +161,9 @@ def main() -> None:
 
     if tokenize_only:
         logger.info("--tokenize-only set — exiting after trainer initialization.")
-        _print_tokenized_samples(trainer)
         return
+
+    _print_tokenized_samples(trainer)
 
     # Auto-resume from the latest checkpoint if one exists.
     checkpoints_dir = run_dir / "checkpoints"
