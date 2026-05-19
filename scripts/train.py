@@ -75,6 +75,8 @@ def _print_tokenized_samples(trainer) -> None:
     tokenizer = trainer.processing_class
     n = min(_TOKENIZE_PREVIEW_SAMPLES, len(dataset))
 
+    logger.info("Printing tokenized preview to stdout (%d of %d samples).", n, len(dataset))
+
     print(f"\n{_TOKENIZE_PREVIEW_SEP}")
     print(f"  Tokenized dataset preview ({n} of {len(dataset)} samples)")
     print(f"  Columns: {dataset.column_names}")
