@@ -244,6 +244,41 @@ Templates convert the list of messages into a single string for the model.
 - **Config**: `data.chat_template: "name"`
 - **Source**: Jinja files located in `src/post_training/chat_templates/templates/`
 
+##### SFT requires `{% generation %}` markers
+
+SFT in this framework uses TRL's `assistant_only_loss=True`, which masks the
+cross-entropy loss on every non-assistant token (system + user). This depends on
+the chat template wrapping the assistant content emission in
+`{% generation %}…{% endgeneration %}` markers — transformers'
+`apply_chat_template(..., return_assistant_tokens_mask=True)` uses them to build
+the per-token loss mask.
+
+If your template lacks those markers, `build_sft_trainer()` will refuse to start
+with a `ValueError` that names the template and points to the fix. This is
+deliberate: silently training without the mask measurably degrades downstream
+performance (the framework previously had this bug; SFT computed CE loss on
+every token in the packed sequence).
+
+Templates that are safe for SFT today:
+
+| Name | Source | Notes |
+|------|--------|-------|
+| `olmo3-instruct-sft` | `allenai/OLMo-3-7B-Instruct-SFT` (HF Hub) | Use to reproduce the Instruct-SFT recipe. |
+| `olmo3-think-sft`    | `allenai/Olmo-3-7B-Think-SFT` (HF Hub)    | Use to reproduce the Think-SFT recipe. |
+
+Templates that are *not* safe for SFT (kept for inference / DPO compatibility):
+
+| Name | Notes |
+|------|-------|
+| `olmo3` | Legacy alias for the markerless Think-SFT template; preserved for inference parity only. |
+| `chatml`, `tulu3`, `apertus` | Markerless; need `{% generation %}` markers added before they can be used for SFT. |
+
+To use a custom template for SFT, wrap exactly the tokens that should contribute
+to loss — typically `content` + `function_calls`/`tool_calls` + the closing
+`<|im_end|>` or `eos_token`. Do **not** wrap the leading role-tag prefix
+(`<|im_start|>assistant\n`); it's a deterministic control sequence the model
+shouldn't have to predict.
+
 #### D. Data inspection
 
 Use the data script to debug the pipeline stages (Raw → Transformed → Formatted → Tokenized) and to compute token statistics.
@@ -431,7 +466,7 @@ checkpointing:
 
 # -- Data mix ----------------------------------------------------------------
 data:
-  chat_template: "olmo3"                     # Name from chat template registry
+  chat_template: "olmo3-instruct-sft"        # Name from chat template registry
   num_proc: null                             # null = auto-detect, capped at 32
   datasets:
     - name: "nemotron_pt_v2"
