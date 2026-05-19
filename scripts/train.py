@@ -55,6 +55,48 @@ from post_training.utils.paths import setup_run_directory
 
 logger = logging.getLogger(__name__)
 
+_TOKENIZE_PREVIEW_SAMPLES = 5
+_TOKENIZE_PREVIEW_SEP = "─" * 72
+
+
+def _indent(text: str, n: int) -> str:
+    prefix = " " * n
+    return "\n".join(prefix + line for line in text.splitlines())
+
+
+def _print_tokenized_samples(trainer) -> None:
+    """Print decoded samples of ``trainer.train_dataset`` from the main process."""
+    from accelerate import PartialState
+
+    if not PartialState().is_main_process:
+        return
+
+    dataset = trainer.train_dataset
+    tokenizer = trainer.processing_class
+    n = min(_TOKENIZE_PREVIEW_SAMPLES, len(dataset))
+
+    logger.info("Printing tokenized preview to stdout (%d of %d samples).", n, len(dataset))
+
+    print(f"\n{_TOKENIZE_PREVIEW_SEP}")
+    print(f"  Tokenized dataset preview ({n} of {len(dataset)} samples)")
+    print(f"  Columns: {dataset.column_names}")
+    print(_TOKENIZE_PREVIEW_SEP)
+
+    for i in range(n):
+        row = dataset[i]
+        print(f"\n  [Sample {i}]")
+        for key, value in row.items():
+            if isinstance(value, list) and key.endswith("input_ids"):
+                print(f"    {key}  (length {len(value)})")
+                print(_indent(tokenizer.decode(value), 6))
+            elif key == "labels" and isinstance(value, list):
+                masked = sum(1 for x in value if x == -100)
+                unmasked_ids = [x for x in value if x != -100]
+                print(f"    labels  ({len(value)} total, {masked} masked)")
+                if unmasked_ids:
+                    print(_indent(tokenizer.decode(unmasked_ids), 6))
+    print(f"\n{_TOKENIZE_PREVIEW_SEP}\n")
+
 
 def _parse_args() -> tuple[str, list[str]]:
     """Parse ``--config`` and collect remaining args as OmegaConf overrides."""
@@ -122,6 +164,8 @@ def main() -> None:
     if tokenize_only:
         logger.info("--tokenize-only set — exiting after trainer initialization.")
         return
+
+    _print_tokenized_samples(trainer)
 
     # Auto-resume from the latest checkpoint if one exists.
     from transformers.trainer_utils import get_last_checkpoint
