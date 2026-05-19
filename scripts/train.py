@@ -160,12 +160,11 @@ def main() -> None:
 
     # ── Build trainer & launch ──────────────────────────────────────
     trainer = build_trainer(config, run_dir)
+    _print_tokenized_samples(trainer)
 
     if tokenize_only:
         logger.info("--tokenize-only set — exiting after trainer initialization.")
         return
-
-    _print_tokenized_samples(trainer)
 
     # Auto-resume from the latest checkpoint if one exists.
     from transformers.trainer_utils import get_last_checkpoint
