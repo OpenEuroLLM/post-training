@@ -29,6 +29,8 @@ def render_trl_slurm_script(
     config: PostTrainingConfig,
     run_dir: Path,
     config_path: str,
+    *,
+    tokenize_only: bool = False,
 ) -> Path:
     """Render the TRL SLURM batch script and write it to *run_dir/slurm/job.sh*.
 
@@ -71,6 +73,7 @@ def render_trl_slurm_script(
         module_purge=config.slurm.module_purge,
         run_dir=str(run_dir),
         config_path=config_path,
+        tokenize_only=tokenize_only,
         # Accelerate flags
         mixed_precision=config.accelerate.mixed_precision,
         dynamo_backend=config.accelerate.dynamo_backend,
@@ -94,6 +97,8 @@ def render_trl_container_slurm_script(
     config: PostTrainingConfig,
     run_dir: Path,
     config_path: str,
+    *,
+    tokenize_only: bool = False,
 ) -> Path:
     """Render the containerized TRL SLURM batch script into *run_dir/slurm/job.sh*.
 
@@ -122,6 +127,7 @@ def render_trl_container_slurm_script(
         max_failures=config.slurm.max_failures,
         run_dir=str(run_dir.resolve()),
         config_path=config_path,
+        tokenize_only=tokenize_only,
         # Accelerate flags
         mixed_precision=config.accelerate.mixed_precision,
         dynamo_backend=config.accelerate.dynamo_backend,
@@ -217,6 +223,8 @@ def generate_and_submit(
     config: PostTrainingConfig,
     run_dir: Path,
     config_path: str,
+    *,
+    tokenize_only: bool = False,
 ) -> str:
     """Render the SLURM script and submit it in one call.
 
@@ -227,5 +235,7 @@ def generate_and_submit(
     """
     from post_training.backend import get_backend
 
-    script_path = get_backend(config.backend).render_slurm_script(config, run_dir, config_path)
+    script_path = get_backend(config.backend).render_slurm_script(
+        config, run_dir, config_path, tokenize_only=tokenize_only
+    )
     return submit_job(script_path)

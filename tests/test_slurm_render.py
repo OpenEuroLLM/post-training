@@ -2,6 +2,7 @@
 
 import pytest
 
+from post_training.backend import LlamaFactoryBackend, TRLBackend
 from post_training.config import PostTrainingConfig
 from post_training.slurm.launcher import (
     render_llamafactory_slurm_script,
@@ -134,3 +135,101 @@ def test_trl_container_qos_mem_absent_when_none(tmp_path, config):
 
     assert "--qos" not in content
     assert "--mem" not in content
+
+
+# ---------------------------------------------------------------------------
+# --tokenize-only forwarding — TRL templates and backend dispatch
+# ---------------------------------------------------------------------------
+
+
+def _train_invocation(content: str) -> str:
+    """Return the rendered line that invokes scripts/train.py."""
+    for line in content.splitlines():
+        if "scripts/train.py" in line:
+            return line
+    raise AssertionError("no scripts/train.py invocation found in rendered script")
+
+
+def test_trl_tokenize_only_appended(tmp_path, config):
+    """--tokenize-only is appended to the train.py invocation when requested."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_slurm_script(
+        config, run_dir, "configs/trl/sft.yaml", tokenize_only=True
+    ).read_text()
+
+    assert "--tokenize-only" in _train_invocation(content)
+
+
+def test_trl_tokenize_only_absent_by_default(tmp_path, config):
+    """No --tokenize-only flag is emitted when the kwarg is omitted."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    assert "--tokenize-only" not in content
+
+
+def test_trl_container_tokenize_only_appended(tmp_path, config):
+    """--tokenize-only is appended in the containerized TRL template."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_container_slurm_script(
+        config, run_dir, "configs/trl/sft.yaml", tokenize_only=True
+    ).read_text()
+
+    assert "--tokenize-only" in _train_invocation(content)
+
+
+def test_trl_container_tokenize_only_absent_by_default(tmp_path, config):
+    """No --tokenize-only flag in the containerized TRL template by default."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_container_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    assert "--tokenize-only" not in content
+
+
+def test_trl_backend_forwards_tokenize_only_non_container(tmp_path, config):
+    """TRLBackend.render_slurm_script forwards the flag on the bare-metal path."""
+    config.container.image = None  # force non-container branch
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    script = TRLBackend().render_slurm_script(
+        config, run_dir, "configs/trl/sft.yaml", tokenize_only=True
+    )
+
+    assert "--tokenize-only" in _train_invocation(script.read_text())
+
+
+def test_trl_backend_forwards_tokenize_only_container(tmp_path, config):
+    """TRLBackend.render_slurm_script forwards the flag on the container path."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    script = TRLBackend().render_slurm_script(
+        config, run_dir, "configs/trl/sft.yaml", tokenize_only=True
+    )
+
+    assert "--tokenize-only" in _train_invocation(script.read_text())
+
+
+def test_llamafactory_backend_ignores_tokenize_only(tmp_path, config):
+    """LlamaFactoryBackend accepts the kwarg silently and never emits --tokenize-only.
+
+    submit.py raises before reaching this point, but the backend itself
+    must not crash if a caller passes the kwarg.
+    """
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    script = LlamaFactoryBackend().render_slurm_script(
+        config, run_dir, "configs/llamafactory/long-context.yaml", tokenize_only=True
+    )
+
+    assert "--tokenize-only" not in script.read_text()
