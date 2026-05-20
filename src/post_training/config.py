@@ -34,12 +34,27 @@ class ModelConfig:
 class LRSchedulerKwargs:
     """Extra keyword arguments forwarded to the LR scheduler.
 
-    Set ``min_lr_rate`` only for schedulers that support it (e.g.
-    ``cosine_with_min_lr``).  Leave it as ``None`` for schedulers like
-    ``linear`` that do not accept this argument.
+    Only fields relevant to the active ``lr_scheduler_type`` should be set;
+    the rest must remain ``None`` and are stripped before being forwarded to
+    HuggingFace.  Schedulers like ``linear`` or ``constant`` accept no extra
+    kwargs and require every field to stay ``None``.
+
+    Per-scheduler fields:
+
+    - ``cosine_with_min_lr``: ``min_lr_rate``
+    - ``warmup_stable_decay``: ``num_stable_steps``, ``num_decay_steps``,
+      ``min_lr_ratio``, ``num_cycles``, ``warmup_type``, ``decay_type``
     """
 
+    # cosine_with_min_lr
     min_lr_rate: float | None = None
+    # warmup_stable_decay
+    num_stable_steps: int | None = None
+    num_decay_steps: int | None = None
+    min_lr_ratio: float | None = None
+    num_cycles: float | None = None
+    warmup_type: str | None = None  # 'linear' | 'cosine' | '1-sqrt'
+    decay_type: str | None = None  # 'linear' | 'cosine' | '1-sqrt'
 
 
 @dataclass

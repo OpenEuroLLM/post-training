@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import math
@@ -75,6 +76,58 @@ def _dataset_mix_hash(datasets: list) -> str:
 
 
 class TRLBackend(Backend):
+    # LRSchedulerKwargs fields → set of lr_scheduler_type values that accept them.
+    # A scheduler not listed here accepts none of the kwargs in LRSchedulerKwargs.
+    _LR_SCHEDULER_ALLOWED_KWARGS: dict[str, set[str]] = {
+        "cosine_with_min_lr": {"min_lr_rate"},
+        "warmup_stable_decay": {
+            "num_stable_steps",
+            "num_decay_steps",
+            "min_lr_ratio",
+            "num_cycles",
+            "warmup_type",
+            "decay_type",
+        },
+    }
+
+    _WSD_WARMUP_DECAY_TYPES = {"linear", "cosine", "1-sqrt"}
+
+    @classmethod
+    def _validate_lr_scheduler_kwargs(cls, config: PostTrainingConfig) -> None:
+        t = config.training
+        allowed = cls._LR_SCHEDULER_ALLOWED_KWARGS.get(t.lr_scheduler_type, set())
+        set_fields = {
+            k: v for k, v in dataclasses.asdict(t.lr_scheduler_kwargs).items() if v is not None
+        }
+        bad = sorted(k for k in set_fields if k not in allowed)
+        if bad:
+            if allowed:
+                raise ValueError(
+                    f"training.lr_scheduler_kwargs.{bad[0]} is not a valid kwarg for "
+                    f"lr_scheduler_type='{t.lr_scheduler_type}'. "
+                    f"Allowed kwargs for this scheduler: {sorted(allowed)}. "
+                    f"Offending kwargs: {bad}."
+                )
+            raise ValueError(
+                f"lr_scheduler_type='{t.lr_scheduler_type}' accepts no extra kwargs, "
+                f"but training.lr_scheduler_kwargs has: {bad}. Unset them or pick a "
+                f"scheduler that supports them."
+            )
+
+        if t.lr_scheduler_type == "warmup_stable_decay":
+            if t.lr_scheduler_kwargs.num_decay_steps is None:
+                raise ValueError(
+                    "training.lr_scheduler_kwargs.num_decay_steps is required when "
+                    "lr_scheduler_type='warmup_stable_decay' (no default in HF)."
+                )
+            for field_name in ("warmup_type", "decay_type"):
+                value = getattr(t.lr_scheduler_kwargs, field_name)
+                if value is not None and value not in cls._WSD_WARMUP_DECAY_TYPES:
+                    raise ValueError(
+                        f"training.lr_scheduler_kwargs.{field_name}={value!r} is invalid. "
+                        f"Must be one of {sorted(cls._WSD_WARMUP_DECAY_TYPES)}."
+                    )
+
     def validate(self, config: PostTrainingConfig) -> None:
         if config.method not in _SUPPORTED_METHODS:
             raise ValueError(
@@ -97,6 +150,8 @@ class TRLBackend(Backend):
             raise ValueError("training.effective_batch_size must be positive.")
         if t.per_device_train_batch_size <= 0:
             raise ValueError("training.per_device_train_batch_size must be positive.")
+
+        self._validate_lr_scheduler_kwargs(config)
 
         # Training length: exactly one of max_steps / num_train_epochs /
         # num_training_samples / num_training_tokens must be specified.
