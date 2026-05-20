@@ -103,6 +103,20 @@ def _duration_summary(config: PostTrainingConfig) -> str:
     return "unknown"
 
 
+def _lr_scheduler_summary(config: PostTrainingConfig) -> str:
+    """Return e.g. 'cosine_with_min_lr  (min_lr_rate=0.1)' or just the name."""
+    import dataclasses
+
+    t = config.training
+    set_fields = {
+        k: v for k, v in dataclasses.asdict(t.lr_scheduler_kwargs).items() if v is not None
+    }
+    if not set_fields:
+        return t.lr_scheduler_type
+    kwargs_str = ", ".join(f"{k}={v}" for k, v in set_fields.items())
+    return f"{t.lr_scheduler_type}  ({kwargs_str})"
+
+
 def _batch_summary(config: PostTrainingConfig, total_gpus: int) -> tuple[str, str]:
     """Return (batch_line, grad_acc_line)."""
     t = config.training
@@ -203,10 +217,7 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     _row("Backend", config.backend)
     _row("Duration", _duration_summary(config))
     _row("Learning rate", f"{config.training.learning_rate:.2e}")
-    lr_sched = config.training.lr_scheduler_type
-    min_lr = config.training.lr_scheduler_kwargs.min_lr_rate
-    lr_sched_str = lr_sched if min_lr is None else f"{lr_sched}  (min_lr_rate={min_lr})"
-    _row("LR scheduler", lr_sched_str)
+    _row("LR scheduler", _lr_scheduler_summary(config))
     _row("Warmup steps", str(config.training.warmup_steps))
     batch_line, _ = _batch_summary(config, total_gpus)
     _row("Batch sizes", batch_line)
