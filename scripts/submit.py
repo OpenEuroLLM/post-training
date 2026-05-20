@@ -114,7 +114,7 @@ def main() -> None:
         config.slurm.gpus_per_node = 1
 
     if config.offline:
-        if config.container.env_file:
+        if config.container is not None and config.container.env_file:
             _apply_hf_env_from_file(config.container.env_file)
         logger.info(
             "offline=True: pre-fetching models and datasets on the login node "

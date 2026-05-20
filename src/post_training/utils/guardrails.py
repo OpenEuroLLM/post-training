@@ -148,6 +148,7 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     # ------------------------------------------------------------------
     _section("SLURM")
     _row("Job name", config.slurm.job_name)
+    _row("Account", config.slurm.account or "none")
     _row("Partition", config.slurm.partition)
     _row("Nodes", str(config.slurm.num_nodes))
     gpu_summary = (
@@ -165,9 +166,10 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     # Environment
     # ------------------------------------------------------------------
     _section("Environment")
-    using_container = bool(config.container.image)
+    using_container = bool(config.container and config.container.image)
     if using_container:
-        _row("Container image", config.container.image)
+        assert config.container is not None
+        _row("Container image", config.container.image or "none")
         if config.container.bind_mounts:
             _row("Bind mounts", config.container.bind_mounts[0])
             for mount in config.container.bind_mounts[1:]:
@@ -185,6 +187,7 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     _row("Attention impl", config.model.attn_implementation)
     _row("Dtype", config.model.dtype)
     _row("Chat template", config.data.chat_template)
+    _row("Data seed", str(config.data.seed))
     for i, entry in enumerate(config.data.datasets):
         label = "Dataset" if i == 0 else ""
         parts = [entry.path]
@@ -204,7 +207,11 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     _row("Duration", _duration_summary(config))
     _row("Learning rate", f"{config.training.learning_rate:.2e}")
     lr_sched = config.training.lr_scheduler_type
-    min_lr = config.training.lr_scheduler_kwargs.min_lr_rate
+    min_lr = (
+        config.training.lr_scheduler_kwargs.min_lr_rate
+        if config.training.lr_scheduler_kwargs
+        else None
+    )
     lr_sched_str = lr_sched if min_lr is None else f"{lr_sched}  (min_lr_rate={min_lr})"
     _row("LR scheduler", lr_sched_str)
     _row("Warmup steps", str(config.training.warmup_steps))

@@ -83,13 +83,24 @@ class TRLBackend(Backend):
             )
 
         # Container validation (only when container.image is set)
-        if config.container.image:
+        if config.container is not None and config.container.image:
             if not config.container.bind_mounts:
                 raise ValueError(
                     "container.bind_mounts must be non-empty when container.image is set."
                 )
             if not config.container.env_file:
                 raise ValueError("container.env_file must be set when container.image is set.")
+
+        total_weight = 0.0
+        for entry in config.data.datasets:
+            if entry.weight < 0:
+                raise ValueError(
+                    f"data.datasets[].weight must be non-negative, got {entry.weight} "
+                    f"for dataset '{entry.name}'."
+                )
+            total_weight += entry.weight
+        if config.data.datasets and total_weight <= 0:
+            raise ValueError("Sum of data.datasets[].weight must be > 0.")
 
         t = config.training
 
@@ -156,7 +167,7 @@ class TRLBackend(Backend):
         return ["checkpoints", "inference_checkpoints"]
 
     def render_slurm_script(self, config, run_dir, frozen_config_path, *, tokenize_only=False):
-        if config.container.image:
+        if config.container is not None and config.container.image:
             from post_training.slurm.launcher import render_trl_container_slurm_script
 
             return render_trl_container_slurm_script(
@@ -182,7 +193,7 @@ class LlamaFactoryBackend(Backend):
     def validate(self, config: PostTrainingConfig) -> None:
         if not config.llamafactory:
             raise ValueError("llamafactory must be set when backend='llamafactory'.")
-        if not config.container.image:
+        if config.container is None or not config.container.image:
             raise ValueError("container.image must be set when backend='llamafactory'.")
 
     def generate_run_name(self, config: PostTrainingConfig, timestamp: str) -> str:
