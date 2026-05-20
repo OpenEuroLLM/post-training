@@ -507,9 +507,7 @@ def helpsteer3_feedback(example: dict[str, Any]) -> dict[str, Any]:
     response1_score = score(example["feedback1"])
     response2_score = score(example["feedback2"])
     chosen_response = (
-        example["response1"]
-        if response1_score >= response2_score
-        else example["response2"]
+        example["response1"] if response1_score >= response2_score else example["response2"]
     )
 
     return {

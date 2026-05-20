@@ -107,14 +107,10 @@ def test_zero_negative_and_all_zero_weights(monkeypatch):
     assert Counter(mixed["source"]) == {"b": 2}
 
     with pytest.raises(ValueError, match="non-negative"):
-        loader.load_and_mix_datasets(
-            _config(DatasetEntry(name="a", path="dataset-a", weight=-0.1))
-        )
+        loader.load_and_mix_datasets(_config(DatasetEntry(name="a", path="dataset-a", weight=-0.1)))
 
     with pytest.raises(ValueError, match="No rows left"):
-        loader.load_and_mix_datasets(
-            _config(DatasetEntry(name="a", path="dataset-a", weight=0.0))
-        )
+        loader.load_and_mix_datasets(_config(DatasetEntry(name="a", path="dataset-a", weight=0.0)))
 
 
 def test_columns_to_keep_and_features_enforce_schema(monkeypatch):

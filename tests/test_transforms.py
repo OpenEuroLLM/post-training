@@ -27,15 +27,9 @@ def test_helpsteer2_preference_strength_selects_response():
         "response_2": "second",
     }
 
-    assert helpsteer2({**example, "preference_strength": 1})["messages"][1][
-        "content"
-    ] == "second"
-    assert helpsteer2({**example, "preference_strength": 0})["messages"][1][
-        "content"
-    ] == "first"
-    assert helpsteer2({**example, "preference_strength": -1})["messages"][1][
-        "content"
-    ] == "first"
+    assert helpsteer2({**example, "preference_strength": 1})["messages"][1]["content"] == "second"
+    assert helpsteer2({**example, "preference_strength": 0})["messages"][1]["content"] == "first"
+    assert helpsteer2({**example, "preference_strength": -1})["messages"][1]["content"] == "first"
 
 
 def test_helpsteer3_preference_selects_response():
@@ -45,9 +39,11 @@ def test_helpsteer3_preference_selects_response():
         "response2": "second",
     }
 
-    assert helpsteer3_preference({**example, "overall_preference": 1})["messages"][
-        -1
-    ]["content"] == "second"
-    assert helpsteer3_preference({**example, "overall_preference": 0})["messages"][
-        -1
-    ]["content"] == "first"
+    assert (
+        helpsteer3_preference({**example, "overall_preference": 1})["messages"][-1]["content"]
+        == "second"
+    )
+    assert (
+        helpsteer3_preference({**example, "overall_preference": 0})["messages"][-1]["content"]
+        == "first"
+    )

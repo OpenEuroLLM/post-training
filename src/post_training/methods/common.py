@@ -104,13 +104,19 @@ def build_common_training_kwargs(
         gradient_accumulation_steps=grad_accum,
         warmup_steps=t.warmup_steps,
         lr_scheduler_type=t.lr_scheduler_type,
-        lr_scheduler_kwargs=None
-        if t.lr_scheduler_kwargs is None
-        else {k: v for k, v in dataclasses.asdict(t.lr_scheduler_kwargs).items() if v is not None},
+        lr_scheduler_kwargs=(
+            None
+            if t.lr_scheduler_kwargs is None
+            else {
+                k: v for k, v in dataclasses.asdict(t.lr_scheduler_kwargs).items() if v is not None
+            }
+        ),
         gradient_checkpointing=t.gradient_checkpointing,
-        gradient_checkpointing_kwargs=None
-        if t.gradient_checkpointing_kwargs is None
-        else dataclasses.asdict(t.gradient_checkpointing_kwargs),
+        gradient_checkpointing_kwargs=(
+            None
+            if t.gradient_checkpointing_kwargs is None
+            else dataclasses.asdict(t.gradient_checkpointing_kwargs)
+        ),
         use_liger_kernel=t.use_liger_kernel,
         bf16=t.bf16,
         seed=t.seed,

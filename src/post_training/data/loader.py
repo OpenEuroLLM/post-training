@@ -199,8 +199,7 @@ def load_and_mix_datasets(
 
     if not resampled_datasets:
         raise ValueError(
-            "No rows left after applying data.datasets[].weight. Check your "
-            "weights and filters."
+            "No rows left after applying data.datasets[].weight. Check your weights and filters."
         )
 
     if len(resampled_datasets) == 1:
