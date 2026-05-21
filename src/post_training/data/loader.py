@@ -104,11 +104,18 @@ def load_and_mix_datasets(
 
     num_proc = _resolve_num_proc(config.num_proc)
     logger.info("Dataset processing will use num_proc=%d", num_proc)
-
     seed = config.seed
-    loaded_datasets: list[Dataset] = []
-    weights: list[float] = []
 
+    weights: list[float] = []
+    for entry in entries:
+        if entry.weight < 0:
+            raise ValueError(
+                f"data.datasets[].weight must be non-negative, got {entry.weight} "
+                f"for dataset '{entry.name}'."
+            )
+        weights.append(entry.weight)
+
+    loaded_datasets: list[Dataset] = []
     for entry in entries:
         logger.info(
             "Loading dataset '%s' from '%s' (data_dir=%s, subset=%s, split=%s, "
@@ -174,16 +181,9 @@ def load_and_mix_datasets(
             ds = ds.filter(row_filter, num_proc=num_proc)
 
         loaded_datasets.append(ds)
-        weights.append(entry.weight)
 
     resampled_datasets: list[Dataset] = []
     for idx, (ds, weight) in enumerate(zip(loaded_datasets, weights, strict=True)):
-        if weight < 0:
-            raise ValueError(
-                f"data.datasets[].weight must be non-negative, got {weight} "
-                f"for dataset '{entries[idx].name}'."
-            )
-
         target_n = int(round(weight * len(ds)))
         logger.info(
             "Resampling dataset '%s' from %d rows to %d rows (weight=%s).",
