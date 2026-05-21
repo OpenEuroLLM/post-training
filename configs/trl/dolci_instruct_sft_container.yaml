@@ -19,6 +19,15 @@ container:
 # -- Model -------------------------------------------------------------------
 model:
   name_or_path: "allenai/Olmo-3-7B-Think-SFT"
+  # Use the Instruct-SFT tokenizer rather than Think-SFT's. Both have
+  # vocab_size=100278 and identical bos/eos/pad/unk, but Instruct-SFT
+  # promotes <functions>, </functions>, <function_calls>, </function_calls>
+  # to dedicated single-token IDs 100266-100269 (Think-SFT leaves them as
+  # <|extra_id_1>...<|extra_id_4>, so the markers BPE-fragment into 3-4
+  # tokens each).  ~10.6% of Dolci-Instruct-SFT rows contain function-call
+  # markup; matches AllenAI's canonical prep in
+  # open-instruct/scripts/slurm/sft/prepare_dolci_instruct_data.sh.
+  tokenizer_name_or_path: "allenai/OLMo-3-7B-Instruct-SFT"
   attn_implementation: "flash_attention_3"
   dtype: "bfloat16"
 

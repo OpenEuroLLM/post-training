@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 
 from datasets import load_dataset
 from huggingface_hub import snapshot_download
+from transformers import AutoTokenizer
 
 if TYPE_CHECKING:
     from post_training.config import DatasetEntry, PostTrainingConfig
@@ -38,6 +39,16 @@ def _prefetch_model(name_or_path: str) -> None:
     logger.info("Downloading model '%s' to HF cache...", name_or_path)
     snapshot_download(repo_id=name_or_path, repo_type="model")
     logger.info("Model '%s' cached.", name_or_path)
+
+
+def _prefetch_tokenizer(name_or_path: str) -> None:
+    """Fetch only the tokenizer files from a Hub repo (avoids re-downloading model weights)."""
+    if _is_local(name_or_path):
+        logger.info("Tokenizer '%s' is a local path, skipping download.", name_or_path)
+        return
+    logger.info("Downloading tokenizer '%s' to HF cache...", name_or_path)
+    AutoTokenizer.from_pretrained(name_or_path)
+    logger.info("Tokenizer '%s' cached.", name_or_path)
 
 
 def _prefetch_dataset(entry: DatasetEntry) -> None:
@@ -62,6 +73,12 @@ def prefetch_assets(config: PostTrainingConfig) -> None:
     logger.info("Pre-fetching assets for offline run...")
 
     _prefetch_model(config.model.name_or_path)
+
+    if (
+        config.model.tokenizer_name_or_path is not None
+        and config.model.tokenizer_name_or_path != config.model.name_or_path
+    ):
+        _prefetch_tokenizer(config.model.tokenizer_name_or_path)
 
     if config.method == "dpo" and config.dpo.ref_model_name_or_path is not None:
         _prefetch_model(config.dpo.ref_model_name_or_path)

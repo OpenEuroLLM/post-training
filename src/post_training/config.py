@@ -23,6 +23,12 @@ class ModelConfig:
     """Model identity and loading options."""
 
     name_or_path: str = "allenai/Olmo-3-1025-7B"
+    # When the model checkpoint we warm-start from ships a tokenizer that
+    # differs from the canonical SFT-recipe tokenizer (e.g. Olmo-3-7B-Think-SFT
+    # vs Olmo-3-7B-Instruct-SFT, which promote function-calling markers to
+    # dedicated single-token IDs 100266-100269), set this to the recipe's
+    # tokenizer.  Falls back to ``name_or_path`` when ``None``.
+    tokenizer_name_or_path: str | None = None
     attn_implementation: str = "flash_attention_3"
     dtype: str = "bfloat16"
 

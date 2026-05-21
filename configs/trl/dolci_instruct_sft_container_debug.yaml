@@ -18,6 +18,9 @@ container:
 # -- Model -------------------------------------------------------------------
 model:
   name_or_path: "allenai/Olmo-3-7B-Think-SFT"
+  # See production config for rationale: Instruct-SFT's tokenizer has
+  # dedicated single-token IDs for the function-call markup that Dolci uses.
+  tokenizer_name_or_path: "allenai/OLMo-3-7B-Instruct-SFT"
   attn_implementation: "flash_attention_3"
   dtype: "bfloat16"
 

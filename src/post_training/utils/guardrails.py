@@ -182,6 +182,11 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     # ------------------------------------------------------------------
     _section("Model & Data")
     _row("Model", config.model.name_or_path)
+    if (
+        config.model.tokenizer_name_or_path is not None
+        and config.model.tokenizer_name_or_path != config.model.name_or_path
+    ):
+        _row("Tokenizer", config.model.tokenizer_name_or_path)
     _row("Attention impl", config.model.attn_implementation)
     _row("Dtype", config.model.dtype)
     _row("Chat template", config.data.chat_template)
