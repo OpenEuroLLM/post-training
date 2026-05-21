@@ -73,6 +73,12 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
         # chat template to wrap assistant turns in {% generation %}…{% endgeneration %}.
         # Without this, SFTTrainer trains on user + system tokens too.
         assistant_only_loss=True,
+        # Pre-pack shuffle so each packed sequence draws from across the
+        # whole dataset.  TRL's default is False, which leaves packed
+        # sequences correlated with parquet-shard order and (with epochs>1)
+        # repeats the exact same packed combinations every epoch.  AllenAI's
+        # canonical Dolci prep does this offline at convert_sft_data_for_olmocore.py:240.
+        shuffle_dataset=True,
     )
 
     trainer = SFTTrainer(
