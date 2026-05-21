@@ -37,7 +37,13 @@ training:
   learning_rate: 8.0e-5
   effective_batch_size: 32
   per_device_train_batch_size: 1
-  warmup_ratio: 0.03
+  # AllenAI's canonical Dolci-Instruct-SFT recipe hard-codes t_warmup=200 in
+  # train_dolci_instruct.sh:83, overriding OLMo-core's class-default
+  # warmup_fraction=0.03 (paper Table 47).  Mirror the script value here so
+  # the LR ramp matches the canonical run; warmup_ratio must be null to keep
+  # HF TrainingArguments from overwriting warmup_steps with the ratio.
+  warmup_ratio: null
+  warmup_steps: 200
   lr_scheduler_type: "linear"
   adam_beta2: 0.95
   gradient_checkpointing: true

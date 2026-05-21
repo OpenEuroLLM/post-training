@@ -67,7 +67,11 @@ class TrainingConfig:
     learning_rate: float = 2.0e-5
     effective_batch_size: int = 512
     per_device_train_batch_size: int = 4
-    warmup_ratio: float = 0.03
+    # Set to None when warmup_steps is configured explicitly.  HF
+    # TrainingArguments 5.x overwrites warmup_steps with warmup_ratio in
+    # __post_init__ when warmup_ratio is not None, so both must be set
+    # consistently or warmup_steps will silently lose.
+    warmup_ratio: float | None = 0.03
     warmup_steps: int = 0
     lr_scheduler_type: str = "cosine_with_min_lr"
     lr_scheduler_kwargs: LRSchedulerKwargs = field(default_factory=LRSchedulerKwargs)
