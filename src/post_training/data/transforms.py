@@ -334,35 +334,32 @@ def ultrafeedback(example: dict[str, Any]) -> dict[str, Any]:
 def aegis_safety(example: dict[str, Any]) -> dict[str, Any]:
     """Transform nvidia/Aegis-AI-Content-Safety-Dataset-2.0.
 
-    Keeps only safe, non-redacted responses.
+    Keeps only unsafe, non-redacted responses.
     """
     if example["prompt"] == "REDACTED":
         return {"messages": []}
 
-    if example["response_label"] == "unsafe":
+    if example["response_label"] != "unsafe":
         return {"messages": []}
 
-    if example["response_label"] == "safe":
-        return {
-            "messages": [
-                {"role": "user", "content": example["prompt"]},
-                {"role": "assistant", "content": example["response"]},
-            ]
-        }
-
-    return {"messages": []}
+    return {
+        "messages": [
+            {"role": "user", "content": example["prompt"]},
+            {"role": "assistant", "content": example["response"]},
+        ]
+    }
 
 
 @register_transform("helpsteer2")
 def helpsteer2(example: dict[str, Any]) -> dict[str, Any]:
     """Transform nvidia/HelpSteer2.
 
-    Picks the response with non-negative preference strength.
+    Positive preference strength chooses response 2; otherwise response 1.
     """
-    if example["preference_strength"] >= 0:
-        chosen_response = example["response_1"]
-    else:
+    if example["preference_strength"] > 0:
         chosen_response = example["response_2"]
+    else:
+        chosen_response = example["response_1"]
 
     return {
         "messages": [
@@ -465,3 +462,96 @@ def lmsys_chat(example: dict[str, Any]) -> dict[str, Any]:
     The ``conversation`` column contains the messages list directly.
     """
     return {"messages": example["conversation"]}
+
+
+@register_transform("helpsteer3_preference")
+def helpsteer3_preference(example: dict[str, Any]) -> dict[str, Any]:
+    """Transform nvidia/HelpSteer3 Preference split.
+
+    Positive overall preference chooses response 2; otherwise response 1.
+    """
+    if example["overall_preference"] > 0:
+        chosen_response = example["response2"]
+    else:
+        chosen_response = example["response1"]
+
+    return {
+        "messages": [
+            *example["context"],
+            {"role": "assistant", "content": chosen_response},
+        ]
+    }
+
+
+@register_transform("helpsteer3_feedback")
+def helpsteer3_feedback(example: dict[str, Any]) -> dict[str, Any]:
+    """Transform nvidia/HelpSteer3 Feedback split for SFT.
+
+    Picks the response with the higher averaged rubric score.
+    """
+    grades = {
+        "not": 0,
+        "slightly": 1,
+        "partially": 2,
+        "mostly": 3,
+        "perfectly": 4,
+    }
+
+    def score(feedbacks: list[str]) -> float:
+        scores = [
+            next(grades[grade] for grade in grades if grade in feedback.split(".")[0])
+            for feedback in feedbacks
+        ]
+        return sum(scores) / len(scores)
+
+    response1_score = score(example["feedback1"])
+    response2_score = score(example["feedback2"])
+    chosen_response = (
+        example["response1"] if response1_score >= response2_score else example["response2"]
+    )
+
+    return {
+        "messages": [
+            *example["context"],
+            {"role": "assistant", "content": chosen_response},
+        ]
+    }
+
+
+@register_transform("helpsteer3_edit")
+def helpsteer3_edit(example: dict[str, Any]) -> dict[str, Any]:
+    """Transform nvidia/HelpSteer3 Edit split for SFT."""
+    return {
+        "messages": [
+            *example["context"],
+            {"role": "assistant", "content": example["edited_response"]},
+        ]
+    }
+
+
+@register_transform("helpsteer3_edit_quality")
+def helpsteer3_edit_quality(example: dict[str, Any]) -> dict[str, Any]:
+    """Transform nvidia/HelpSteer3 Edit Quality split for SFT."""
+    return {
+        "messages": [
+            *example["context"],
+            {"role": "assistant", "content": example["good_edited_response"]},
+        ]
+    }
+
+
+@register_transform("helpsteer3_principle")
+def helpsteer3_principle(example: dict[str, Any]) -> dict[str, Any]:
+    """Transform nvidia/HelpSteer3 Principle split for SFT.
+
+    Keeps only examples where the principle is fulfilled.
+    """
+    if example["fulfilment"] == "No":
+        return {"messages": []}
+
+    return {
+        "messages": [
+            *example["context"],
+            {"role": "assistant", "content": example["response"]},
+        ]
+    }

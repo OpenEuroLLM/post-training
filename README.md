@@ -167,17 +167,17 @@ python scripts/submit.py --config /path/to/config.yaml
 ### 2. Use Containers Where Possible
 Given the heterogeneity of cluster environments, training jobs should, where possible, run inside a [Singularity](https://docs.sylabs.io/guides/latest/user-guide/) (or Apptainer) container that bundles all required dependencies—such as PyTorch, CUDA, Flash Attention, and any cluster-specific backend libraries—into a single, portable environment, simplifying both setup and reproducibility across systems.
 
-Container images are specified in the config under `container.image`. The SLURM launcher passes the image to `singularity exec` and bind-mounts the repository into the container at runtime, so no rebuild is needed when the code changes.
+Container images are specified in the config under `container.image`. Set `container: null` for TRL bare-metal runs. When a container image is configured, the SLURM launcher passes it to `singularity exec` and bind-mounts the repository into the container at runtime, so no rebuild is needed when the code changes.
 
 ```yaml
 container:
   image: /path/to/image.sif
   bind_mounts:
     - /data:/data
-  env_file: env/cluster.env  # optional: sourced before launch
+  env_file: env/cluster.env  # required when image is set; sourced before launch
 ```
 
-Both the LlamaFactory and containerized TRL backends use this mechanism. Building containers for different HPCs is a work in progress, so if your cluster specific container is not available yet, please use the `uv` environment instead (or raise a pull request with a recipe for your cluster-specific container!). To use the `uv` environment, simply set `image` to `null`.
+Both the LlamaFactory and containerized TRL backends use this mechanism. Building containers for different HPCs is a work in progress, so if your cluster specific container is not available yet, please use the `uv` environment instead (or raise a pull request with a recipe for your cluster-specific container!). For TRL, use the `uv` environment by setting `container: null` or `container.image: null`; LlamaFactory requires a container image.
 
 ## 🧩 Feature Guide
 
@@ -203,20 +203,21 @@ The data pipeline is modularized into four distinct stages.
 
 #### A. Dataset registry & mixing
 
-Define multiple datasets in `data.datasets`. The loader automatically interleaves them based on the `weight` parameter (normalized automatically).
+Define multiple datasets in `data.datasets`. The loader samples each dataset independently according to its `weight`, concatenates the sampled datasets, and shuffles the final mix with `data.seed`. A weight of `1.0` means the full dataset after transforms and filters, values below `1.0` undersample, values above `1.0` oversample, and `0.0` omits that dataset.
 
 ```yaml
 data:
+  seed: 42
   datasets:
     - name: "my_dataset"
       path: "org/dataset"
       split: "train"
-      weight: 1.0  # Mixing weight (normalized automatically)
+      weight: 1.0  # 1 = full dataset, <1 undersamples, >1 oversamples
 ```
 
 #### B. Data transformations
 
-Raw datasets often come in varying formats. Transforms normalize them into a standard `messages` list format before templating.
+Raw datasets often come in varying formats. Transforms normalize them into a standard `messages` list format before templating. SFT loading keeps the `messages` column and enforces its feature schema during mapping to avoid wrongly inferring the schema; conceretly, during the data transformation, some samples might be mapped to an empty list [of messages]. If the first sample falls into that case, it makes the automatically inferred schema of the mapped column wrong, raising exceptions during the mapping of the subsequent samples where each is mapped to a list of dicts (i.e., messages).
 
 - **Config**: `transform: "transform_name"` (in the dataset entry)
 - **Registry**: `src/post_training/data/transforms.py`
@@ -284,8 +285,8 @@ shouldn't have to predict.
 Use the data script to debug the pipeline stages (Raw → Transformed → Formatted → Tokenized) and to compute token statistics.
 
 ```bash
-python scripts/data.py --config configs/trl/sft.yaml --show-formatted --num-samples 3
-python scripts/data.py --config configs/trl/sft.yaml token-stats
+python scripts/data.py inspect --config configs/trl/sft.yaml --show-formatted --num-samples 3
+python scripts/data.py token-stats --config configs/trl/sft.yaml
 ```
 
 ### 3. Training Length
@@ -304,6 +305,7 @@ You must specify exactly one determining factor for training duration in the `tr
   These are used by the SLURM launcher to generate the correct job script.
 - **Self-healing**: the SLURM launcher (`src/post_training/slurm/`) supports auto-requeueing.
   - `slurm.signal_time_seconds` ensures the job saves a checkpoint and requeues itself before the wall time expires
+- **Account**: set `slurm.account` when your cluster requires an explicit `#SBATCH --account` directive; leave it `null` to omit the directive.
 
 ### 5. Checkpointing
 
@@ -428,6 +430,9 @@ backend: trl
 run_name: null                               # auto-generated from model + datasets if null
 offline: false                               # set true to disable all HuggingFace / wandb network calls
 
+# -- Container ---------------------------------------------------------------
+container: null                              # null = bare-metal; set image/binds/env_file for Singularity
+
 # -- Model -------------------------------------------------------------------
 model:
   name_or_path: "allenai/Olmo-3-1025-7B"
@@ -445,9 +450,10 @@ training:
   per_device_train_batch_size: 8
   warmup_steps: 0.03
   lr_scheduler_type: "cosine_with_min_lr"
-  lr_scheduler_kwargs:
+  lr_scheduler_kwargs:                         # set to null for schedulers with no kwargs
     min_lr_rate: 0.1
   gradient_checkpointing: true
+  gradient_checkpointing_kwargs: null          # null = use TRL/Transformers defaults
   bf16: true
   seed: 42
   use_liger_kernel: true
@@ -468,11 +474,12 @@ checkpointing:
 data:
   chat_template: "olmo3-instruct-sft"        # Name from chat template registry
   num_proc: null                             # null = auto-detect, capped at 32
+  seed: 42                                   # RNG seed for dataset resampling and final shuffle
   datasets:
     - name: "nemotron_pt_v2"
       path: "nvidia/Nemotron-Post-Training-Dataset-v2"
       split: "stem"
-      weight: 1.0
+      weight: 1.0                            # 1 = full dataset, <1 undersamples, >1 oversamples
       transform: null                        # null = already conversational
 
 # -- DeepSpeed ---------------------------------------------------------------
@@ -499,6 +506,7 @@ logging:
 
 # -- SLURM -------------------------------------------------------------------
 slurm:
+  account: null                              # set when your cluster requires #SBATCH --account
   partition: "booster"
   num_nodes: 1
   gpus_per_node: 4
@@ -518,5 +526,3 @@ paths:
   output_base: "outputs"
   debug_base: "outputs/debug"
 ```
-
-

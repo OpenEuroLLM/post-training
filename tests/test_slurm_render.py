@@ -3,7 +3,7 @@
 import pytest
 
 from post_training.backend import LlamaFactoryBackend, TRLBackend
-from post_training.config import PostTrainingConfig
+from post_training.config import ContainerConfig, PostTrainingConfig
 from post_training.slurm.launcher import (
     render_llamafactory_slurm_script,
     render_trl_container_slurm_script,
@@ -14,9 +14,11 @@ from post_training.slurm.launcher import (
 @pytest.fixture
 def config():
     cfg = PostTrainingConfig()
-    cfg.container.image = "/shared/containers/trl.sif"
-    cfg.container.bind_mounts = ["/scratch:/scratch"]
-    cfg.container.env_file = "/shared/env/cluster.env"
+    cfg.container = ContainerConfig(
+        image="/shared/containers/trl.sif",
+        bind_mounts=["/scratch:/scratch"],
+        env_file="/shared/env/cluster.env",
+    )
     return cfg
 
 
@@ -196,7 +198,7 @@ def test_trl_container_tokenize_only_absent_by_default(tmp_path, config):
 
 def test_trl_backend_forwards_tokenize_only_non_container(tmp_path, config):
     """TRLBackend.render_slurm_script forwards the flag on the bare-metal path."""
-    config.container.image = None  # force non-container branch
+    config.container = None  # force non-container branch
     run_dir = tmp_path / "outputs" / "my-run"
     run_dir.mkdir(parents=True)
 
@@ -205,6 +207,20 @@ def test_trl_backend_forwards_tokenize_only_non_container(tmp_path, config):
     )
 
     assert "--tokenize-only" in _train_invocation(script.read_text())
+
+
+def test_trl_backend_treats_container_null_as_bare_metal(tmp_path):
+    """container: null uses the non-container TRL template."""
+    cfg = PostTrainingConfig()
+    cfg.container = None
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    script = TRLBackend().render_slurm_script(cfg, run_dir, "configs/trl/sft.yaml")
+    content = script.read_text()
+
+    assert "singularity exec" not in content
+    assert "accelerate launch" in content
 
 
 def test_trl_backend_forwards_tokenize_only_container(tmp_path, config):

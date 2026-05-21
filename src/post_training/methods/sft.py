@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from accelerate import PartialState
+from datasets import Features, List, Value
 from trl import SFTConfig, SFTTrainer
 
 from post_training.chat_templates.registry import has_generation_markers
@@ -23,6 +24,17 @@ if TYPE_CHECKING:
     from post_training.config import PostTrainingConfig
 
 logger = logging.getLogger(__name__)
+
+MESSAGES_FEATURES = Features(
+    {
+        "messages": List(
+            {
+                "content": Value("string"),
+                "role": Value("string"),
+            }
+        )
+    }
+)
 
 
 def _sft_row_filter(example: dict) -> bool:
@@ -77,7 +89,12 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
         )
 
     with PartialState().main_process_first():
-        dataset = load_and_mix_datasets(config.data, row_filter=_sft_row_filter)
+        dataset = load_and_mix_datasets(
+            config.data,
+            row_filter=_sft_row_filter,
+            columns_to_keep=["messages"],
+            features=MESSAGES_FEATURES,
+        )
 
     sft_config = SFTConfig(
         **build_common_training_kwargs(config, run_dir),

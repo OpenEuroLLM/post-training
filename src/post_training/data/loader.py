@@ -2,7 +2,8 @@
 
 The main entry point is :func:`load_and_mix_datasets` which reads the
 ``data`` section of the config, loads each dataset, applies per-dataset
-transforms, and interleaves them according to the specified weights.
+transforms, rescales each dataset according to its weight, then concatenates
+and shuffles the result.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ import os
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from datasets import Dataset, interleave_datasets, load_dataset
+from datasets import Dataset, Features, concatenate_datasets, load_dataset
 
 from post_training.data.transforms import get_transform
 
@@ -38,9 +39,40 @@ def _resolve_num_proc(configured: int | None) -> int:
     return min(available, _MAX_NUM_PROC)
 
 
+def _resample_to_size(ds: Dataset, target_n: int, seed: int) -> Dataset:
+    """Return exactly ``target_n`` rows from ``ds``.
+
+    Undersampling is done without replacement. Oversampling repeats full
+    shuffled copies of the dataset and takes a final remainder slice.
+    """
+    n = len(ds)
+    if target_n <= 0:
+        raise ValueError("target_n must be positive.")
+    if n == 0:
+        raise ValueError("Cannot resample an empty dataset.")
+
+    ds_shuffled = ds.shuffle(seed=seed)
+
+    if target_n <= n:
+        return ds_shuffled.select(range(target_n))
+
+    full_copies = target_n // n
+    remainder = target_n % n
+
+    copies: list[Dataset] = [ds_shuffled] * full_copies
+    if remainder > 0:
+        copies.append(ds_shuffled.select(range(remainder)))
+
+    if len(copies) == 1:
+        return copies[0]
+    return concatenate_datasets(copies)
+
+
 def load_and_mix_datasets(
     config: DataConfig,
     row_filter: Callable[[dict], bool] | None = None,
+    columns_to_keep: list[str] | None = None,
+    features: Features | None = None,
 ) -> Dataset:
     """Load, transform, and optionally filter/mix datasets.
 
@@ -53,11 +85,18 @@ def load_and_mix_datasets(
         rows.  Each training method passes its own filter (e.g. SFT
         checks ``messages``, DPO checks ``chosen`` / ``rejected``).
         When ``None``, no filtering is applied.
+    columns_to_keep:
+        Optional list of columns to retain after loading/mapping. When a
+        transform is applied, original input columns are removed before the
+        transform output is materialized.
+    features:
+        Optional dataset schema to enforce while mapping transformed rows or
+        by casting already-structured rows.
 
     Returns
     -------
     datasets.Dataset
-        A single (possibly interleaved) dataset ready for the trainer.
+        A single concatenated and shuffled dataset ready for the trainer.
     """
     entries = config.datasets
     if not entries:
@@ -65,10 +104,18 @@ def load_and_mix_datasets(
 
     num_proc = _resolve_num_proc(config.num_proc)
     logger.info("Dataset processing will use num_proc=%d", num_proc)
+    seed = config.seed
+
+    weights: list[float] = []
+    for entry in entries:
+        if entry.weight < 0:
+            raise ValueError(
+                f"data.datasets[].weight must be non-negative, got {entry.weight} "
+                f"for dataset '{entry.name}'."
+            )
+        weights.append(entry.weight)
 
     loaded_datasets: list[Dataset] = []
-    weights: list[float] = []
-
     for entry in entries:
         logger.info(
             "Loading dataset '%s' from '%s' (data_dir=%s, subset=%s, split=%s, "
@@ -109,7 +156,24 @@ def load_and_mix_datasets(
                 entry.transform,
                 entry.name,
             )
-            ds = ds.map(transform_fn, num_proc=num_proc)
+            map_kwargs: dict = {"num_proc": num_proc}
+            if columns_to_keep is not None or features is not None:
+                map_kwargs["remove_columns"] = ds.column_names
+            if features is not None:
+                map_kwargs["features"] = features
+            ds = ds.map(transform_fn, **map_kwargs)
+
+        if columns_to_keep is not None:
+            present = [column for column in columns_to_keep if column in ds.column_names]
+            if not present:
+                raise KeyError(
+                    f"None of the expected columns {columns_to_keep} were found in "
+                    f"dataset '{entry.name}'. Available columns: {ds.column_names}"
+                )
+            ds = ds.select_columns(present)
+
+        if features is not None:
+            ds = ds.cast(features)
 
         # Apply method-specific row filter (e.g. SFT checks for non-empty
         # "messages", DPO checks for non-empty "chosen" / "rejected").
@@ -117,19 +181,30 @@ def load_and_mix_datasets(
             ds = ds.filter(row_filter, num_proc=num_proc)
 
         loaded_datasets.append(ds)
-        weights.append(entry.weight)
 
-    # If there is only a single dataset, return it directly.
-    if len(loaded_datasets) == 1:
-        return loaded_datasets[0]
+    resampled_datasets: list[Dataset] = []
+    for idx, (ds, weight) in enumerate(zip(loaded_datasets, weights, strict=True)):
+        target_n = round(weight * len(ds))
+        logger.info(
+            "Resampling dataset '%s' from %d rows to %d rows (weight=%s).",
+            entries[idx].name,
+            len(ds),
+            target_n,
+            weight,
+        )
+        if target_n <= 0:
+            continue
 
-    # Normalise weights so they sum to 1.
-    total = sum(weights)
-    probabilities = [w / total for w in weights]
+        resampled_datasets.append(_resample_to_size(ds, target_n, seed + idx))
 
-    logger.info(
-        "Interleaving %d datasets with probabilities %s",
-        len(loaded_datasets),
-        probabilities,
-    )
-    return interleave_datasets(loaded_datasets, probabilities=probabilities)
+    if not resampled_datasets:
+        raise ValueError(
+            "No rows left after applying data.datasets[].weight. Check your weights and filters."
+        )
+
+    if len(resampled_datasets) == 1:
+        mixed = resampled_datasets[0]
+    else:
+        mixed = concatenate_datasets(resampled_datasets)
+
+    return mixed.shuffle(seed=seed)

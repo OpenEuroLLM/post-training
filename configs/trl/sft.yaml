@@ -21,7 +21,7 @@ backend: trl
 run_name: null                               # auto-generated from model + datasets if null
 offline: true
 
-# Container (remove or set image: null for bare-metal)
+# Container (set to null, remove, or set image: null for bare-metal)
 container:
   image: /e/data1/datasets/playground/mmlaion/shared/oellm_shared_evals/trl-jupiter.sif
   bind_mounts:
@@ -47,9 +47,10 @@ training:
   per_device_train_batch_size: 8
   warmup_steps: 0.03
   lr_scheduler_type: "cosine_with_min_lr"
-  lr_scheduler_kwargs:
+  lr_scheduler_kwargs:                         # set to null for schedulers with no kwargs
     min_lr_rate: 0.1
   gradient_checkpointing: true
+  gradient_checkpointing_kwargs: null          # null = use TRL/Transformers defaults
   bf16: true
   seed: 42
   use_liger_kernel: true
@@ -70,11 +71,12 @@ checkpointing:
 data:
   chat_template: "olmo3-instruct-sft"        # Name from chat template registry
   num_proc: null                             # null = auto-detect, capped at 32
+  seed: 42                                   # RNG seed for dataset resampling and final shuffle
   datasets:
     - name: "nemotron_pt_v2"
       path: "nvidia/Nemotron-Post-Training-Dataset-v2"
       split: "stem"
-      weight: 1.0
+      weight: 1.0                            # 1 = full dataset, <1 undersamples, >1 oversamples
       transform: null                        # null = already conversational
 
 # -- DeepSpeed ---------------------------------------------------------------
@@ -119,6 +121,5 @@ debug:
 paths:
   output_base: "outputs"
   debug_base: "outputs/debug"
-
 
 

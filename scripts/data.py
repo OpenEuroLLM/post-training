@@ -256,6 +256,7 @@ def _run_count_tokens(args: argparse.Namespace, cli_overrides: list[str]) -> Non
     # ── Lazy imports (heavy) ────────────────────────────────────────
     from post_training.data.loader import _resolve_num_proc, load_and_mix_datasets
     from post_training.methods.common import build_tokenizer
+    from post_training.methods.sft import MESSAGES_FEATURES, _sft_row_filter
 
     # Load config
     config = PostTrainingConfig.load(args.config, cli_overrides)
@@ -264,8 +265,21 @@ def _run_count_tokens(args: argparse.Namespace, cli_overrides: list[str]) -> Non
     tokenizer = build_tokenizer(config)
     print(f"Using chat template: {config.data.chat_template}")
 
+    columns_to_keep = None
+    features = None
+    row_filter = None
+    if config.method == "sft":
+        columns_to_keep = ["messages"]
+        features = MESSAGES_FEATURES
+        row_filter = _sft_row_filter
+
     # Load dataset mix
-    ds = load_and_mix_datasets(config.data)
+    ds = load_and_mix_datasets(
+        config.data,
+        row_filter=row_filter,
+        columns_to_keep=columns_to_keep,
+        features=features,
+    )
     print(f"Number of loaded rows: {len(ds)}")
 
     # Tokenize dataset

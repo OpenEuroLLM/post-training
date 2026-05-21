@@ -105,6 +105,9 @@ def render_trl_container_slurm_script(
     Uses ``singularity exec`` to run ``accelerate launch`` inside a container,
     following the same patterns as the LlamaFactory containerized template.
     """
+    if config.container is None or not config.container.image:
+        raise ValueError("container.image must be set to render a containerized TRL script.")
+
     env = Environment(
         loader=FileSystemLoader(str(_TEMPLATE_DIR)),
         keep_trailing_newline=True,
@@ -157,6 +160,9 @@ def render_llamafactory_slurm_script(
     run_dir: Path,
 ) -> Path:
     """Render the LlamaFactory SLURM batch script into *run_dir/slurm/job.sh*."""
+    if config.container is None or not config.container.image:
+        raise ValueError("container.image must be set to render a LlamaFactory script.")
+
     env = Environment(
         loader=FileSystemLoader(str(_TEMPLATE_DIR)),
         keep_trailing_newline=True,

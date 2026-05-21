@@ -75,14 +75,14 @@ class TrainingConfig:
         },
     )
     lr_scheduler_type: str = "cosine_with_min_lr"
-    lr_scheduler_kwargs: LRSchedulerKwargs = field(default_factory=LRSchedulerKwargs)
+    lr_scheduler_kwargs: LRSchedulerKwargs | None = field(default_factory=LRSchedulerKwargs)
     adam_beta1: float = 0.9
     adam_beta2: float = 0.999
     weight_decay: float = 0.0
     adam_epsilon: float = 1e-8
 
     gradient_checkpointing: bool = True
-    gradient_checkpointing_kwargs: GradientCheckpointingKwargs = field(
+    gradient_checkpointing_kwargs: GradientCheckpointingKwargs | None = field(
         default_factory=GradientCheckpointingKwargs
     )
     bf16: bool = True
@@ -147,6 +147,7 @@ class DataConfig:
 
     chat_template: str = "default"
     num_proc: int | None = None  # None = auto (capped at 32)
+    seed: int = 42  # Deterministic seed used for dataset resampling and shuffling.
     datasets: list[DatasetEntry] = field(default_factory=list)
 
 
@@ -238,7 +239,7 @@ class PostTrainingConfig:
     offline: bool = False
     backend: str = "trl"
     llamafactory: dict | None = None
-    container: ContainerConfig = field(default_factory=ContainerConfig)
+    container: ContainerConfig | None = None
 
     model: ModelConfig = field(default_factory=ModelConfig)
     training: TrainingConfig = field(default_factory=TrainingConfig)
