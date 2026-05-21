@@ -184,7 +184,7 @@ def load_and_mix_datasets(
 
     resampled_datasets: list[Dataset] = []
     for idx, (ds, weight) in enumerate(zip(loaded_datasets, weights, strict=True)):
-        target_n = int(round(weight * len(ds)))
+        target_n = round(weight * len(ds))
         logger.info(
             "Resampling dataset '%s' from %d rows to %d rows (weight=%s).",
             entries[idx].name,
