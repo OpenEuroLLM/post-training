@@ -217,7 +217,7 @@ data:
 
 #### B. Data transformations
 
-Raw datasets often come in varying formats. Transforms normalize them into a standard `messages` list format before templating. SFT loading keeps the `messages` column and enforces its feature schema after mapping so malformed later rows fail early instead of surfacing during training.
+Raw datasets often come in varying formats. Transforms normalize them into a standard `messages` list format before templating. SFT loading keeps the `messages` column and enforces its feature schema during mapping to avoid wrongly inferring the schema; conceretly, during the data transformation, some samples might be mapped to an empty list [of messages]. If the first sample falls into that case, it makes the automatically inferred schema of the mapped column wrong, raising exceptions during the mapping of the subsequent samples where each is mapped to a list of dicts (i.e., messages).
 
 - **Config**: `transform: "transform_name"` (in the dataset entry)
 - **Registry**: `src/post_training/data/transforms.py`
