@@ -1,0 +1,150 @@
+method: sft
+backend: trl
+run_name: null
+offline: true
+container: null
+
+model:
+  name_or_path: "allenai/Olmo-3-1025-7B"
+  attn_implementation: "flash_attention_3"
+  dtype: "bfloat16"
+
+training:
+  max_steps: 1
+  num_training_samples: null
+  num_training_tokens: null
+  learning_rate: 8.0e-5
+  lr_scheduler_type: "linear"
+  lr_scheduler_kwargs: null
+  warmup_steps: 0.03
+  weight_decay: 0.0
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  effective_batch_size: 32
+  per_device_train_batch_size: 2
+  gradient_checkpointing: true
+  use_liger_kernel: true
+  bf16: true
+  seed: 42
+
+sft:
+  max_seq_length: 32768
+  packing: true
+
+data:
+  chat_template: "olmo3-instruct-sft"
+  num_proc: null
+  seed: 42
+  datasets:
+    - name: "orca_agentinstruct_1m_v1__default__analytical_reasoning"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "analytical_reasoning"
+      weight: 1.0
+      transform: null
+    - name: "orca_agentinstruct_1m_v1__default__brain_teaser"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "brain_teaser"
+      weight: 1.0
+      transform: null
+    - name: "orca_agentinstruct_1m_v1__default__code_"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "code_"
+      weight: 1.0
+      transform: null
+    - name: "orca_agentinstruct_1m_v1__default__creative_content"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "creative_content"
+      weight: 1.0
+      transform: null
+    - name: "orca_agentinstruct_1m_v1__default__fermi"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "fermi"
+      weight: 1.0
+      transform: null
+    - name: "orca_agentinstruct_1m_v1__default__follow_up"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "follow_up"
+      weight: 1.0
+      transform: null
+    - name: "orca_agentinstruct_1m_v1__default__fs_cot_flow"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "fs_cot_flow"
+      weight: 1.0
+      transform: null
+    - name: "orca_agentinstruct_1m_v1__default__mcq"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "mcq"
+      weight: 1.0
+      transform: null
+    - name: "orca_agentinstruct_1m_v1__default__open_domain_qa"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "open_domain_qa"
+      weight: 1.0
+      transform: null
+    - name: "orca_agentinstruct_1m_v1__default__rag"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "rag"
+      weight: 1.0
+      transform: null
+    - name: "orca_agentinstruct_1m_v1__default__rc"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "rc"
+      weight: 1.0
+      transform: null
+    - name: "orca_agentinstruct_1m_v1__default__struct2text_flow"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "struct2text_flow"
+      weight: 1.0
+      transform: null
+    - name: "orca_agentinstruct_1m_v1__default__text_classification"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "text_classification"
+      weight: 1.0
+      transform: null
+    - name: "orca_agentinstruct_1m_v1__default__text_extraction"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "text_extraction"
+      weight: 1.0
+      transform: null
+    - name: "orca_agentinstruct_1m_v1__default__text_modification"
+      path: "openeurollm/orca-agentinstruct-1M-v1-decontaminated"
+      subset: "default"
+      split: "text_modification"
+      weight: 1.0
+      transform: null
+
+deepspeed:
+  config_path: "configs/deepspeed/zero2.yaml"
+
+logging:
+  report_to:
+    - "wandb"
+    - "tensorboard"
+  wandb_project: "sft-training"
+  logging_steps: 1
+  include_num_input_tokens_seen: "non_padding"
+
+slurm:
+  account: "reformo"
+  partition: "booster"
+  num_nodes: 1
+  gpus_per_node: 4
+  cpus_per_task: 32
+  wall_time: "02:00:00"
+  job_name: "sft-training"
+  signal_time_seconds: 300
+  max_failures: 3

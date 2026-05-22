@@ -24,7 +24,6 @@ Any extra arguments are forwarded as OmegaConf dot-list overrides::
 from __future__ import annotations
 
 import argparse
-import statistics
 import sys
 from pathlib import Path
 from typing import Any
@@ -253,59 +252,25 @@ def _parse_count_tokens_args(
 
 def _run_count_tokens(args: argparse.Namespace, cli_overrides: list[str]) -> None:
     """Run the token-stats command."""
-    # ── Lazy imports (heavy) ────────────────────────────────────────
-    from post_training.data.loader import _resolve_num_proc, load_and_mix_datasets
-    from post_training.methods.common import build_tokenizer
-    from post_training.methods.sft import MESSAGES_FEATURES, _sft_row_filter
+    from post_training.utils.token_stats import count_token_stats_for_config
 
     # Load config
     config = PostTrainingConfig.load(args.config, cli_overrides)
-
-    # Load tokenizer
-    tokenizer = build_tokenizer(config)
     print(f"Using chat template: {config.data.chat_template}")
 
-    columns_to_keep = None
-    features = None
-    row_filter = None
-    if config.method == "sft":
-        columns_to_keep = ["messages"]
-        features = MESSAGES_FEATURES
-        row_filter = _sft_row_filter
+    result = count_token_stats_for_config(config)
+    print(f"Number of loaded rows: {result.loaded_rows}")
+    print(f"Number of tokenized rows: {result.tokenized_rows}")
 
-    # Load dataset mix
-    ds = load_and_mix_datasets(
-        config.data,
-        row_filter=row_filter,
-        columns_to_keep=columns_to_keep,
-        features=features,
-    )
-    print(f"Number of loaded rows: {len(ds)}")
+    if result.stats is None:
+        print("No tokens counted.")
+        return
 
-    # Tokenize dataset
-    tokenized_ds = ds.map(
-        lambda x: tokenizer.apply_chat_template(
-            x["messages"],
-            tokenize=True,
-            add_generation_prompt=False,
-            desc="Tokenizing dataset",
-        ),
-        num_proc=_resolve_num_proc(config.data.num_proc),
-    )
-    print(f"Number of tokenized rows: {len(tokenized_ds)}")
-
-    # Total number of tokens
-    lengths = [len(x) for x in tokenized_ds["input_ids"]]
-    total_tokens = sum(lengths)
-    avg_tokens = total_tokens / len(lengths)
-    min_tokens = min(lengths)
-    max_tokens = max(lengths)
-    std_tokens = statistics.stdev(lengths)
-    print(f"Total number of tokens: {total_tokens}")
-    print(f"Average number of tokens: {avg_tokens}")
-    print(f"Minimum number of tokens: {min_tokens}")
-    print(f"Maximum number of tokens: {max_tokens}")
-    print(f"Standard deviation of tokens: {std_tokens}")
+    print(f"Total number of tokens: {result.stats.total_tokens}")
+    print(f"Average number of tokens: {result.stats.avg_tokens}")
+    print(f"Minimum number of tokens: {result.stats.min_tokens}")
+    print(f"Maximum number of tokens: {result.stats.max_tokens}")
+    print(f"Standard deviation of tokens: {result.stats.std_tokens}")
 
 
 # ── Argument parsing ────────────────────────────────────────────────────────

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_MAX_NUM_PROC = 32
+_MAX_NUM_PROC = 64
 
 
 def _resolve_num_proc(configured: int | None) -> int:
@@ -103,6 +103,7 @@ def load_and_mix_datasets(
         raise ValueError("No datasets specified in data.datasets.")
 
     num_proc = _resolve_num_proc(config.num_proc)
+    map_num_proc = num_proc if num_proc > 1 else None
     logger.info("Dataset processing will use num_proc=%d", num_proc)
     seed = config.seed
 
@@ -156,7 +157,7 @@ def load_and_mix_datasets(
                 entry.transform,
                 entry.name,
             )
-            map_kwargs: dict = {"num_proc": num_proc}
+            map_kwargs: dict = {"num_proc": map_num_proc}
             if columns_to_keep is not None or features is not None:
                 map_kwargs["remove_columns"] = ds.column_names
             if features is not None:
@@ -178,7 +179,7 @@ def load_and_mix_datasets(
         # Apply method-specific row filter (e.g. SFT checks for non-empty
         # "messages", DPO checks for non-empty "chosen" / "rejected").
         if row_filter is not None:
-            ds = ds.filter(row_filter, num_proc=num_proc)
+            ds = ds.filter(row_filter, num_proc=map_num_proc)
 
         loaded_datasets.append(ds)
 

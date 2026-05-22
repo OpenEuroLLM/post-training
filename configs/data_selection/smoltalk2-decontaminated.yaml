@@ -1,0 +1,234 @@
+method: sft
+backend: trl
+run_name: null
+offline: true
+container: null
+
+model:
+  name_or_path: "allenai/Olmo-3-1025-7B"
+  attn_implementation: "flash_attention_3"
+  dtype: "bfloat16"
+
+training:
+  max_steps: 1
+  num_training_samples: null
+  num_training_tokens: null
+  learning_rate: 8.0e-5
+  lr_scheduler_type: "linear"
+  lr_scheduler_kwargs: null
+  warmup_steps: 0.03
+  weight_decay: 0.0
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  effective_batch_size: 32
+  per_device_train_batch_size: 2
+  gradient_checkpointing: true
+  use_liger_kernel: true
+  bf16: true
+  seed: 42
+
+sft:
+  max_seq_length: 32768
+  packing: true
+
+data:
+  chat_template: "olmo3-instruct-sft"
+  num_proc: null
+  seed: 42
+  datasets:
+    - name: "smoltalk2__Mid__Llama_Nemotron_Post_Training_Dataset_reasoning_r1"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "Mid"
+      split: "Llama_Nemotron_Post_Training_Dataset_reasoning_r1"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__Mid__OpenThoughts3_1.2M"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "Mid"
+      split: "OpenThoughts3_1.2M"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__Preference__llama_3.1_tulu_3_8b_preference_mixture_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "Preference"
+      split: "llama_3.1_tulu_3_8b_preference_mixture_no_think"
+      weight: 1.0
+      transform: "smoltalk2_preference"
+    - name: "smoltalk2__Preference__tulu_3_8b_pref_mix_Qwen3_32B_Qwen3_0.6B_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "Preference"
+      split: "tulu_3_8b_pref_mix_Qwen3_32B_Qwen3_0.6B_think"
+      weight: 1.0
+      transform: "smoltalk2_preference"
+    - name: "smoltalk2__SFT__LongAlign_64k_Qwen3_32B_yarn_131k_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "LongAlign_64k_Qwen3_32B_yarn_131k_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__LongAlign_64k_context_lang_annotated_lang_6_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "LongAlign_64k_context_lang_annotated_lang_6_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__Mixture_of_Thoughts_science_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "Mixture_of_Thoughts_science_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__OpenHermes_2.5_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "OpenHermes_2.5_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__OpenThoughts3_1.2M_no_think_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "OpenThoughts3_1.2M_no_think_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__OpenThoughts3_1.2M_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "OpenThoughts3_1.2M_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__aya_dataset_Qwen3_32B_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "aya_dataset_Qwen3_32B_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__hermes_function_calling_v1_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "hermes_function_calling_v1_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__multi_turn_reasoning_if_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "multi_turn_reasoning_if_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__s1k_1.1_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "s1k_1.1_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__smolagents_toolcalling_traces_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "smolagents_toolcalling_traces_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__smoltalk_everyday_convs_reasoning_Qwen3_32B_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "smoltalk_everyday_convs_reasoning_Qwen3_32B_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__smoltalk_multilingual8_Qwen3_32B_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "smoltalk_multilingual8_Qwen3_32B_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__smoltalk_multilingual_8languages_lang_5_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "smoltalk_multilingual_8languages_lang_5_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__smoltalk_smollm3_everyday_conversations_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "smoltalk_smollm3_everyday_conversations_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__smoltalk_smollm3_explore_instruct_rewriting_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "smoltalk_smollm3_explore_instruct_rewriting_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__smoltalk_smollm3_smol_magpie_ultra_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "smoltalk_smollm3_smol_magpie_ultra_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__smoltalk_smollm3_smol_rewrite_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "smoltalk_smollm3_smol_rewrite_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__smoltalk_smollm3_smol_summarize_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "smoltalk_smollm3_smol_summarize_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__smoltalk_smollm3_systemchats_30k_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "smoltalk_smollm3_systemchats_30k_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__smoltalk_systemchats_Qwen3_32B_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "smoltalk_systemchats_Qwen3_32B_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__table_gpt_Qwen3_32B_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "table_gpt_Qwen3_32B_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__table_gpt_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "table_gpt_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__tulu_3_sft_personas_instruction_following_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "tulu_3_sft_personas_instruction_following_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+    - name: "smoltalk2__SFT__xlam_traces_no_think"
+      path: "openeurollm/smoltalk2-decontaminated"
+      subset: "SFT"
+      split: "xlam_traces_no_think"
+      weight: 1.0
+      transform: "smoltalk2"
+
+deepspeed:
+  config_path: "configs/deepspeed/zero2.yaml"
+
+logging:
+  report_to:
+    - "wandb"
+    - "tensorboard"
+  wandb_project: "sft-training"
+  logging_steps: 1
+  include_num_input_tokens_seen: "non_padding"
+
+slurm:
+  account: "reformo"
+  partition: "booster"
+  num_nodes: 1
+  gpus_per_node: 4
+  cpus_per_task: 32
+  wall_time: "02:00:00"
+  job_name: "sft-training"
+  signal_time_seconds: 300
+  max_failures: 3

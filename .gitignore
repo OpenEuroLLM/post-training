@@ -21,7 +21,7 @@ slurm-*.err
 logs/
 
 # Data selection experiments
-configs/data_selection/
+# configs/data_selection/
 scripts/data_selection_exp.py
 scripts/playground.ipynb
 

@@ -1,0 +1,108 @@
+openeurollm/lmsys-chat-1m-decontaminated:
+  default:
+    train:
+      avg_tokens: 568.519697659174
+      max_tokens: 1515214
+      min_tokens: 40
+      std_tokens: 4164.788292918319
+      total_tokens: 567201869
+openeurollm/orca-agentinstruct-1M-v1-decontaminated:
+  default:
+    analytical_reasoning:
+      avg_tokens: 893.1136372733458
+      max_tokens: 2909
+      min_tokens: 273
+      std_tokens: 242.9652976726922
+      total_tokens: 22312658
+    brain_teaser:
+      avg_tokens: 557.143729234218
+      max_tokens: 3952
+      min_tokens: 26
+      std_tokens: 340.1104754977876
+      total_tokens: 27836015
+    code_:
+      avg_tokens: 1581.5270036325064
+      max_tokens: 134987
+      min_tokens: 87
+      std_tokens: 2920.476398140083
+      total_tokens: 158043575
+    creative_content:
+      avg_tokens: 1182.6104361401894
+      max_tokens: 4393
+      min_tokens: 62
+      std_tokens: 366.86438377039997
+      total_tokens: 59084400
+    fermi:
+      avg_tokens: 696.4337576048671
+      max_tokens: 2704
+      min_tokens: 37
+      std_tokens: 365.82495763206134
+      total_tokens: 17399701
+    follow_up:
+      avg_tokens: 1973.4713432443632
+      max_tokens: 56572
+      min_tokens: 24
+      std_tokens: 1192.957516358674
+      total_tokens: 195269069
+    fs_cot_flow:
+      avg_tokens: 1083.5021098742113
+      max_tokens: 2836
+      min_tokens: 100
+      std_tokens: 484.1175921661394
+      total_tokens: 26960783
+    mcq:
+      avg_tokens: 520.7160393699999
+      max_tokens: 2626
+      min_tokens: 45
+      std_tokens: 239.92909212807973
+      total_tokens: 52005473
+    open_domain_qa:
+      avg_tokens: 519.6931295520808
+      max_tokens: 2345
+      min_tokens: 16
+      std_tokens: 240.30060832716887
+      total_tokens: 141351854
+    rag:
+      avg_tokens: 2105.1359416046685
+      max_tokens: 4469
+      min_tokens: 150
+      std_tokens: 444.72518081701935
+      total_tokens: 104976814
+    rc:
+      avg_tokens: 1207.0225606090964
+      max_tokens: 8816
+      min_tokens: 163
+      std_tokens: 488.8062240467369
+      total_tokens: 60242496
+    struct2text_flow:
+      avg_tokens: 1145.5521169052147
+      max_tokens: 4344
+      min_tokens: 66
+      std_tokens: 378.68536044493567
+      total_tokens: 57226056
+    text_classification:
+      avg_tokens: 611.7158258991079
+      max_tokens: 3308
+      min_tokens: 111
+      std_tokens: 528.6935463536554
+      total_tokens: 30582121
+    text_extraction:
+      avg_tokens: 1591.2091727303707
+      max_tokens: 14903
+      min_tokens: 100
+      std_tokens: 675.3150789112341
+      total_tokens: 79380652
+    text_modification:
+      avg_tokens: 1557.5278350928504
+      max_tokens: 12880
+      min_tokens: 57
+      std_tokens: 637.4135059006596
+      total_tokens: 77750232
+openeurollm/open-perfectblend-decontaminated:
+  default:
+    train:
+      avg_tokens: 541.7118360730835
+      max_tokens: 14184
+      min_tokens: 37
+      std_tokens: 470.2161041930572
+      total_tokens: 768648467
