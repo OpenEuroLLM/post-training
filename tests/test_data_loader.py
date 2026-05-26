@@ -37,6 +37,20 @@ def _config(*entries: DatasetEntry, seed: int = 123) -> DataConfig:
     return DataConfig(num_proc=1, seed=seed, datasets=list(entries))
 
 
+def test_resolve_num_proc_auto_uses_affinity_cap(monkeypatch):
+    monkeypatch.setattr(loader, "_MAX_NUM_PROC", 8)
+    monkeypatch.setattr(loader.os, "cpu_count", lambda: 4)
+
+    assert loader._resolve_num_proc(None) == 8
+
+
+def test_resolve_num_proc_clamps_explicit_value_to_affinity_cap(monkeypatch):
+    monkeypatch.setattr(loader, "_MAX_NUM_PROC", 8)
+    monkeypatch.setattr(loader.os, "cpu_count", lambda: 64)
+
+    assert loader._resolve_num_proc(16) == 8
+
+
 def test_weight_resampling_uses_each_dataset_size(monkeypatch):
     _patch_load_dataset(
         monkeypatch,
