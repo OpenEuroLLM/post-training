@@ -22,21 +22,20 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_MAX_NUM_PROC = 32
+_MAX_NUM_PROC = len(os.sched_getaffinity(0))
 
 
 def _resolve_num_proc(configured: int | None) -> int:
     """Return the number of worker processes for ``.map()`` / ``.filter()``.
 
-    When *configured* is ``None`` (the default), auto-detect from
-    ``os.cpu_count()`` but cap at ``_MAX_NUM_PROC`` to avoid process
-    explosion on large HPC nodes.  An explicit value is still clamped to the
-    available CPU count so we never request more workers than cores.
+    When *configured* is ``None`` (the default), use the process CPU affinity
+    mask so SLURM jobs respect their allocated cores instead of all CPUs on an
+    HPC node. An explicit value is still clamped to that affinity count so we
+    never request more workers than allocated cores.
     """
-    available = os.cpu_count() or 1
     if configured is not None:
-        return min(configured, available)
-    return min(available, _MAX_NUM_PROC)
+        return min(configured, _MAX_NUM_PROC)
+    return _MAX_NUM_PROC
 
 
 def _resample_to_size(ds: Dataset, target_n: int, seed: int) -> Dataset:
