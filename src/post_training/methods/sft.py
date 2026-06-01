@@ -17,6 +17,7 @@ from post_training.methods.common import (
     build_model_init_kwargs,
     build_tokenizer,
 )
+from post_training.patches import maybe_install_olmo3_swa_rope
 
 if TYPE_CHECKING:
     from post_training.config import PostTrainingConfig
@@ -45,6 +46,12 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
         Ready to call ``.train()``.
     """
     mc = config.sft  # method-specific config
+
+    # Olmo3 SWA RoPE bug (HF transformers ≤ 5.4.x, see PR #45945): SWA layers
+    # incorrectly receive YaRN-scaled RoPE instead of vanilla. Patch must be
+    # installed before SFTTrainer constructs the model. No-op for non-Olmo3
+    # models and once upstream merges the fix.
+    maybe_install_olmo3_swa_rope(config.model.name_or_path)
 
     tokenizer = build_tokenizer(config)
 

@@ -1,0 +1,121 @@
+# ============================================================================
+# Dolci Instruct SFT — SHORT test run for the Olmo3 SWA RoPE patch
+#
+# Mirrors `dolci_instruct_sft_container.yaml` exactly EXCEPT:
+#   - more frequent inference checkpoints (every 50 steps)
+#   - wall_time: 04:00:00 (vs 24h) — SLURM stops the job at ~700 steps
+#
+# IMPORTANT: We keep `num_train_epochs: 2` (NOT a small max_steps) so the
+# LR schedule is BYTE-IDENTICAL to production through the steps we eval:
+#   - warmup_ratio=0.03 → ~100 warmup steps (3354 total × 0.03)
+#   - linear decay slope matches production (decay over the full 3354 horizon)
+# With max_steps: 300, warmup would be just 9 steps and decay would hit LR=0
+# at step 300 — nothing like the trajectory the model actually trains under
+# in production, so checkpoint-vs-checkpoint comparison would be invalid.
+#
+# Same model / tokenizer / chat_template / dataset / max_seq_length as the
+# production config so TRL's tokenized-dataset cache hits.
+# ============================================================================
+
+method: sft
+backend: trl
+run_name: null
+offline: true
+
+# -- Container ---------------------------------------------------------------
+container:
+  image: /leonardo_work/OELLM_prod2026/container_images/post-training-flash-attn-3.sif
+  bind_mounts:
+    - /leonardo_scratch/large/userexternal/knikolao:/leonardo_scratch/large/userexternal/knikolao
+    - /leonardo_work/OELLM_prod2026:/leonardo_work/OELLM_prod2026
+  env_file: env/leonardo.env
+
+# -- Model -------------------------------------------------------------------
+model:
+  name_or_path: "allenai/Olmo-3-7B-Think-SFT"
+  tokenizer_name_or_path: "allenai/OLMo-3-7B-Instruct-SFT"
+  attn_implementation: "flash_attention_3"
+  dtype: "bfloat16"
+
+# -- Training hyper-parameters (from OLMo-3 paper Table 47) -----------------
+# Matches production exactly. Wall-time stops the job before all steps run.
+training:
+  num_train_epochs: 2
+  learning_rate: 8.0e-5
+  effective_batch_size: 32
+  per_device_train_batch_size: 1
+  warmup_ratio: 0.03
+  lr_scheduler_type: "linear"
+  adam_beta2: 0.95
+  gradient_checkpointing: true
+  bf16: true
+  seed: 42
+  use_liger_kernel: true
+
+# -- SFT method parameters ---------------------------------------------------
+sft:
+  max_seq_length: 32768
+  packing: true
+  dataset_num_proc: 32
+
+# -- Checkpointing -----------------------------------------------------------
+checkpointing:
+  save_strategy: "steps"
+  save_steps: 100               # keep training checkpoints sparse (3 total: 100/200/300)
+  save_total_limit: 3
+  inference_checkpoint_steps: 50  # 6 inference checkpoints for eval: 50/100/150/200/250/300
+  inference_checkpoint_path: "inference_checkpoints"
+
+# -- Data mix ----------------------------------------------------------------
+data:
+  chat_template: "olmo3-instruct-sft"
+  num_proc: 32
+  datasets:
+    - name: "dolci_instruct_sft"
+      path: "/leonardo_scratch/large/userexternal/knikolao/propella_annotation/data/Dolci-Instruct-SFT-Decont/data"
+      split: "train"
+      weight: 1.0
+      transform: null
+
+# -- DeepSpeed ---------------------------------------------------------------
+deepspeed:
+  config_path: "configs/deepspeed/zero2.yaml"
+
+# -- Accelerate launch flags -------------------------------------------------
+accelerate:
+  mixed_precision: "bf16"
+  use_deepspeed: true
+  deepspeed_multinode_launcher: "standard"
+  same_network: true
+  rdzv_backend: "static"
+  dynamo_backend: "inductor"
+
+# -- Logging & tracking ------------------------------------------------------
+logging:
+  report_to:
+    - "wandb"
+    - "tensorboard"
+  wandb_project: "propella-olmo-sft"
+  logging_steps: 1
+  include_num_input_tokens_seen: "non_padding"
+
+# -- SLURM -------------------------------------------------------------------
+slurm:
+  partition: "boost_usr_prod"
+  num_nodes: 4
+  gpus_per_node: 4
+  cpus_per_task: 32
+  wall_time: "04:00:00"
+  job_name: "propella-olmo-sft-rope-short"
+  signal_time_seconds: 300
+  max_failures: 1
+
+# -- Debug mode --------------------------------------------------------------
+debug:
+  enabled: false
+  override_existing: false
+
+# -- Output paths -------------------------------------------------------------
+paths:
+  output_base: "outputs"
+  debug_base: "outputs/debug"

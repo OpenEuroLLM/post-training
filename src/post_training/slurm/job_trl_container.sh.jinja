@@ -64,6 +64,14 @@ if [ ! -f "$FAILURE_COUNT_FILE" ]; then
 fi
 
 handle_signal() {
+    # Tie the timeout-requeue path to max_failures so single-shot runs
+    # (max_failures: 1, e.g. short test runs) terminate cleanly at the wall
+    # instead of looping through the queue. Production runs keep max_failures
+    # at 3 and continue to auto-resume across multiple 24h slots.
+    if [ "$MAX_FAILURES" -le 1 ]; then
+        echo "[$(date)] SIGUSR1 received, max_failures=$MAX_FAILURES → not requeueing (single-shot mode)."
+        return
+    fi
     echo "[$(date)] Received SIGUSR1 — timeout approaching. Requeuing..."
     scontrol requeue $SLURM_JOB_ID
 }
