@@ -110,8 +110,21 @@ def main() -> None:
                 "--tokenize-only is only supported with backend=trl "
                 "(LlamaFactory uses llamafactory-cli, which has no equivalent flag)."
             )
+        # Resource overrides for the "warm the dataset cache" workflow.
+        #
+        # - num_nodes=1: tokenization is single-rank work (HF datasets `.map`
+        #   honors num_proc within one process group; no multi-node value).
+        # - gpus_per_node=4: --tokenize-only exits *after* trainer init, and
+        #   SFTTrainer constructs the model + DeepSpeed optimizer first. A 7B
+        #   model + Adam (~98 GB optimizer state) under ZeRO-2 OOMs on a single
+        #   GPU during initialize_optimizer_states; sharding across 4 GPUs on
+        #   one node fits comfortably (~35 GB/GPU).
+        # - wall_time=02:00:00: 2.15M rows × 32k context tokenize in ~10-30 min
+        #   with sft.dataset_num_proc=32; 2h is margin and keeps the cache-warm
+        #   job off the 24h production wall.
         config.slurm.num_nodes = 1
-        config.slurm.gpus_per_node = 1
+        config.slurm.gpus_per_node = 4
+        config.slurm.wall_time = "02:00:00"
 
     if config.offline:
         if config.container is not None and config.container.env_file:

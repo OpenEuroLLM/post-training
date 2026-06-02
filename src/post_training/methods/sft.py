@@ -19,6 +19,7 @@ from post_training.methods.common import (
     build_tokenizer,
     sanitize_generation_config,
 )
+from post_training.patches import maybe_install_olmo3_swa_rope
 
 if TYPE_CHECKING:
     from post_training.config import PostTrainingConfig
@@ -58,6 +59,13 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
         Ready to call ``.train()``.
     """
     mc = config.sft  # method-specific config
+
+    # Olmo3 ≤ transformers 5.4.x feeds YaRN-scaled RoPE to the 24 SWA layers
+    # that were trained with vanilla RoPE (HF refactor PR #39847). Install the
+    # per-layer fix (mirrors HF PR #45945) BEFORE SFTTrainer constructs the
+    # model below. No-op for non-Olmo3 models and self-retires once the
+    # installed transformers already carries the fix.
+    maybe_install_olmo3_swa_rope(config.model.name_or_path)
 
     tokenizer = build_tokenizer(config)
 

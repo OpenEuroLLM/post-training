@@ -11,9 +11,13 @@ wheels/
 
 # Runtime outputs
 outputs/
+scripts/diagnostics/check_rope_swa_divergence/run/
 
 # Weights & Biases
 wandb/
+
+# Local env files carry secrets (e.g. WANDB_API_KEY) — never commit
+env/leonardo.env
 
 # SLURM logs (the ones inside outputs/ are already covered)
 slurm-*.out
