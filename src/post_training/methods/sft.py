@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from accelerate import PartialState
-from datasets import Features, List, Value
 from trl import SFTConfig, SFTTrainer
 
 from post_training.chat_templates.registry import has_generation_markers
@@ -25,17 +24,6 @@ if TYPE_CHECKING:
     from post_training.config import PostTrainingConfig
 
 logger = logging.getLogger(__name__)
-
-MESSAGES_FEATURES = Features(
-    {
-        "messages": List(
-            {
-                "content": Value("string"),
-                "role": Value("string"),
-            }
-        )
-    }
-)
 
 
 def _sft_row_filter(example: dict) -> bool:
@@ -97,11 +85,22 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
         )
 
     with PartialState().main_process_first():
+        # Interim fix (this branch only): no `features=` schema cast.
+        # Dolci/Propella `messages` are a 4-field struct
+        # {content, function_calls, functions, role}; the upstream hardcoded
+        # {content, role} cast raises TypeError on load (Arrow can't drop
+        # struct fields). We keep the native schema so the function-calling
+        # subfields reach the chat template (it reads them via
+        # message.get(...)). A single-dataset run needs no cross-dataset
+        # schema normalization, so dropping the cast is sufficient and avoids
+        # a cast pass that would invalidate the tokenize cache. The proper
+        # opt-in/dynamic-union fix lives upstream on
+        # `fix/sft-message-schema-normalization`; expect a rebase conflict
+        # here once it merges — resolve in favor of upstream.
         dataset = load_and_mix_datasets(
             config.data,
             row_filter=_sft_row_filter,
             columns_to_keep=["messages"],
-            features=MESSAGES_FEATURES,
         )
 
     sft_config = SFTConfig(
