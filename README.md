@@ -328,7 +328,7 @@ You must specify exactly one determining factor for training duration in the `tr
 - **Debug**: `debug.enabled: true`
   Forces `report_to: none`, uses a separate output directory, and allows overwriting existing runs.
 - **Tokenize only**: `--tokenize-only` (CLI flag on `train.py` / `submit.py`)
-  Exits immediately after the trainer is initialized — dataset loading, tokenization, and packing all run, but the training loop is never entered. Useful for pretokenizing the dataset before committing to a full run. When passed to `submit.py`, the job is automatically constrained to 1 node and 1 GPU.
+  Exits immediately after the trainer is initialized — dataset loading, tokenization, and packing all run, but the training loop is never entered. Useful for pretokenizing the dataset before committing to a full run. When passed to `submit.py`, the job is automatically constrained to 1 node, 1 GPU, and a 2h wall.
 
   ```bash
   python scripts/submit.py --config configs/trl/sft.yaml --tokenize-only
