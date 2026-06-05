@@ -32,7 +32,7 @@ from transformers import AutoTokenizer
 from post_training.chat_templates.registry import CHAT_TEMPLATES, get_chat_template
 
 DEFAULT_DATASET = (
-    "/leonardo_scratch/large/userexternal/knikolao/propella_annotation"
+    "/leonardo_work/OELLM_prod2026/users/knikolao/propella_annotation"
     "/data/Dolci-Instruct-SFT-Decont/data"
 )
 DEFAULT_TOKENIZER = "allenai/Olmo-3-7B-Think-SFT"

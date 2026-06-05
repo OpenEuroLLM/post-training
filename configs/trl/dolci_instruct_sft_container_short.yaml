@@ -26,7 +26,7 @@ offline: true
 container:
   image: /leonardo_work/OELLM_prod2026/container_images/post-training-flash-attn-3.sif
   bind_mounts:
-    - /leonardo_scratch/large/userexternal/knikolao:/leonardo_scratch/large/userexternal/knikolao
+    - /leonardo_work/OELLM_prod2026/users/knikolao:/leonardo_work/OELLM_prod2026/users/knikolao
     - /leonardo_work/OELLM_prod2026:/leonardo_work/OELLM_prod2026
   env_file: env/leonardo.env
 
@@ -74,7 +74,7 @@ data:
   num_proc: 32
   datasets:
     - name: "dolci_instruct_sft"
-      path: "/leonardo_scratch/large/userexternal/knikolao/propella_annotation/data/Dolci-Instruct-SFT-Decont/data"
+      path: "/leonardo_work/OELLM_prod2026/users/knikolao/propella_annotation/data/Dolci-Instruct-SFT-Decont/data"
       split: "train"
       weight: 1.0
       transform: null

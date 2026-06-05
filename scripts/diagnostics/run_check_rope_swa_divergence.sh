@@ -21,18 +21,18 @@
 #SBATCH --mem=128G
 #SBATCH --time=00:30:00
 #SBATCH --job-name=rope-swa-check
-#SBATCH --output=/leonardo_scratch/large/userexternal/knikolao/post_trainig_olmo_trl/post-training/scripts/diagnostics/check_rope_swa_divergence/run/%x-%j.out
+#SBATCH --output=/leonardo_work/OELLM_prod2026/users/knikolao/post_trainig_olmo_trl/post-training/scripts/diagnostics/check_rope_swa_divergence/run/%x-%j.out
 
 set -euo pipefail
 
-REPO=/leonardo_scratch/large/userexternal/knikolao/post_trainig_olmo_trl/post-training
+REPO=/leonardo_work/OELLM_prod2026/users/knikolao/post_trainig_olmo_trl/post-training
 DIAG=$REPO/scripts/diagnostics/check_rope_swa_divergence
 
 TRAIN_SIF=/leonardo_work/OELLM_prod2026/container_images/post-training-flash-attn-3.sif
-EVAL_SIF=/leonardo_scratch/large/userexternal/knikolao/containers/vllm-v0.19.0.sif
+EVAL_SIF=/leonardo_work/OELLM_prod2026/users/knikolao/containers/vllm-v0.19.0.sif
 
-BIND="--bind /leonardo_scratch/large/userexternal/knikolao:/leonardo_scratch/large/userexternal/knikolao --bind /leonardo_work/OELLM_prod2026:/leonardo_work/OELLM_prod2026"
-ENV="--env HF_HOME=/leonardo_scratch/large/userexternal/knikolao/huggingface --env TRANSFORMERS_OFFLINE=1 --env HF_HUB_OFFLINE=1 --env HF_DATASETS_OFFLINE=1 --env PYTHONPATH=$REPO/src"
+BIND="--bind /leonardo_work/OELLM_prod2026/users/knikolao:/leonardo_work/OELLM_prod2026/users/knikolao --bind /leonardo_work/OELLM_prod2026:/leonardo_work/OELLM_prod2026"
+ENV="--env HF_HOME=/leonardo_work/OELLM_prod2026/users/knikolao/huggingface --env TRANSFORMERS_OFFLINE=1 --env HF_HUB_OFFLINE=1 --env HF_DATASETS_OFFLINE=1 --env PYTHONPATH=$REPO/src"
 
 cd "$DIAG"
 mkdir -p run

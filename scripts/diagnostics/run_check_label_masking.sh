@@ -47,7 +47,7 @@ echo "=========================================="
 # script. The leading `_` becomes $0 inside `bash -lc`, so "$@" inside the
 # heredoc expands to just $1, $2, ...
 singularity exec --nv \
-  --bind /leonardo_scratch/large/userexternal/knikolao:/leonardo_scratch/large/userexternal/knikolao \
+  --bind /leonardo_work/OELLM_prod2026/users/knikolao:/leonardo_work/OELLM_prod2026/users/knikolao \
   --bind /leonardo_work/OELLM_prod2026:/leonardo_work/OELLM_prod2026 \
   "${CONTAINER}" \
   bash -lc '

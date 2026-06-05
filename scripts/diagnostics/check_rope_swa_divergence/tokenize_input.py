@@ -22,7 +22,7 @@ from transformers import AutoTokenizer
 from post_training.chat_templates.registry import get_chat_template
 
 DOLCI = Path(
-    "/leonardo_scratch/large/userexternal/knikolao/propella_annotation/data/Dolci-Instruct-SFT-Decont/data"
+    "/leonardo_work/OELLM_prod2026/users/knikolao/propella_annotation/data/Dolci-Instruct-SFT-Decont/data"
 )
 
 def main():
