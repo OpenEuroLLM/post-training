@@ -24,6 +24,12 @@
 {% endif -%}
 #SBATCH --time={{ wall_time }}
 #SBATCH --signal=B:USR1@{{ signal_time_seconds }}
+{% if max_failures > 1 -%}
+# Leonardo's cluster default is JobRequeue=0, so `scontrol requeue` is rejected
+# ("Requested operation is presently disabled") unless the job opts in here.
+# Gated on max_failures>1 so single-shot runs still terminate at the wall.
+#SBATCH --requeue
+{% endif -%}
 #SBATCH --output={{ run_dir }}/slurm/slurm-%j.out
 #SBATCH --error={{ run_dir }}/slurm/slurm-%j.err
 #SBATCH --open-mode=append
@@ -65,6 +71,10 @@ if [ ! -f "$FAILURE_COUNT_FILE" ]; then
     echo 0 > "$FAILURE_COUNT_FILE"
 fi
 
+# Set by the SIGUSR1 handler so the wait/exit logic below can tell a timeout
+# requeue apart from a crash and avoid launching a duplicate job.
+REQUEUEING=0
+
 handle_signal() {
     # Tie the timeout-requeue path to max_failures so single-shot runs
     # (max_failures: 1, e.g. short test runs) terminate cleanly at the wall
@@ -74,8 +84,17 @@ handle_signal() {
         echo "[$(date)] SIGUSR1 received, max_failures=$MAX_FAILURES → not requeueing (single-shot mode)."
         return
     fi
-    echo "[$(date)] Received SIGUSR1 — timeout approaching. Requeuing..."
-    scontrol requeue $SLURM_JOB_ID
+    REQUEUEING=1
+    echo "[$(date)] Received SIGUSR1 — timeout approaching. Requeuing job $SLURM_JOB_ID..."
+    # If requeue is rejected (e.g. cluster JobRequeue=0 and the job was submitted
+    # without --requeue), exit non-zero instead of falling through to the main
+    # flow's `exit 0` — otherwise the job is marked COMPLETED and afterok
+    # dependents (the eval launcher) would fire on an incomplete checkpoint.
+    # Exiting non-zero leaves afterok unsatisfied so they don't run.
+    if ! scontrol requeue "$SLURM_JOB_ID"; then
+        echo "[$(date)] WARNING: scontrol requeue failed; exiting non-zero so afterok dependents don't run on an incomplete checkpoint."
+        exit 1
+    fi
 }
 trap handle_signal USR1
 
@@ -123,11 +142,25 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
       --role \$(hostname -s): \
       scripts/train.py --config {{ config_path }}{% if tokenize_only %} --tokenize-only{% endif %}
   " &
+SRUN_PID=$!
 
-wait $!
-EXIT_CODE=$?
+# `wait` returns 128+signum when interrupted by the trapped USR1 (timeout), and
+# srun's status on a crash. `|| EXIT_CODE=$?` captures it inside an || list so
+# `set -e` does not abort here before the resubmit logic below runs — a bare
+# `wait` returning non-zero would otherwise skip everything that follows.
+EXIT_CODE=0
+wait "$SRUN_PID" || EXIT_CODE=$?
 
-# ── Handle failure / resubmit ─────────────────────────────────────────────
+# ── Timeout path ──────────────────────────────────────────────────────────
+# The USR1 handler already asked SLURM to requeue this same job ID; it will go
+# back to PENDING and resume from the latest checkpoint. Exit cleanly so we do
+# NOT also fire the crash-resubmit below and launch a duplicate job.
+if [ "$REQUEUEING" -eq 1 ]; then
+    echo "[$(date)] Requeue in progress for job $SLURM_JOB_ID; exiting cleanly."
+    exit 0
+fi
+
+# ── Crash path: resubmit (also auto-resumes from checkpoint) ───────────────
 if [ $EXIT_CODE -ne 0 ]; then
     FAILURES=$(cat "$FAILURE_COUNT_FILE")
     FAILURES=$((FAILURES + 1))
