@@ -113,6 +113,7 @@ class DPOMethodConfig:
     ref_model_name_or_path: str | None = None
     max_seq_length: int = 2048
     dataset_num_proc: int | None = None
+    precompute_ref_log_probs: bool = True
 
 
 @dataclass

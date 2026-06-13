@@ -56,6 +56,7 @@ def build_dpo_trainer(config: PostTrainingConfig, run_dir: Path) -> DPOTrainer:
         loss_type=mc.loss_type,
         max_length=mc.max_seq_length,
         dataset_num_proc=mc.dataset_num_proc,
+        precompute_ref_log_probs=mc.precompute_ref_log_probs,
         model_init_kwargs=build_model_init_kwargs(config),
     )
 

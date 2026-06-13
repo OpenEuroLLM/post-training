@@ -51,6 +51,7 @@ dpo:
   loss_type: "sigmoid"                       # "sigmoid" | "hinge" | "ipo" | etc.
   ref_model_name_or_path: null               # null → TRL creates an implicit copy
   max_seq_length: 2048
+  precompute_ref_log_probs: true             # Precompute reference model log-probs for faster training
 
 # -- Checkpointing -----------------------------------------------------------
 checkpointing:
