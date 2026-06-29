@@ -249,3 +249,50 @@ def test_llamafactory_backend_ignores_tokenize_only(tmp_path, config):
     )
 
     assert "--tokenize-only" not in script.read_text()
+
+
+# ---------------------------------------------------------------------------
+# container.path — configurable PATH inside the container
+# ---------------------------------------------------------------------------
+
+
+def test_trl_container_default_path(tmp_path, config):
+    """Default container PATH is rendered when not explicitly set."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_container_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    assert 'export PATH=\\"/usr/local/bin:/usr/bin:/bin\\"' in content
+
+
+def test_trl_container_custom_path(tmp_path, config):
+    """Custom container PATH is rendered when set in ContainerConfig."""
+    config.container.path = "/opt/conda/bin:/usr/local/bin:/usr/bin:/bin"
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_container_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    assert 'export PATH=\\"/opt/conda/bin:/usr/local/bin:/usr/bin:/bin\\"' in content
+
+
+def test_llamafactory_container_default_path(tmp_path, config):
+    """Default container PATH is rendered in the LlamaFactory template."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert 'export PATH=\\"/usr/local/bin:/usr/bin:/bin\\"' in content
+
+
+def test_llamafactory_container_custom_path(tmp_path, config):
+    """Custom container PATH is rendered in the LlamaFactory template."""
+    config.container.path = "/opt/conda/bin:/usr/local/bin:/usr/bin:/bin"
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert 'export PATH=\\"/opt/conda/bin:/usr/local/bin:/usr/bin:/bin\\"' in content
