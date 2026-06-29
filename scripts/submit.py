@@ -12,9 +12,11 @@ like ``scripts/train.py``.
 from __future__ import annotations
 
 import argparse
+import difflib
 import logging
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -137,9 +139,34 @@ def main() -> None:
     # This ensures train.py uses the same directory when it loads the config.
     config.run_name = run_dir.name
 
-    # Freeze a copy of the config.
+    # Warn if a config.yaml already exists in the run directory (e.g. resubmission).
     frozen = run_dir / "config.yaml"
+    if frozen.exists():
+        from omegaconf import OmegaConf
+
+        existing_text = frozen.read_text()
+        new_text = OmegaConf.to_yaml(OmegaConf.structured(config))
+        diff_lines = list(
+            difflib.unified_diff(
+                existing_text.splitlines(keepends=True),
+                new_text.splitlines(keepends=True),
+                fromfile="config.yaml (existing)",
+                tofile="config.yaml (new)",
+            )
+        )
+        if diff_lines:
+            logger.warning("config.yaml already exists in the run directory and differs:")
+            print("".join(diff_lines))
+            answer = input("\nOverwrite and proceed? [y/N] ").strip().lower()
+            if answer != "y":
+                logger.info("Aborted.")
+                return
+
+    # Freeze a copy of the config (fully resolved, with CLI overrides applied).
     config.save(frozen)
+
+    # Copy the original source YAML alongside it for reference.
+    shutil.copy(config_path, run_dir / "config.yaml")
 
     # Copy any backend-specific artifacts for reproducibility.
     from post_training.backend import get_backend
