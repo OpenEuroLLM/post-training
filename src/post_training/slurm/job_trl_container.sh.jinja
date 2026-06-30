@@ -80,7 +80,7 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     set -e
 
     # Prevent host Python/PATH from interfering with container
-    export PATH=\"/usr/local/bin:/usr/bin:/bin\"
+    export PATH=\"{{ container_path }}\"
     export PYTHONPATH=\"{{ repo_dir }}/src\"
     export PYTHONNOUSERSITE=1
 
