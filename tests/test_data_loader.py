@@ -127,7 +127,58 @@ def test_zero_negative_and_all_zero_weights(monkeypatch):
         loader.load_and_mix_datasets(_config(DatasetEntry(name="a", path="dataset-a", weight=0.0)))
 
 
-def test_columns_to_keep_and_features_enforce_schema(monkeypatch):
+def test_native_dataset_preserves_extra_message_fields(monkeypatch):
+    _patch_load_dataset(
+        monkeypatch,
+        {
+            "dataset-a": Dataset.from_dict(
+                {
+                    "messages": [
+                        [
+                            {
+                                "role": "user",
+                                "content": "Use this function.",
+                                "functions": '[{"name":"lookup"}]',
+                                "function_calls": None,
+                            },
+                            {
+                                "role": "assistant",
+                                "content": None,
+                                "functions": None,
+                                "function_calls": 'lookup(query="x")',
+                            },
+                        ]
+                    ],
+                    "unused": ["drop me"],
+                }
+            )
+        },
+    )
+    features = Features(
+        {
+            "messages": List(
+                {
+                    "content": Value("string"),
+                    "role": Value("string"),
+                }
+            )
+        }
+    )
+
+    mixed = loader.load_and_mix_datasets(
+        _config(DatasetEntry(name="a", path="dataset-a")),
+        columns_to_keep=["messages"],
+        features=features,
+    )
+
+    assert mixed.column_names == ["messages"]
+    assert "functions" in mixed.features["messages"].feature
+    assert "function_calls" in mixed.features["messages"].feature
+    assert mixed[0]["messages"][0]["functions"] == '[{"name":"lookup"}]'
+    assert mixed[0]["messages"][1]["function_calls"] == 'lookup(query="x")'
+
+
+def test_native_plain_chat_dataset_skips_schema_cast(monkeypatch):
     _patch_load_dataset(monkeypatch, {"dataset-a": _dataset("a", 2)})
     features = Features(
         {
@@ -147,7 +198,7 @@ def test_columns_to_keep_and_features_enforce_schema(monkeypatch):
     )
 
     assert mixed.column_names == ["messages"]
-    assert mixed.features == features
+    assert mixed[0]["messages"][0] == {"content": "a-0", "role": "user"}
 
 
 def test_features_with_transform_remove_original_columns(monkeypatch):
