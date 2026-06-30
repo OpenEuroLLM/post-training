@@ -54,7 +54,10 @@ class InferenceCheckpointCallback(TrainerCallback):
 
         if state.global_step == 0:
             return
-        if state.global_step % self.save_steps != 0:
+
+        is_periodic = state.global_step % self.save_steps == 0
+        is_last_step = state.global_step == state.max_steps
+        if not (is_periodic or is_last_step):
             return
 
         # Only save on the main process.
