@@ -89,8 +89,10 @@ def load_and_mix_datasets(
         transform is applied, original input columns are removed before the
         transform output is materialized.
     features:
-        Optional dataset schema to enforce while mapping transformed rows or
-        by casting already-structured rows.
+        Optional dataset schema to enforce while mapping transformed rows.
+        Already-structured datasets (transform: null) are preserved after
+        top-level column selection so nested message fields remain available
+        to chat templates.
 
     Returns
     -------
@@ -170,9 +172,6 @@ def load_and_mix_datasets(
                     f"dataset '{entry.name}'. Available columns: {ds.column_names}"
                 )
             ds = ds.select_columns(present)
-
-        if features is not None:
-            ds = ds.cast(features)
 
         # Apply method-specific row filter (e.g. SFT checks for non-empty
         # "messages", DPO checks for non-empty "chosen" / "rejected").
