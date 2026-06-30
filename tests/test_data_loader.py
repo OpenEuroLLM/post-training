@@ -198,7 +198,10 @@ def test_native_plain_chat_dataset_skips_schema_cast(monkeypatch):
     )
 
     assert mixed.column_names == ["messages"]
-assert {(msgs[0]["role"], msgs[0]["content"]) for msgs in mixed["messages"]} == {("user", "a-0"), ("user", "a-1")}
+    assert {(msgs[0]["role"], msgs[0]["content"]) for msgs in mixed["messages"]} == {
+        ("user", "a-0"),
+        ("user", "a-1"),
+    }
 
 
 def test_features_with_transform_remove_original_columns(monkeypatch):
