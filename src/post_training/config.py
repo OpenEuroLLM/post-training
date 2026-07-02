@@ -244,7 +244,7 @@ class PostTrainingConfig:
 
     # Infrastructure.
     # Inline DeepSpeed config dict. Set to null to disable DeepSpeed entirely.
-    deepspeed: Any = None
+    deepspeed: dict[str, Any] | None = None
     accelerate: AccelerateConfig = field(default_factory=AccelerateConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     slurm: SlurmConfig = field(default_factory=SlurmConfig)
