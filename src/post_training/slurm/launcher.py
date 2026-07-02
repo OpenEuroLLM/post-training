@@ -142,6 +142,7 @@ def render_trl_container_slurm_script(
         container_image=config.container.image,
         bind_mounts=config.container.bind_mounts,
         env_file=config.container.env_file,
+        container_path=config.container.path,
         repo_dir=str(Path.cwd()),
     )
 
@@ -188,6 +189,7 @@ def render_llamafactory_slurm_script(
         container_image=config.container.image,
         bind_mounts=config.container.bind_mounts,
         env_file=config.container.env_file,
+        container_path=config.container.path,
         # LlamaFactory
         llamafactory_config=str(run_dir / "llamafactory_config.yaml"),
         repo_dir=str(Path.cwd()),

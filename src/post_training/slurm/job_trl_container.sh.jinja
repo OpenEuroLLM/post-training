@@ -43,7 +43,7 @@ export WORLD_SIZE=$(( SLURM_NNODES * GPUS_PER_NODE ))
 
 # NCCL tuning for multi-node stability
 export NCCL_IB_TIMEOUT=120
-export NCCL_DEBUG=INFO
+export NCCL_DEBUG=WARN
 # CUDA_DEVICE_MAX_CONNECTIONS=1 is a Megatron-LM tensor-parallel flag that
 # serializes CUDA streams and hurts ZeRO-2 overlap_comm — do not set it.
 export OMP_NUM_THREADS=1
@@ -80,7 +80,7 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     set -e
 
     # Prevent host Python/PATH from interfering with container
-    export PATH=\"/usr/local/bin:/usr/bin:/bin\"
+    export PATH=\"{{ container_path }}\"
     export PYTHONPATH=\"{{ repo_dir }}/src\"
     export PYTHONNOUSERSITE=1
 

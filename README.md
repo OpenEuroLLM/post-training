@@ -217,7 +217,9 @@ data:
 
 #### B. Data transformations
 
-Raw datasets often come in varying formats. Transforms normalize them into a standard `messages` list format before templating. SFT loading keeps the `messages` column and enforces its feature schema during mapping to avoid wrongly inferring the schema; conceretly, during the data transformation, some samples might be mapped to an empty list [of messages]. If the first sample falls into that case, it makes the automatically inferred schema of the mapped column wrong, raising exceptions during the mapping of the subsequent samples where each is mapped to a list of dicts (i.e., messages).
+Raw datasets often come in varying formats. Transforms normalize them into a standard SFT `messages` list format before templating. When `transform` is set, SFT loading keeps the `messages` column and enforces its feature schema during mapping to avoid wrongly inferring the schema; concretely, some transformed samples might map to an empty `messages` list, and if the first sample falls into that case, automatic schema inference can fail on later samples that map to a list of message dictionaries.
+
+When `transform: null`, the dataset is assumed to already be in SFT conversational format. In that path, the loader keeps the requested top-level columns but does not enforce the narrow SFT feature schema, so native message fields such as `functions`, `function_calls`, `tool_calls`, `name`, or other template-relevant metadata are preserved. The dataset still needs to satisfy the minimum conversational contract expected by the selected chat template, typically a non-empty `messages` list with `role`/`content`-style message entries.
 
 - **Config**: `transform: "transform_name"` (in the dataset entry)
 - **Registry**: `src/post_training/data/transforms.py`

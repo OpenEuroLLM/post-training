@@ -181,6 +181,7 @@ class ContainerConfig:
     image: str | None = None
     bind_mounts: list[str] = field(default_factory=list)
     env_file: str | None = None
+    path: str = "/usr/local/bin:/usr/bin:/bin"
 
 
 @dataclass
