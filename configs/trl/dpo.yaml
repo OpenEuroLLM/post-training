@@ -74,6 +74,8 @@ data:
 
 # -- DeepSpeed ---------------------------------------------------------------
 # Set to null to disable DeepSpeed entirely.
+# To switch from ZeRO stage 2 to stage 3, bump zero_optimization.stage to 3 and
+# add the stage3_* tuning keys — see configs/deepspeed/zero3.yaml for a full example.
 deepspeed:
   bf16:
     enabled: true

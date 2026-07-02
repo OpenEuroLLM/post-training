@@ -300,7 +300,8 @@ You must specify exactly one determining factor for training duration in the `tr
 
 ### 4. Infrastructure & Compute
 
-- **DeepSpeed**: configured via `deepspeed.config_path` (e.g., `configs/deepspeed/zero3.yaml`)
+- **DeepSpeed**: configured inline under the top-level `deepspeed:` key (see the reference config below); set `deepspeed: null` to disable DeepSpeed entirely.
+  To switch from ZeRO stage 2 to stage 3, bump `zero_optimization.stage` to `3` and add the `stage3_*` tuning keys — see `configs/deepspeed/zero3.yaml` for a full example.
 - **Accelerate flags**: the `accelerate` section in the YAML mirrors the CLI flags required for multi-node setups (`mixed_precision`, `dynamo_backend`, `rdzv_backend`, etc.).
   These are used by the SLURM launcher to generate the correct job script.
 - **Self-healing**: the SLURM launcher (`src/post_training/slurm/`) supports auto-requeueing.
@@ -483,8 +484,28 @@ data:
       transform: null                        # null = already conversational
 
 # -- DeepSpeed ---------------------------------------------------------------
+# Set to null to disable DeepSpeed entirely.
+# To switch from ZeRO stage 2 to stage 3, bump zero_optimization.stage to 3 and
+# add the stage3_* tuning keys — see configs/deepspeed/zero3.yaml for a full example.
 deepspeed:
-  config_path: "configs/deepspeed/zero2.yaml"
+  bf16:
+    enabled: true
+  zero_optimization:
+    stage: 2
+    overlap_comm: true
+    contiguous_gradients: true
+    reduce_scatter: true
+  gradient_clipping: 1.0
+  train_micro_batch_size_per_gpu: "auto"
+  gradient_accumulation_steps: "auto"
+  train_batch_size: "auto"
+  optimizer:
+    type: AdamW
+    params:
+      lr: "auto"
+      betas: "auto"
+      eps: "auto"
+      weight_decay: "auto"
 
 # -- Accelerate launch flags (explicit multi-node control) -------------------
 accelerate:
