@@ -22,7 +22,7 @@ def test_nullable_container_and_training_kwargs_load(tmp_path, monkeypatch):
                     "lr_scheduler_kwargs": None,
                     "gradient_checkpointing_kwargs": None,
                 },
-                "deepspeed": {"config_path": None},
+                "deepspeed": None,
                 "data": {
                     "datasets": [
                         {
