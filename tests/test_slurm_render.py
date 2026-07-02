@@ -249,3 +249,78 @@ def test_llamafactory_backend_ignores_tokenize_only(tmp_path, config):
     )
 
     assert "--tokenize-only" not in script.read_text()
+
+
+# ---------------------------------------------------------------------------
+# use_deepspeed / deepspeed_multinode_launcher — gated on deepspeed config
+# ---------------------------------------------------------------------------
+
+
+def test_trl_deepspeed_flags_absent_when_deepspeed_null(tmp_path, config):
+    """deepspeed: null must suppress --use_deepspeed even if accelerate.use_deepspeed=True."""
+    config.deepspeed = None
+    assert config.accelerate.use_deepspeed is True
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    assert "--use_deepspeed" not in content
+    assert "--deepspeed_multinode_launcher" not in content
+
+
+def test_trl_deepspeed_flags_present_when_deepspeed_set(tmp_path, config):
+    """A non-empty deepspeed config renders both DeepSpeed accelerate flags."""
+    config.deepspeed = {"zero_optimization": {"stage": 2}}
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    assert "--use_deepspeed" in content
+    assert "--deepspeed_multinode_launcher standard" in content
+    # No broken backslash-continuation: no blank line between two `\`-continued lines.
+    lines = content.splitlines()
+    broken_continuations = [
+        i
+        for i in range(len(lines) - 2)
+        if lines[i].rstrip().endswith("\\")
+        and lines[i + 1].strip() == ""
+        and lines[i + 2].strip().startswith("--")
+    ]
+    assert broken_continuations == []
+
+
+def test_trl_container_deepspeed_flags_absent_when_deepspeed_null(tmp_path, config):
+    config.deepspeed = None
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_container_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    assert "--use_deepspeed" not in content
+    assert "--deepspeed_multinode_launcher" not in content
+
+
+def test_trl_container_deepspeed_flags_present_when_deepspeed_set(tmp_path, config):
+    config.deepspeed = {"zero_optimization": {"stage": 2}}
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_container_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    assert "--use_deepspeed" in content
+    assert "--deepspeed_multinode_launcher standard" in content
+
+
+def test_trl_deepspeed_flags_absent_when_accelerate_override_disables(tmp_path, config):
+    """accelerate.use_deepspeed=False still overrides even when deepspeed: is set."""
+    config.deepspeed = {"zero_optimization": {"stage": 2}}
+    config.accelerate.use_deepspeed = False
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    assert "--use_deepspeed" not in content
+    assert "--deepspeed_multinode_launcher" not in content

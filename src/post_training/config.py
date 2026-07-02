@@ -155,6 +155,8 @@ class AccelerateConfig:
     """Flags forwarded to ``accelerate launch`` for explicit multi-node control."""
 
     mixed_precision: str = "bf16"
+    # Only takes effect when the top-level `deepspeed:` config is also set;
+    # `deepspeed: null` disables DeepSpeed at launch regardless of this flag.
     use_deepspeed: bool = True
     deepspeed_multinode_launcher: str = "standard"
     same_network: bool = True
