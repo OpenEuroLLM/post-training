@@ -82,6 +82,13 @@ class TRLBackend(Backend):
                 f"Supported methods: {', '.join(_SUPPORTED_METHODS)}"
             )
 
+        if isinstance(config.deepspeed, dict) and "config_path" in config.deepspeed:
+            raise ValueError(
+                "deepspeed.config_path is no longer supported. Inline the DeepSpeed "
+                "JSON/YAML directly under the `deepspeed:` key (see configs/trl/sft.yaml "
+                "for an example), or set `deepspeed: null` to disable DeepSpeed."
+            )
+
         # Container validation (only when container.image is set)
         if config.container is not None and config.container.image:
             if not config.container.bind_mounts:

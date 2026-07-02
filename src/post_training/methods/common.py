@@ -75,7 +75,9 @@ def build_common_training_kwargs(
     logger.info("world_size=%d, gradient_accumulation_steps=%d", world_size, grad_accum)
 
     t = config.training
-    ds_config = config.load_deepspeed_config() if config.deepspeed.config_path else None
+    # Normalize a falsy config (e.g. `{}`) to None so it isn't forwarded to
+    # TrainingArguments as if it were an enabled DeepSpeed config.
+    ds_config = config.deepspeed or None
 
     os.environ.setdefault("TENSORBOARD_LOGGING_DIR", str(run_dir / "logs"))
 

@@ -14,8 +14,6 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import yaml
-
 if TYPE_CHECKING:
     from post_training.config import PostTrainingConfig
 
@@ -70,19 +68,12 @@ def _row(label: str, value: str, warn: bool = False) -> None:
 
 
 def _deepspeed_summary(config: PostTrainingConfig) -> str:
-    """Return a short description of the DeepSpeed config, e.g. 'zero2.yaml (ZeRO stage 2)'."""
-    ds_path = config.deepspeed.config_path
-    if not ds_path:
+    """Return a short description of the inline DeepSpeed config, e.g. 'ZeRO stage 2'."""
+    ds = config.deepspeed
+    if not ds:
         return "disabled"
-    path = Path(ds_path)
-    try:
-        resolved = path if path.is_absolute() else Path.cwd() / path
-        with open(resolved) as fh:
-            ds_cfg = yaml.safe_load(fh)
-        stage = ds_cfg.get("zero_optimization", {}).get("stage", "?")
-        return f"{path.name}  (ZeRO stage {stage})"
-    except Exception:
-        return str(ds_path)
+    stage = ds.get("zero_optimization", {}).get("stage", "?") if isinstance(ds, dict) else "?"
+    return f"ZeRO stage {stage}"
 
 
 # ---------------------------------------------------------------------------

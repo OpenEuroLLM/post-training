@@ -11,7 +11,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml
 from omegaconf import MISSING, DictConfig, OmegaConf
 
 logger = logging.getLogger(__name__)
@@ -152,17 +151,12 @@ class DataConfig:
 
 
 @dataclass
-class DeepSpeedConfig:
-    """Pointer to the DeepSpeed YAML config file.  Set to ``null`` to disable."""
-
-    config_path: str | None = "configs/deepspeed/zero2.yaml"
-
-
-@dataclass
 class AccelerateConfig:
     """Flags forwarded to ``accelerate launch`` for explicit multi-node control."""
 
     mixed_precision: str = "bf16"
+    # Only takes effect when the top-level `deepspeed:` config is also set;
+    # `deepspeed: null` disables DeepSpeed at launch regardless of this flag.
     use_deepspeed: bool = True
     deepspeed_multinode_launcher: str = "standard"
     same_network: bool = True
@@ -252,7 +246,8 @@ class PostTrainingConfig:
     dpo: DPOMethodConfig = field(default_factory=DPOMethodConfig)
 
     # Infrastructure.
-    deepspeed: DeepSpeedConfig = field(default_factory=DeepSpeedConfig)
+    # Inline DeepSpeed config dict. Set to null to disable DeepSpeed entirely.
+    deepspeed: dict[str, Any] | None = None
     accelerate: AccelerateConfig = field(default_factory=AccelerateConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     slurm: SlurmConfig = field(default_factory=SlurmConfig)
@@ -354,12 +349,3 @@ class PostTrainingConfig:
                 f"* world_size ({world_size}). Got gradient_accumulation_steps={gas}."
             )
         return int(gas)
-
-    def load_deepspeed_config(self) -> dict[str, Any]:
-        """Load the DeepSpeed YAML config and return it as a plain dict."""
-        ds_path = Path(self.deepspeed.config_path)
-        if not ds_path.is_absolute():
-            # Resolve relative to the project root (cwd).
-            ds_path = Path.cwd() / ds_path
-        with open(ds_path) as f:
-            return yaml.safe_load(f)
