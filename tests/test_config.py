@@ -1,5 +1,6 @@
 """Tests for nullable config fields."""
 
+import pytest
 import yaml
 
 from post_training.config import PostTrainingConfig
@@ -76,3 +77,33 @@ def test_deepspeed_empty_dict_normalized_to_none(tmp_path, monkeypatch):
     kwargs = build_common_training_kwargs(config, tmp_path)
 
     assert kwargs["deepspeed"] is None
+
+
+def test_deepspeed_old_style_config_path_rejected(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "method": "sft",
+                "backend": "trl",
+                "training": {
+                    "max_steps": 1,
+                    "effective_batch_size": 1,
+                    "per_device_train_batch_size": 1,
+                },
+                "deepspeed": {"config_path": "configs/deepspeed/zero2.yaml"},
+                "data": {
+                    "datasets": [
+                        {
+                            "name": "dummy",
+                            "path": "dummy/path",
+                            "weight": 1.0,
+                        }
+                    ]
+                },
+            }
+        )
+    )
+
+    with pytest.raises(ValueError, match="deepspeed.config_path is no longer supported"):
+        PostTrainingConfig.load(config_path)
