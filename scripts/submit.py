@@ -116,7 +116,7 @@ def main() -> None:
     if config.container is not None and config.container.env_file:
         _apply_hf_env_from_file(config.container.env_file)
 
-    if config.offline:
+    if config.offline or config.prefetch_assets:
         logger.info(
             "offline=True: pre-fetching models and datasets on the login node "
             "before submitting the job."

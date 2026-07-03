@@ -235,6 +235,7 @@ class PostTrainingConfig:
     backend: str = "trl"
     llamafactory: dict | None = None
     container: ContainerConfig | None = None
+    prefetch_assets: bool = True
 
     model: ModelConfig = field(default_factory=ModelConfig)
     training: TrainingConfig = field(default_factory=TrainingConfig)
