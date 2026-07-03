@@ -113,6 +113,10 @@ class DPOMethodConfig:
     max_seq_length: int = 2048
     dataset_num_proc: int | None = None
 
+    # Workaround for a TRL bug: ensure the model is moved to device before
+    # log-prob precomputation when reusing the same model as reference.
+    place_model_on_device: bool = True
+
 
 @dataclass
 class CheckpointingConfig:
