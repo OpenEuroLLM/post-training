@@ -328,6 +328,8 @@ You must specify exactly one determining factor for training duration in the `tr
 
 - **Offline**: `offline: true`
   Disables Hugging Face Hub / Weights & Biases network calls (essential for air-gapped nodes).
+- **Prefetch assets**: `prefetch_assets: true` (default)
+  When submitting via `scripts/submit.py`, pre-fetches models and datasets on the login node before the job is submitted to warm the shared Hugging Face caches (useful for faster startup and for `offline: true` air-gapped runs). Runs whenever `offline` or `prefetch_assets` is true — set `prefetch_assets: false` to skip this step (e.g., assets are already warm in the shared cache).
 - **Debug**: `debug.enabled: true`
   Forces `report_to: none`, uses a separate output directory, and allows overwriting existing runs.
 - **Tokenize only**: `--tokenize-only` (CLI flag on `train.py` / `submit.py`)
@@ -432,6 +434,7 @@ method: sft
 backend: trl
 run_name: null                               # auto-generated from model + datasets if null
 offline: false                               # set true to disable all HuggingFace / wandb network calls
+prefetch_assets: true                        # pre-fetch models/datasets on the login node before submitting (submit.py)
 
 # -- Container ---------------------------------------------------------------
 container: null                              # null = bare-metal; set image/binds/env_file for Singularity

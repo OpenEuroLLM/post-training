@@ -113,7 +113,7 @@ def main() -> None:
         config.slurm.num_nodes = 1
         config.slurm.gpus_per_node = 1
 
-    if config.offline:
+    if config.offline or config.prefetch_assets:
         if config.container is not None and config.container.env_file:
             _apply_hf_env_from_file(config.container.env_file)
         logger.info(
