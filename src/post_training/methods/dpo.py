@@ -24,6 +24,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class PostTrainingDPOConfig(DPOConfig):
+    def __init__(self, place_model_on_device=True, **kwargs):
+        super().__init__(**kwargs)
+        self._place_model_on_device = place_model_on_device
+
+    @property
+    def place_model_on_device(self) -> bool | None:
+        return self._place_model_on_device
+
+
 def _dpo_row_filter(example: dict) -> bool:
     """Keep only rows with non-empty ``chosen`` and ``rejected`` fields."""
     return len(example.get("chosen", [])) > 0 and len(example.get("rejected", [])) > 0
@@ -50,7 +60,7 @@ def build_dpo_trainer(config: PostTrainingConfig, run_dir: Path) -> DPOTrainer:
     with PartialState().main_process_first():
         dataset = load_and_mix_datasets(config.data, row_filter=_dpo_row_filter)
 
-    dpo_config = DPOConfig(
+    dpo_config = PostTrainingDPOConfig(
         **build_common_training_kwargs(config, run_dir),
         beta=mc.beta,
         loss_type=mc.loss_type,
@@ -58,6 +68,7 @@ def build_dpo_trainer(config: PostTrainingConfig, run_dir: Path) -> DPOTrainer:
         dataset_num_proc=mc.dataset_num_proc,
         precompute_ref_log_probs=mc.precompute_ref_log_probs,
         model_init_kwargs=build_model_init_kwargs(config),
+        place_model_on_device=mc.place_model_on_device,
     )
 
     trainer = DPOTrainer(
