@@ -17,15 +17,15 @@ dependencies = [
 
 [project.optional-dependencies]
 trl = [
-    "trl",
-    "deepspeed",
-    "transformers",
-    "datasets>4.5.0",
-    "accelerate",
     "kernels",
     "flash_attn",
-    "liger-kernel",
     "tensorboard",
+    "accelerate==1.14.0",
+    "datasets==5.0.0",
+    "deepspeed==0.19.2",
+    "liger_kernel==0.7.0",
+    "transformers==5.13.0",
+    "trl==1.7.0",
 ]
 flash-attn-2 = ["flash-attn"]
 dev = ["pre-commit", "pytest"]
