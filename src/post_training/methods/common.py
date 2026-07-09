@@ -9,10 +9,12 @@ from __future__ import annotations
 import dataclasses
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import torch
+from accelerate import PartialState
 from transformers import AutoTokenizer
 
 from post_training.callbacks.inference_checkpoint import InferenceCheckpointCallback
@@ -24,6 +26,28 @@ if TYPE_CHECKING:
     from post_training.config import PostTrainingConfig
 
 logger = logging.getLogger(__name__)
+
+
+def build_one_at_a_time[T](state: PartialState, build_fn: Callable[[], T]) -> T:
+    """Call ``build_fn`` on exactly one process at a time, in rank order.
+
+    ``from_pretrained`` resolves the HF Hub cache via ``filelock``-guarded
+    reads/writes that are unreliable under N-way concurrent access on some
+    parallel filesystems (observed on Lustre: spurious "does not appear to
+    have a file named ..." errors on an already fully-cached, static
+    checkpoint, triggered only when every rank calls ``from_pretrained``
+    simultaneously). Serializing via a rank-ordered barrier avoids any two
+    processes contending for the same lock at once, without depending on
+    that same filesystem for the ordering guarantee itself (the barrier
+    goes over the NCCL/Gloo interconnect).
+    """
+    result: T | None = None
+    for i in range(state.num_processes):
+        if state.process_index == i:
+            result = build_fn()
+        state.wait_for_everyone()
+    return result
+
 
 _TORCH_DTYPE_MAP: dict[str, torch.dtype] = {
     "bfloat16": torch.bfloat16,
