@@ -255,12 +255,22 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     if config.backend == "trl" and config.container and config.container.image:
         frozen_src_exists = (run_dir / "src" / "post_training").exists()
         frozen_scripts_exists = (run_dir / "scripts").exists()
-        if frozen_src_exists or frozen_scripts_exists:
+        if frozen_src_exists and frozen_scripts_exists:
             _row(
                 "Frozen source",
                 _yellow(
-                    "*** src/post_training and/or scripts/ already exist in the run "
+                    "*** src/post_training and scripts/ already exist in the run "
                     "directory — they will NOT be replaced ***"
+                ),
+                warn=True,
+            )
+        elif frozen_src_exists or frozen_scripts_exists:
+            missing = "scripts/" if frozen_src_exists else "src/post_training"
+            _row(
+                "Frozen source",
+                _yellow(
+                    f"*** partially frozen — {missing} is missing and will be copied; "
+                    "the existing copy will NOT be replaced ***"
                 ),
                 warn=True,
             )

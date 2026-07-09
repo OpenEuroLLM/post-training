@@ -71,18 +71,6 @@ handle_signal() {
 }
 trap handle_signal USR1
 
-# ── Freeze source code for this run ───────────────────────────────────────
-if [ -d "{{ run_dir }}/src/post_training" ] || [ -d "{{ run_dir }}/scripts" ]; then
-    echo "WARNING: {{ run_dir }}/src/post_training or {{ run_dir }}/scripts already exists."
-    echo "WARNING: Skipping copy — keeping the source frozen at original submission time."
-    echo "WARNING: Delete these directories manually if you intentionally want to refresh the frozen source."
-else
-    echo "Copying src/post_training and scripts to run directory..."
-    mkdir -p "{{ run_dir }}/src"
-    cp -r "{{ repo_dir }}/src/post_training" "{{ run_dir }}/src/"
-    cp -r "{{ repo_dir }}/scripts" "{{ run_dir }}/scripts"
-fi
-
 # ── Launch inside Singularity container ───────────────────────────────────
 srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
   singularity exec --nv \
@@ -107,9 +95,9 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     export HF_DATASETS_CACHE=${HF_DATASETS_CACHE:-${HF_HOME}/datasets}
     export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
-    cd {{ run_dir }}
+    cd "{{ run_dir }}"
 
-    export WANDB_DIR={{ run_dir }}
+    export WANDB_DIR="{{ run_dir }}"
 
     accelerate launch \
       --num_machines \$NNODES \
