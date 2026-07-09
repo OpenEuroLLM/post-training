@@ -46,6 +46,7 @@ def build_one_at_a_time[T](state: PartialState, build_fn: Callable[[], T]) -> T:
         if state.process_index == i:
             result = build_fn()
         state.wait_for_everyone()
+    assert result is not None, "build_one_at_a_time: result is None."
     return result
 
 
