@@ -252,6 +252,18 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     # ------------------------------------------------------------------
     _section("Output")
     _row("Run directory", str(run_dir))
+    if config.backend == "trl" and config.container and config.container.image:
+        frozen_src_exists = (run_dir / "src" / "post_training").exists()
+        frozen_scripts_exists = (run_dir / "scripts").exists()
+        if frozen_src_exists or frozen_scripts_exists:
+            _row(
+                "Frozen source",
+                _yellow(
+                    "*** src/post_training and/or scripts/ already exist in the run "
+                    "directory — they will NOT be replaced ***"
+                ),
+                warn=True,
+            )
     _row("Logging", ", ".join(config.logging.report_to))
     if "wandb" in config.logging.report_to:
         _row("WandB project", config.logging.wandb_project)
