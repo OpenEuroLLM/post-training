@@ -147,7 +147,9 @@ def main() -> None:
 
     get_backend(config.backend).post_freeze(config, run_dir)
 
-    job_id = generate_and_submit(config, run_dir, "config.yaml", tokenize_only=tokenize_only)
+    job_id = generate_and_submit(
+        config, run_dir, str(frozen.resolve()), tokenize_only=tokenize_only
+    )
     logger.info("SLURM job submitted: %s", job_id)
 
 
