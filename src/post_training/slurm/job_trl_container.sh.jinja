@@ -13,12 +13,9 @@
 #SBATCH --qos={{ qos }}
 {% endif -%}
 #SBATCH --nodes={{ num_nodes }}
-#SBATCH --ntasks-per-node=1
+#SBATCH --ntasks-per-node={{ gpus_per_node }}
 #SBATCH --gres=gpu:{{ gpus_per_node }}
-#SBATCH --cpus-per-task={{ cpus_per_task }}
-{% if cpus_per_gpu is integer and cpus_per_gpu > 0 -%}
-#SBATCH --cpus-per-gpu={{ cpus_per_gpu }}
-{% endif -%}
+#SBATCH --cpus-per-task={{ cpus_per_gpu }}
 {% if mem -%}
 #SBATCH --mem={{ mem }}
 {% endif -%}
@@ -39,7 +36,7 @@ MASTER_ADDR=$(getent hosts "$MASTER_ADDR" | awk '{print $1}')
 export MASTER_ADDR
 export MASTER_PORT=$((29500 + SLURM_JOB_ID % 2000))
 export GPUS_PER_NODE={{ gpus_per_node }}
-export WORLD_SIZE=$(( SLURM_NNODES * GPUS_PER_NODE ))
+export WORLD_SIZE="$SLURM_NTASKS"
 
 # NCCL tuning for multi-node stability
 export NCCL_IB_TIMEOUT=120
@@ -72,51 +69,59 @@ handle_signal() {
 trap handle_signal USR1
 
 # ── Launch inside Singularity container ───────────────────────────────────
-srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
-  singularity exec --nv \
+srun \
+  --export=ALL \
+  --wait=60 \
+  --kill-on-bad-exit=1 \
+  --ntasks="$SLURM_NTASKS" \
+  --ntasks-per-node="{{ gpus_per_node }}" \
+  --cpus-per-task="{{ cpus_per_gpu }}" \
+  --cpu-bind=cores \
+  --gpus-per-task=1 \
+  --gpu-bind=single:1 \
+  singularity exec --rocm \
 {% for mount in bind_mounts %}  --bind "{{ mount }}" \
 {% endfor %}  "{{ container_image }}" \
-  bash -lc "
-    set -e
+  bash -lc '
+    set -euo pipefail
 
-    # Prevent host Python/PATH from interfering with container
-    export PATH=\"{{ container_path }}\"
-    export PYTHONPATH=\"{{ repo_dir }}/src\"
+    export PATH="{{ container_path }}"
+    export PYTHONPATH="{{ repo_dir }}/src"
     export PYTHONNOUSERSITE=1
 
-    export NODE_RANK=\"\$SLURM_NODEID\"
-    export NNODES=\"\$SLURM_NNODES\"
-    export NPROC_PER_NODE=${GPUS_PER_NODE}
+    export RANK="$SLURM_PROCID"
+    export WORLD_SIZE="$SLURM_NTASKS"
+    export LOCAL_RANK=0
+    export LOCAL_WORLD_SIZE=1
 
-    # Forward HF cache paths from host env (offline mode is controlled by train.py via config)
-    export HF_HOME=${HF_HOME}
-    export HF_HUB_CACHE=${HF_HUB_CACHE}
-    export HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE}
-    export HF_DATASETS_CACHE=${HF_DATASETS_CACHE:-${HF_HOME}/datasets}
+    export MASTER_ADDR="'"$MASTER_ADDR"'"
+    export MASTER_PORT="'"$MASTER_PORT"'"
+
+    # Use 1 here when DataLoader workers perform most CPU work.
+    export OMP_NUM_THREADS=1
+    export MKL_NUM_THREADS=1
+    export OPENBLAS_NUM_THREADS=1
+
+    export ACCELERATE_MIXED_PRECISION="{{ mixed_precision }}"
+    export ACCELERATE_DYNAMO_BACKEND="{{ dynamo_backend }}"
+
     export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+    export WANDB_DIR="{{ run_dir }}"
 
-    cd {{ repo_dir }}
+    echo \
+      "host=$(hostname)" \
+      "rank=$RANK" \
+      "slurm_local_rank=$SLURM_LOCALID" \
+      "cpus=$SLURM_CPUS_PER_TASK" \
+      "ROCR_VISIBLE_DEVICES=${ROCR_VISIBLE_DEVICES:-unset}" \
+      "HIP_VISIBLE_DEVICES=${HIP_VISIBLE_DEVICES:-unset}" \
+      "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
 
-    export WANDB_DIR={{ run_dir }}
+    cd "{{ repo_dir }}"
 
-    accelerate launch \
-      --num_machines \$NNODES \
-      --num_processes $WORLD_SIZE \
-      --machine_rank \$NODE_RANK \
-      --main_process_ip $MASTER_ADDR \
-      --main_process_port $MASTER_PORT \
-      --mixed_precision {{ mixed_precision }} \
-      --dynamo_backend {{ dynamo_backend }} \
-{% if use_deepspeed -%}
-      --use_deepspeed \
-      --deepspeed_multinode_launcher {{ deepspeed_multinode_launcher }} \
-{% endif -%}
-{% if same_network %}      --same_network \
-{% endif %}      --rdzv_backend {{ rdzv_backend }} \
-      --max_restarts 0 \
-      --role \$(hostname -s): \
-      scripts/train.py --config {{ config_path }}{% if tokenize_only %} --tokenize-only{% endif %}
-  " &
+    python scripts/train.py \
+      --config "{{ config_path }}"
+  ' &
 
 wait $!
 EXIT_CODE=$?
