@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from datasets import Dataset, Features, concatenate_datasets, load_dataset
@@ -23,6 +24,37 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _MAX_NUM_PROC = len(os.sched_getaffinity(0))
+
+_EXTENSION_TO_BUILDER = {
+    ".parquet": "parquet",
+    ".csv": "csv",
+    ".json": "json",
+    ".jsonl": "json",
+    ".txt": "text",
+}
+
+
+def _load_dataset_entry(path: str, split: str, **load_kwargs) -> Dataset:
+    """Load *path* as a local data file, a local dataset directory, or a Hub repo id.
+
+    ``load_dataset(path, ...)`` auto-detects a local file from the bare
+    ``path`` string, but that inference is unreliable for a single literal
+    file (as opposed to a directory it can glob into) — it can report "no
+    data file found" for a file that demonstrably exists. Passing the
+    builder name explicitly via ``data_files=`` for local files sidesteps
+    that ambiguity; local directories and Hub repo ids keep working through
+    the normal bare-path form.
+    """
+    local_path = Path(path)
+    if local_path.is_file():
+        builder = _EXTENSION_TO_BUILDER.get(local_path.suffix)
+        if builder is None:
+            raise ValueError(
+                f"Unsupported local dataset file extension '{local_path.suffix}' for '{path}'. "
+                f"Supported extensions: {sorted(_EXTENSION_TO_BUILDER)}"
+            )
+        return load_dataset(builder, data_files=str(local_path), split=split, **load_kwargs)
+    return load_dataset(path, split=split, **load_kwargs)
 
 
 def _resolve_num_proc(configured: int | None) -> int:
@@ -137,7 +169,7 @@ def load_and_mix_datasets(
         if entry.subset is not None:
             load_kwargs["name"] = entry.subset
 
-        ds = load_dataset(entry.path, split=entry.split, **load_kwargs)
+        ds = _load_dataset_entry(entry.path, entry.split, **load_kwargs)
 
         # Apply optional per-dataset transform.
         if entry.transform is not None:
