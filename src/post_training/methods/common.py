@@ -28,7 +28,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def build_one_at_a_time[T](state: PartialState, build_fn: Callable[[], T]) -> T:
+def build_one_at_a_time[T](
+    state: PartialState, build_fn: Callable[[], T], serial: bool = True
+) -> T:
     """Call ``build_fn`` on exactly one process at a time, in rank order.
 
     ``from_pretrained`` resolves the HF Hub cache via ``filelock``-guarded
@@ -40,7 +42,14 @@ def build_one_at_a_time[T](state: PartialState, build_fn: Callable[[], T]) -> T:
     processes contending for the same lock at once, without depending on
     that same filesystem for the ordering guarantee itself (the barrier
     goes over the NCCL/Gloo interconnect).
+
+    Set ``serial=False`` (``load_model_serially_across_ranks: false`` in the
+    config) to skip the barrier and let every rank call ``build_fn``
+    concurrently, e.g. on filesystems that don't exhibit this contention.
     """
+    if not serial:
+        return build_fn()
+
     result: T | None = None
     for i in range(state.num_processes):
         if state.process_index == i:
