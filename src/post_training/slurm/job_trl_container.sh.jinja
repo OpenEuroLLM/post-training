@@ -77,8 +77,6 @@ srun \
   --ntasks-per-node="{{ gpus_per_node }}" \
   --cpus-per-task="{{ cpus_per_gpu }}" \
   --cpu-bind=cores \
-  --gpus-per-task=1 \
-  --gpu-bind=single:1 \
   singularity exec --rocm \
 {% for mount in bind_mounts %}  --bind "{{ mount }}" \
 {% endfor %}  "{{ container_image }}" \
@@ -88,6 +86,14 @@ srun \
     export PATH="{{ container_path }}"
     export PYTHONPATH="{{ repo_dir }}/src"
     export PYTHONNOUSERSITE=1
+
+    # Slurm cgroup-remapping each task to a single GPU (--gpu-bind=single:1)
+    # breaks RCCL peer/IPC access on MI250X: every process sees its GCD as
+    # local index 0 with no visibility into the others, so RCCL cannot open
+    # IPC handles across ranks ("invalid device pointer"). Instead, leave all
+    # GCDs visible to every task and select the device explicitly here.
+    export ROCR_VISIBLE_DEVICES="$SLURM_LOCALID"
+    export HIP_VISIBLE_DEVICES="$SLURM_LOCALID"
 
     export RANK="$SLURM_PROCID"
     export WORLD_SIZE="$SLURM_NTASKS"
