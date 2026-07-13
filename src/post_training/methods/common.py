@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import torch
+import torch.distributed as dist
 from accelerate import PartialState
 from transformers import AutoTokenizer
 
@@ -46,16 +47,44 @@ def build_one_at_a_time[T](
     Set ``serial=False`` (``load_model_serially_across_ranks: false`` in the
     config) to skip the barrier and let every rank call ``build_fn``
     concurrently, e.g. on filesystems that don't exhibit this contention.
+
+    If ``build_fn`` raises on the active rank, that rank is caught *before*
+    it can skip the barrier below (which every other rank is already
+    blocked on, waiting for its turn) — otherwise the whole job hangs
+    instead of failing. The failure is then broadcast so every rank raises
+    together, rather than only the failing rank aborting while the others
+    loop on to a barrier the crashed rank can no longer reach.
     """
     if not serial:
         return build_fn()
 
     result: T | None = None
     for i in range(state.num_processes):
+        exc: Exception | None = None
         if state.process_index == i:
-            result = build_fn()
+            try:
+                result = build_fn()
+            except Exception as e:  # noqa: BLE001 - must catch to keep ranks in sync
+                exc = e
+
+        # Reached unconditionally: a failure on rank i must not stop it from
+        # releasing every other rank waiting here for their turn.
         state.wait_for_everyone()
-    assert result is not None, "build_one_at_a_time: result is None."
+
+        if state.num_processes > 1:
+            failed = torch.tensor(int(exc is not None), device=state.device)
+            dist.all_reduce(failed, op=dist.ReduceOp.MAX)
+            if failed.item():
+                if exc is not None:
+                    raise RuntimeError(
+                        f"build_one_at_a_time: rank {i} raised while running build_fn(): {exc!r}"
+                    ) from exc
+                raise RuntimeError(
+                    f"build_one_at_a_time: rank {i} raised while running build_fn(); aborting all ranks."
+                )
+        elif exc is not None:
+            raise exc
+
     return result
 
 
