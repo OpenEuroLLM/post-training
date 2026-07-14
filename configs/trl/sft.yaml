@@ -20,6 +20,7 @@ method: sft
 backend: trl
 run_name: null                               # auto-generated from model + datasets if null
 offline: true
+load_model_serially_across_ranks: false      # setting to true avoids HF cache lock contention on some parallel filesystems (e.g. Lustre)
 
 # Container (set to null, remove, or set image: null for bare-metal)
 container:

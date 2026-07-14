@@ -14,6 +14,7 @@ from post_training.methods.common import (
     build_callbacks,
     build_common_training_kwargs,
     build_model_init_kwargs,
+    build_one_at_a_time,
     build_tokenizer,
     sanitize_generation_config,
 )
@@ -46,7 +47,11 @@ def build_dpo_trainer(config: PostTrainingConfig, run_dir: Path) -> DPOTrainer:
     """
     mc = config.dpo  # method-specific config
 
-    tokenizer = build_tokenizer(config)
+    tokenizer = build_one_at_a_time(
+        PartialState(),
+        lambda: build_tokenizer(config),
+        serial=config.load_model_serially_across_ranks,
+    )
     with PartialState().main_process_first():
         dataset = load_and_mix_datasets(config.data, row_filter=_dpo_row_filter)
 
@@ -59,13 +64,17 @@ def build_dpo_trainer(config: PostTrainingConfig, run_dir: Path) -> DPOTrainer:
         model_init_kwargs=build_model_init_kwargs(config),
     )
 
-    trainer = DPOTrainer(
-        model=config.model.name_or_path,
-        ref_model=mc.ref_model_name_or_path,  # None → TRL creates implicit copy
-        processing_class=tokenizer,
-        train_dataset=dataset,
-        args=dpo_config,
-        callbacks=build_callbacks(config, run_dir),
+    trainer = build_one_at_a_time(
+        PartialState(),
+        lambda: DPOTrainer(
+            model=config.model.name_or_path,
+            ref_model=mc.ref_model_name_or_path,  # None → TRL creates implicit copy
+            processing_class=tokenizer,
+            train_dataset=dataset,
+            args=dpo_config,
+            callbacks=build_callbacks(config, run_dir),
+        ),
+        serial=config.load_model_serially_across_ranks,
     )
     sanitize_generation_config(trainer)
     return trainer
