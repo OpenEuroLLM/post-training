@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import math
+import os
 import re
 import shutil
 from abc import ABC, abstractmethod
@@ -196,26 +197,29 @@ class TRLBackend(Backend):
 
         Done here (at submission time) rather than inside the SLURM job script,
         so a job that sits queued isn't affected by later repo changes. Each
-        directory is guarded independently so a partial freeze left behind by
-        an interrupted previous attempt is completed rather than left broken.
+        directory is copied into a temp path and atomically swapped into place,
+        so an interrupted previous attempt can never leave a partial freeze that
+        gets mistaken for a completed one.
         """
         if config.container is None or not config.container.image:
             return
 
         repo_dir = Path.cwd()
-        frozen_src = run_dir / "src" / "post_training"
-        frozen_scripts = run_dir / "scripts"
+        self._freeze_dir(repo_dir / "src" / "post_training", run_dir / "src" / "post_training")
+        self._freeze_dir(repo_dir / "scripts", run_dir / "scripts")
 
-        if frozen_src.exists():
-            logger.warning("%s already exists — leaving frozen source in place.", frozen_src)
-        else:
-            frozen_src.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(repo_dir / "src" / "post_training", frozen_src)
+    @staticmethod
+    def _freeze_dir(src: Path, dst: Path) -> None:
+        if dst.exists():
+            logger.warning("%s already exists — leaving frozen source in place.", dst)
+            return
 
-        if frozen_scripts.exists():
-            logger.warning("%s already exists — leaving frozen scripts in place.", frozen_scripts)
-        else:
-            shutil.copytree(repo_dir / "scripts", frozen_scripts)
+        tmp = dst.with_name(dst.name + ".tmp")
+        if tmp.exists():
+            shutil.rmtree(tmp)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(src, tmp)
+        os.replace(tmp, dst)
 
 
 # ---------------------------------------------------------------------------
