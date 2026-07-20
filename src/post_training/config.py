@@ -236,6 +236,7 @@ class PostTrainingConfig:
     llamafactory: dict | None = None
     container: ContainerConfig | None = None
     prefetch_assets: bool = True
+    load_model_serially_across_ranks: bool = False
 
     model: ModelConfig = field(default_factory=ModelConfig)
     training: TrainingConfig = field(default_factory=TrainingConfig)
