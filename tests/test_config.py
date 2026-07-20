@@ -79,6 +79,52 @@ def test_deepspeed_empty_dict_normalized_to_none(tmp_path, monkeypatch):
     assert kwargs["deepspeed"] is None
 
 
+def _base_config_dict(**overrides):
+    config = {
+        "method": "sft",
+        "backend": "trl",
+        "training": {
+            "max_steps": 1,
+            "effective_batch_size": 1,
+            "per_device_train_batch_size": 1,
+        },
+        "deepspeed": None,
+        "data": {
+            "datasets": [
+                {
+                    "name": "dummy",
+                    "path": "dummy/path",
+                    "weight": 1.0,
+                }
+            ]
+        },
+    }
+    config.update(overrides)
+    return config
+
+
+def test_max_failures_capped_without_explicit_run_name(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(_base_config_dict(slurm={"max_failures": 3})))
+
+    config = PostTrainingConfig.load(config_path)
+
+    assert config.run_name is None
+    assert config.slurm.max_failures == 1
+
+
+def test_max_failures_kept_with_explicit_run_name(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(_base_config_dict(run_name="my-explicit-run", slurm={"max_failures": 3}))
+    )
+
+    config = PostTrainingConfig.load(config_path)
+
+    assert config.run_name == "my-explicit-run"
+    assert config.slurm.max_failures == 3
+
+
 def test_deepspeed_old_style_config_path_rejected(tmp_path):
     config_path = tmp_path / "config.yaml"
     config_path.write_text(

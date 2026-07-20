@@ -320,6 +320,18 @@ class PostTrainingConfig:
         """Run cross-field validation and compute derived values."""
         from post_training.backend import get_backend
 
+        # Auto-resubmission-on-failure (slurm.max_failures > 1) is a deliberate
+        # opt-in for runs with an explicitly pinned name; auto-generated
+        # (timestamped) run names are treated as ephemeral and are capped to
+        # never resubmit after a failure.
+        if not self.run_name and self.slurm.max_failures > 1:
+            logger.warning(
+                "slurm.max_failures=%d has no effect without an explicit run_name; "
+                "capping to 1 (no resubmission-on-failure) for this auto-generated run.",
+                self.slurm.max_failures,
+            )
+            self.slurm.max_failures = 1
+
         get_backend(self.backend).validate(self)
 
     def resolve_gradient_accumulation_steps(self, world_size: int) -> int:
