@@ -116,6 +116,7 @@ def main() -> None:
     if config.container is not None and config.container.env_file:
         _apply_hf_env_from_file(config.container.env_file)
 
+    prefetched = None
     if config.offline or config.prefetch_assets:
         logger.info(
             "offline=True: pre-fetching models and datasets on the login node "
@@ -125,7 +126,7 @@ def main() -> None:
         # huggingface_hub and datasets read the correct HF_HOME on first import.
         from post_training.utils.prefetch import prefetch_assets
 
-        prefetch_assets(config)
+        prefetched = prefetch_assets(config)
 
     # Set up the run directory (so the SLURM script can reference it).
     run_dir = setup_run_directory(config, allow_override=True)
@@ -137,6 +138,16 @@ def main() -> None:
     # CRITICAL: Set run_name so it's preserved in the frozen config.
     # This ensures train.py uses the same directory when it loads the config.
     config.run_name = run_dir.name
+
+    # Substitute resolved local snapshot dirs for the model repo ids, now that
+    # run-name generation and the guardrails review (both more readable with
+    # the original repo id) are done. train.py then loads a local directory
+    # path, so from_pretrained skips HF Hub's cache-resolution/filelock path
+    # entirely — avoiding contention when every rank loads it at once.
+    if prefetched is not None:
+        config.model.name_or_path = prefetched.model
+        if prefetched.ref_model is not None:
+            config.dpo.ref_model_name_or_path = prefetched.ref_model
 
     # Freeze a copy of the config.
     frozen = run_dir / "config.yaml"
