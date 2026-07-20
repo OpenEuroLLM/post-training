@@ -20,7 +20,6 @@ method: dpo
 backend: trl
 run_name: null                               # auto-generated from model + datasets if null
 offline: false                               # set true to disable all HuggingFace / wandb network calls
-load_model_serially_across_ranks: false      # setting to true avoids HF cache lock contention on some parallel filesystems (e.g. Lustre)
 
 # -- Model -------------------------------------------------------------------
 model:

@@ -16,7 +16,6 @@ from post_training.methods.common import (
     build_callbacks,
     build_common_training_kwargs,
     build_model_init_kwargs,
-    build_one_at_a_time,
     build_tokenizer,
     sanitize_generation_config,
 )
@@ -60,11 +59,7 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
     """
     mc = config.sft  # method-specific config
 
-    tokenizer = build_one_at_a_time(
-        PartialState(),
-        lambda: build_tokenizer(config),
-        serial=config.load_model_serially_across_ranks,
-    )
+    tokenizer = build_tokenizer(config)
 
     # Fail fast if the chat template can't drive `assistant_only_loss=True`.
     # Missing markers silently degrade SFT to full-sequence loss — a 21h run
@@ -113,16 +108,12 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
         assistant_only_loss=True,
     )
 
-    trainer = build_one_at_a_time(
-        PartialState(),
-        lambda: SFTTrainer(
-            model=config.model.name_or_path,
-            processing_class=tokenizer,
-            train_dataset=dataset,
-            args=sft_config,
-            callbacks=build_callbacks(config, run_dir),
-        ),
-        serial=config.load_model_serially_across_ranks,
+    trainer = SFTTrainer(
+        model=config.model.name_or_path,
+        processing_class=tokenizer,
+        train_dataset=dataset,
+        args=sft_config,
+        callbacks=build_callbacks(config, run_dir),
     )
 
     sanitize_generation_config(trainer)
