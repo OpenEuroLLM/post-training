@@ -55,7 +55,8 @@ from post_training.utils.paths import setup_run_directory
 
 logger = logging.getLogger(__name__)
 
-_TOKENIZE_PREVIEW_SAMPLES = 5
+_TOKENIZE_PREVIEW_SAMPLES = 1
+_TOKENIZE_PREVIEW_MAX_CHARS = 200
 _TOKENIZE_PREVIEW_SEP = "─" * 72
 
 
@@ -64,8 +65,15 @@ def _indent(text: str, n: int) -> str:
     return "\n".join(prefix + line for line in text.splitlines())
 
 
+def _truncate_preview(text: str, max_chars: int = _TOKENIZE_PREVIEW_MAX_CHARS) -> str:
+    """Cap decoded text to a couple of lines so the preview stays short."""
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + f" ... [truncated, {len(text) - max_chars} more chars]"
+
+
 def _print_tokenized_samples(trainer) -> None:
-    """Print decoded samples of ``trainer.train_dataset`` from the main process."""
+    """Print a short decoded preview of ``trainer.train_dataset`` from the main process."""
     from accelerate import PartialState
 
     if not PartialState().is_main_process:
@@ -88,13 +96,13 @@ def _print_tokenized_samples(trainer) -> None:
         for key, value in row.items():
             if isinstance(value, list) and key.endswith("input_ids"):
                 print(f"    {key}  (length {len(value)})")
-                print(_indent(tokenizer.decode(value), 6))
+                print(_indent(_truncate_preview(tokenizer.decode(value)), 6))
             elif key == "labels" and isinstance(value, list):
                 masked = sum(1 for x in value if x == -100)
                 unmasked_ids = [x for x in value if x != -100]
                 print(f"    labels  ({len(value)} total, {masked} masked)")
                 if unmasked_ids:
-                    print(_indent(tokenizer.decode(unmasked_ids), 6))
+                    print(_indent(_truncate_preview(tokenizer.decode(unmasked_ids)), 6))
     print(f"\n{_TOKENIZE_PREVIEW_SEP}\n")
 
 
