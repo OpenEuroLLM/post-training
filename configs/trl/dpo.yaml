@@ -43,7 +43,13 @@ training:
   gradient_checkpointing_kwargs: null          # null = use TRL/Transformers defaults
   bf16: true
   seed: 42
-  use_liger_kernel: true
+  use_liger_kernel: false
+  liger_kernel_config:                         # set to null to use Liger's own defaults instead
+    fused_linear_cross_entropy: false
+    cross_entropy: false                       # redundant with fused_linear_cross_entropy, keep off
+    rope: true
+    rms_norm: true
+    swiglu: true
 
 # -- DPO method parameters ---------------------------------------------------
 dpo:
