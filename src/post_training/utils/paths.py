@@ -51,10 +51,15 @@ def setup_run_directory(config: PostTrainingConfig, allow_override: bool = False
     """
     run_name = generate_run_name(config)
 
+    # Resolve to an absolute path and persist it back onto the config so that
+    # re-deriving the run directory from a frozen config.yaml later (e.g. from
+    # scripts/train.py, possibly running from a different cwd) is idempotent.
     if config.debug.enabled:
-        base = Path(config.paths.debug_base)
+        base = Path(config.paths.debug_base).resolve()
+        config.paths.debug_base = str(base)
     else:
-        base = Path(config.paths.output_base)
+        base = Path(config.paths.output_base).resolve()
+        config.paths.output_base = str(base)
 
     run_dir = base / run_name
 

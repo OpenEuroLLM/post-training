@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
+import os
 import re
+import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -14,6 +17,8 @@ import yaml
 
 if TYPE_CHECKING:
     from post_training.config import PostTrainingConfig
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -188,7 +193,33 @@ class TRLBackend(Backend):
         )
 
     def post_freeze(self, config, run_dir):
-        pass
+        """Freeze src/post_training and scripts/ into run_dir for containerized runs.
+
+        Done here (at submission time) rather than inside the SLURM job script,
+        so a job that sits queued isn't affected by later repo changes. Each
+        directory is copied into a temp path and atomically swapped into place,
+        so an interrupted previous attempt can never leave a partial freeze that
+        gets mistaken for a completed one.
+        """
+        if config.container is None or not config.container.image:
+            return
+
+        repo_dir = Path.cwd()
+        self._freeze_dir(repo_dir / "src" / "post_training", run_dir / "src" / "post_training")
+        self._freeze_dir(repo_dir / "scripts", run_dir / "scripts")
+
+    @staticmethod
+    def _freeze_dir(src: Path, dst: Path) -> None:
+        if dst.exists():
+            logger.warning("%s already exists — leaving frozen source in place.", dst)
+            return
+
+        tmp = dst.with_name(dst.name + ".tmp")
+        if tmp.exists():
+            shutil.rmtree(tmp)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(src, tmp)
+        os.replace(tmp, dst)
 
 
 # ---------------------------------------------------------------------------

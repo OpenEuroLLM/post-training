@@ -143,7 +143,6 @@ def render_trl_container_slurm_script(
         bind_mounts=config.container.bind_mounts,
         env_file=config.container.env_file,
         container_path=config.container.path,
-        repo_dir=str(Path.cwd()),
     )
 
     slurm_dir = run_dir / "slurm"
