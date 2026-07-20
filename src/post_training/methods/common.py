@@ -120,6 +120,13 @@ def build_common_training_kwargs(
             else dataclasses.asdict(t.gradient_checkpointing_kwargs)
         ),
         use_liger_kernel=t.use_liger_kernel,
+        liger_kernel_config=(
+            None
+            if t.liger_kernel_config is None
+            else {
+                k: v for k, v in dataclasses.asdict(t.liger_kernel_config).items() if v is not None
+            }
+        ),
         bf16=t.bf16,
         seed=t.seed,
         # Checkpointing

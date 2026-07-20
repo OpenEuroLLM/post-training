@@ -52,6 +52,20 @@ class GradientCheckpointingKwargs:
 
 
 @dataclass
+class LigerKernelConfig:
+    """Per-kernel toggles forwarded to Liger Kernel when ``use_liger_kernel=True``.
+
+    Unset (``None``) fields are omitted so Liger's own defaults apply to them.
+    """
+
+    fused_linear_cross_entropy: bool | None = None
+    cross_entropy: bool | None = None
+    rope: bool | None = None
+    rms_norm: bool | None = None
+    swiglu: bool | None = None
+
+
+@dataclass
 class TrainingConfig:
     """Core training hyper-parameters shared across all methods."""
 
@@ -87,6 +101,7 @@ class TrainingConfig:
     bf16: bool = True
     seed: int = 42
     use_liger_kernel: bool = True
+    liger_kernel_config: LigerKernelConfig | None = None
 
 
 # ---------------------------------------------------------------------------

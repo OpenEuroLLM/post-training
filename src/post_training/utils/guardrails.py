@@ -10,6 +10,7 @@ Pass ``--confirm`` to ``submit.py`` to skip all guardrails.
 
 from __future__ import annotations
 
+import dataclasses
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -209,7 +210,17 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     batch_line, _ = _batch_summary(config, total_gpus)
     _row("Batch sizes", batch_line)
     _row("Grad checkpoint", str(config.training.gradient_checkpointing))
-    _row("Liger kernel", str(config.training.use_liger_kernel))
+    liger_str = str(config.training.use_liger_kernel)
+    if config.training.liger_kernel_config is not None:
+        kernel_overrides = {
+            k: v
+            for k, v in dataclasses.asdict(config.training.liger_kernel_config).items()
+            if v is not None
+        }
+        if kernel_overrides:
+            overrides_str = ", ".join(f"{k}={v}" for k, v in kernel_overrides.items())
+            liger_str = f"{liger_str}  ({overrides_str})"
+    _row("Liger kernel", liger_str)
     _row("Seed", str(config.training.seed))
 
     if config.method == "sft":
