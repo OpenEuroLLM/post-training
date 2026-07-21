@@ -17,6 +17,7 @@ from post_training.methods.common import (
     build_common_training_kwargs,
     build_model_init_kwargs,
     build_tokenizer,
+    prioritize_metric_callbacks,
     sanitize_generation_config,
 )
 
@@ -117,4 +118,5 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
     )
 
     sanitize_generation_config(trainer)
+    prioritize_metric_callbacks(trainer)
     return trainer

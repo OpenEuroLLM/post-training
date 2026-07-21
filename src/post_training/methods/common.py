@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import torch
 from transformers import AutoTokenizer
+from transformers.integrations import WandbCallback
 
 from post_training.callbacks.inference_checkpoint import InferenceCheckpointCallback
 from post_training.callbacks.mfu import MFUCallback
@@ -211,3 +212,28 @@ def build_callbacks(config: PostTrainingConfig, run_dir: Path) -> list:
         )
 
     return callbacks
+
+
+def prioritize_metric_callbacks(trainer: Any) -> None:
+    """Move ``ThroughputCallback``/``MFUCallback`` to run just before ``WandbCallback``.
+
+    ``Trainer.__init__`` always places reporting-integration callbacks
+    (``WandbCallback``, ``TensorBoardCallback``, ...) ahead of user-supplied
+    ones, regardless of the order passed to ``callbacks=``. ``WandbCallback``
+    reads the shared ``logs`` dict and ships it off inside its own
+    ``on_log``, so keys added by callbacks that run *after* it (like the
+    throughput/MFU keys) never reach it. Splicing our callbacks in right
+    before it lets their ``logs[...] = ...`` mutations land in time, in the
+    same on_log call.
+    """
+    metric_callback_types = (ThroughputCallback, MFUCallback)
+    callbacks = trainer.callback_handler.callbacks
+    metric_callbacks = [cb for cb in callbacks if isinstance(cb, metric_callback_types)]
+    if not metric_callbacks:
+        return
+    rest = [cb for cb in callbacks if not isinstance(cb, metric_callback_types)]
+    wandb_index = next((i for i, cb in enumerate(rest) if isinstance(cb, WandbCallback)), None)
+    if wandb_index is None:
+        return
+    rest[wandb_index:wandb_index] = metric_callbacks
+    trainer.callback_handler.callbacks = rest
