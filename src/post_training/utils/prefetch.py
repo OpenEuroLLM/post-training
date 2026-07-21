@@ -49,13 +49,15 @@ def _is_local(path: str) -> bool:
     return Path(path).exists()
 
 
-def _prefetch_model(name_or_path: str) -> str:
+def _prefetch_model(name_or_path: str, revision: str | None = None) -> str:
     """Ensure *name_or_path* is cached locally and return its local directory."""
     if _is_local(name_or_path):
         logger.info("Model '%s' is a local path, skipping download.", name_or_path)
         return name_or_path
-    logger.info("Downloading model '%s' to HF cache...", name_or_path)
-    local_path = snapshot_download(repo_id=name_or_path, repo_type="model")
+    logger.info(
+        "Downloading model '%s' (revision=%s) to HF cache...", name_or_path, revision or "main"
+    )
+    local_path = snapshot_download(repo_id=name_or_path, repo_type="model", revision=revision)
     logger.info("Model '%s' cached at '%s'.", name_or_path, local_path)
     return local_path
 
@@ -83,7 +85,7 @@ def prefetch_assets(config: PostTrainingConfig) -> PrefetchedPaths:
     """
     logger.info("Pre-fetching assets for offline run...")
 
-    model_path = _prefetch_model(config.model.name_or_path)
+    model_path = _prefetch_model(config.model.name_or_path, revision=config.model.revision)
 
     ref_model_path = None
     if config.method == "dpo" and config.dpo.ref_model_name_or_path is not None:

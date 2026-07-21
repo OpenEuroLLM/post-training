@@ -178,6 +178,7 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     _row("Model", config.model.name_or_path)
     _row("Attention impl", config.model.attn_implementation)
     _row("Dtype", config.model.dtype)
+    _row("Revision", config.model.revision or "main")
     _row("Chat template", config.data.chat_template)
     _row("Data seed", str(config.data.seed))
     for i, entry in enumerate(config.data.datasets):

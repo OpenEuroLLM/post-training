@@ -27,6 +27,7 @@ class ModelConfig:
     name_or_path: str = "allenai/Olmo-3-1025-7B"
     attn_implementation: str = "flash_attention_3"
     dtype: str = "bfloat16"
+    revision: str | None = None
 
 
 @dataclass
