@@ -22,6 +22,7 @@ _GPU_PEAK_TFLOPS: dict[str, float] = {
     "H200": 989.0,  # https://www.nvidia.com/en-us/data-center/h200/
     "H100": 989.0,  # https://www.nvidia.com/en-us/data-center/h100/
     "A100": 312.0,  # https://www.nvidia.com/en-us/data-center/a100/
+    "MI250X": 191.5,  # https://www.amd.com/en/products/accelerators/instinct/mi200/mi250x.html
 }
 
 
