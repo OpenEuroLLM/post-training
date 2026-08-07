@@ -62,7 +62,7 @@ CHAT_TEMPLATES: dict[str, str] = {
     "olmo3-think-sft": "olmo3-think-sft.jinja",
     "apertus": "apertus.jinja",
     "tulu3": "tulu3.jinja",
-    "qwen3": "qwen3-8b.jinja",
+    "qwen3": "qwen3.jinja",
 }
 
 
