@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from accelerate import PartialState
+from datasets import Dataset
 from trl import DPOConfig, DPOTrainer
 
 from post_training.data.loader import load_and_mix_datasets
@@ -25,9 +26,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _dpo_row_filter(example: dict) -> bool:
-    """Keep only rows with non-empty ``chosen`` and ``rejected`` fields."""
-    return len(example.get("chosen", [])) > 0 and len(example.get("rejected", [])) > 0
+def _filter_dpo_rows(ds: Dataset, num_proc: int) -> Dataset:
+    """Drop rows with an empty ``chosen`` or ``rejected`` field."""
+    return ds.filter(
+        lambda row: len(row["chosen"]) > 0 and len(row["rejected"]) > 0,
+        num_proc=num_proc,
+        desc="filtering empty preference pairs",
+    )
 
 
 def build_dpo_trainer(config: PostTrainingConfig, run_dir: Path) -> DPOTrainer:
@@ -49,7 +54,7 @@ def build_dpo_trainer(config: PostTrainingConfig, run_dir: Path) -> DPOTrainer:
 
     tokenizer = build_tokenizer(config)
     with PartialState().main_process_first():
-        dataset = load_and_mix_datasets(config.data, row_filter=_dpo_row_filter)
+        dataset = load_and_mix_datasets(config.data, dataset_filter_fn=_filter_dpo_rows)
 
     dpo_config = DPOConfig(
         **build_common_training_kwargs(config, run_dir),

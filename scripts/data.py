@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import statistics
 import sys
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -256,7 +257,7 @@ def _run_count_tokens(args: argparse.Namespace, cli_overrides: list[str]) -> Non
     # ── Lazy imports (heavy) ────────────────────────────────────────
     from post_training.data.loader import _resolve_num_proc, load_and_mix_datasets
     from post_training.methods.common import build_tokenizer
-    from post_training.methods.sft import MESSAGES_FEATURES, _sft_row_filter
+    from post_training.methods.sft import MESSAGES_FEATURES, _filter_sft_rows
 
     # Load config
     config = PostTrainingConfig.load(args.config, cli_overrides)
@@ -267,16 +268,20 @@ def _run_count_tokens(args: argparse.Namespace, cli_overrides: list[str]) -> Non
 
     columns_to_keep = None
     features = None
-    row_filter = None
+    dataset_filter_fn = None
     if config.method == "sft":
         columns_to_keep = ["messages"]
         features = MESSAGES_FEATURES
-        row_filter = _sft_row_filter
+        dataset_filter_fn = partial(
+            _filter_sft_rows,
+            tokenizer=tokenizer,
+            max_length=config.sft.max_seq_length,
+        )
 
     # Load dataset mix
     ds = load_and_mix_datasets(
         config.data,
-        row_filter=row_filter,
+        dataset_filter_fn=dataset_filter_fn,
         columns_to_keep=columns_to_keep,
         features=features,
     )
