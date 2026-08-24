@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -31,6 +32,60 @@ logger = logging.getLogger(__name__)
 # Warn instead of info once this share of rows is dropped.
 _DROP_WARN_PERCENT = 1.0
 
+# What `max_length` does to one row's supervised span.
+_KEEP = 0  # the whole supervised span survives
+_CUT = 1  # kept, but max_length cuts the span part-way through
+_NO_ASSISTANT = 2  # dropped: no assistant tokens anywhere in the row
+_BEYOND_CAP = 3  # dropped: assistant tokens exist, all of them past max_length
+
+
+def _classify_row(
+    messages: list[dict],
+    tokenizer: PreTrainedTokenizerBase,
+    max_length: int | None,
+) -> int:
+    """Say what ``max_length`` does to one row's supervised span.
+
+    One untruncated render answers all three questions, so this costs the same
+    as the plain ``any(assistant_masks)`` check and distinguishes three cases a
+    single boolean conflates:
+
+    * no assistant tokens at all — the row's SHAPE is wrong, or the template
+      excludes every turn it has
+    * assistant tokens exist but lie entirely past ``max_length`` — the CAP is
+      wrong, and the row would be fine at a larger one
+    * the span starts inside the window and continues past it — the row stays in
+      training and teaches an answer that stops mid-sentence
+
+    The third is the dangerous one: under final-turn-only supervision the
+    assistant content sits at the END of the row, so a row only slightly over
+    ``max_length`` keeps a non-zero mask, passes any ``any(...)`` check, and
+    trains on a truncated trace with no end-of-turn token. Nothing downstream
+    reports it.
+
+    The render must be UNTRUNCATED: a truncated mask stops at ``max_length``, so
+    the third case would be invisible. The window is then applied by slicing,
+    which is right-truncation by construction — what both TRL paths do (the
+    non-packing path truncates the row; ``bfd`` keeps the first fragment).
+    """
+    rendered = tokenizer.apply_chat_template(
+        messages,
+        return_dict=True,
+        return_assistant_tokens_mask=True,
+    )
+    mask = rendered["assistant_masks"]
+
+    if not any(mask):
+        return _NO_ASSISTANT
+    if max_length is None:
+        return _KEEP
+    if not any(mask[:max_length]):
+        return _BEYOND_CAP
+    if any(mask[max_length:]):
+        return _CUT
+    return _KEEP
+
+
 MESSAGES_FEATURES = Features(
     {
         "messages": List(
@@ -50,13 +105,20 @@ def _filter_sft_rows(
     tokenizer: PreTrainedTokenizerBase,
     max_length: int | None = None,
 ) -> Dataset:
-    """Drop rows that contribute nothing to the SFT loss.
+    """Drop rows that contribute nothing to the SFT loss, and report what does.
 
     A row is dropped when its ``messages`` list is empty, or when rendering it
-    through the chat template gives an all-zero ``assistant_masks``. The second
-    case happens when a conversation ends on a non-assistant turn, or when the
-    template strips the only assistant content the row holds. Such rows cost
-    compute and produce a zero gradient.
+    through the chat template leaves no assistant token inside the ``max_length``
+    window. The second case happens when a conversation ends on a non-assistant
+    turn, when the template strips the only assistant content the row holds, or
+    when the assistant turn sits entirely past the cap. Such rows cost compute
+    and produce a zero gradient.
+
+    Dropping is only half the job. A row whose supervised span STARTS inside the
+    window and continues past it is kept — it does produce gradient — but it
+    teaches an answer that stops mid-sentence with no end-of-turn token. That is
+    invisible to a keep/drop count, so it is reported separately and loudly; see
+    :func:`_classify_row`.
 
     Parameters
     ----------
@@ -92,54 +154,84 @@ def _filter_sft_rows(
             "Check the dataset and its transform."
         )
 
-    template_kwargs = {"truncation": True, "max_length": max_length} if max_length else {}
-
-    # remove_columns keeps the map cache tiny: it holds the flag alone, not a copy of the data.
-    in_loss = ds.map(
-        lambda row: {
-            "in_loss": any(
-                tokenizer.apply_chat_template(
-                    row["messages"],
-                    return_dict=True,
-                    return_assistant_tokens_mask=True,
-                    **template_kwargs,
-                )["assistant_masks"]
-            )
-        },
+    # remove_columns keeps the map cache tiny: it holds the verdict alone, not a copy of the data.
+    verdicts = ds.map(
+        lambda row: {"verdict": _classify_row(row["messages"], tokenizer, max_length)},
         num_proc=num_proc,
         remove_columns=ds.column_names,
         desc="computing assistant loss masks",
-    )["in_loss"]
+    )["verdict"]
 
+    counts = Counter(verdicts)
     keep: list[int] = []
     dropped: list[int] = []
-    for index, ok in enumerate(in_loss):
-        if ok:
-            keep.append(index)
-        else:
-            dropped.append(index)
+    for index, verdict in enumerate(verdicts):
+        (keep if verdict in (_KEEP, _CUT) else dropped).append(index)
 
     dropped_percent = 100 * len(dropped) / len(ds)
+    # "within the length window" only when there IS one — the total-drop error
+    # below must not name max_length when it was never set.
+    scope = " within the length window" if max_length is not None else ""
     summary = (
-        f"{len(ds)} rows, {len(dropped)} with an all-zero assistant mask ({dropped_percent:.3f}%)."
+        f"{len(ds)} rows, {len(dropped)} with an all-zero assistant mask{scope} "
+        f"({dropped_percent:.3f}%)."
     )
 
     if not keep:
-        cause = (
-            "The chat template is probably missing the {% generation %}…{% endgeneration %} "
-            "markers around the assistant content, which makes every mask all-zero."
-        )
-        if max_length is not None:
-            cause += (
-                f" A max_length of {max_length} may also be short enough to truncate "
-                "away every assistant turn."
+        if counts[_BEYOND_CAP] and not counts[_NO_ASSISTANT]:
+            # Every row HAS an assistant turn, so the template is fine and the
+            # cap is the whole story. Sending the reader to the template here
+            # would cost them a long detour.
+            cause = (
+                f"Every row has assistant tokens, but in every row all of them fall "
+                f"beyond max_length={max_length}. This is a max_seq_length problem, "
+                f"not a template problem: raise sft.max_seq_length, or shorten the "
+                f"rows upstream."
             )
+        else:
+            cause = (
+                "The chat template is probably missing the {% generation %}…{% endgeneration %} "
+                "markers around the assistant content, which makes every mask all-zero."
+            )
+            if max_length is not None:
+                cause += (
+                    f" A max_length of {max_length} may also be short enough to truncate "
+                    "away every assistant turn."
+                )
         raise ValueError(f"{summary} Every row would contribute zero loss. {cause}")
 
     if dropped_percent > _DROP_WARN_PERCENT:
         logger.warning(summary)
     else:
         logger.info(summary)
+
+    # The rows that stay but are damaged. This cannot be inferred from the drop
+    # count — these rows are NOT dropped, they train on a truncated answer — and
+    # nothing downstream reports it, so it is a warning at any rate above zero.
+    if counts[_CUT]:
+        logger.warning(
+            "%d of %d rows (%.3f%%) are cut by max_length=%d PART-WAY THROUGH their "
+            "supervised span. Those rows stay in training, and each one teaches an "
+            "answer that stops mid-sentence with no end-of-turn token — for reasoning "
+            "data, an unterminated <think> block. Raise sft.max_seq_length above the "
+            "rows' length, or drop the over-long rows upstream. Dropping them is safe; "
+            "training on them is not.",
+            counts[_CUT],
+            len(ds),
+            100 * counts[_CUT] / len(ds),
+            max_length,
+        )
+
+    if max_length is not None and (counts[_NO_ASSISTANT] or counts[_BEYOND_CAP]):
+        # Which of the two reasons a row was dropped decides what to change:
+        # the data and template for the first, sft.max_seq_length for the second.
+        logger.info(
+            "Dropped rows by cause: %d with no assistant tokens at all, "
+            "%d with every assistant token beyond max_length=%d.",
+            counts[_NO_ASSISTANT],
+            counts[_BEYOND_CAP],
+            max_length,
+        )
 
     if dropped:
         patterns = {
