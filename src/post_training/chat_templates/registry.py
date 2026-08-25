@@ -46,6 +46,15 @@ _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 #     recipe via TRL.  Same assistant-only masking pattern as Instruct-SFT;
 #     OLMo-core's reference Think pipeline uses identical offline-baked
 #     masks (only learning rate and dataset differ between the two recipes).
+#
+# Note on ``qwen3``: Unlike the OLMo templates, ``qwen3`` masks *only the
+# final exchange*: Qwen3 strips ``<think>`` blocks from assistant turns at
+# or before the last user query, so history renders as a bare answer with
+# no reasoning trace. Training on that teaches the model to answer directly at
+# exactly the position where it opens a ``<think>`` block at inference.  The
+# markers therefore wrap the assistant body only when
+# ``loop.index0 > ns.last_query_index``.  Multi-step tool exchanges keep every
+# assistant turn after the last user query, since those retain their traces.
 CHAT_TEMPLATES: dict[str, str] = {
     "chatml": "chatml.jinja",
     "olmo3": "olmo3.jinja",
@@ -53,6 +62,7 @@ CHAT_TEMPLATES: dict[str, str] = {
     "olmo3-think-sft": "olmo3-think-sft.jinja",
     "apertus": "apertus.jinja",
     "tulu3": "tulu3.jinja",
+    "qwen3": "qwen3.jinja",
 }
 
 

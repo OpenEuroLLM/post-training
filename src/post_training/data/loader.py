@@ -101,7 +101,7 @@ def _resample_to_size(ds: Dataset, target_n: int, seed: int) -> Dataset:
 
 def load_and_mix_datasets(
     config: DataConfig,
-    row_filter: Callable[[dict], bool] | None = None,
+    dataset_filter_fn: Callable[[Dataset, int], Dataset] | None = None,
     columns_to_keep: list[str] | None = None,
     features: Features | None = None,
 ) -> Dataset:
@@ -111,10 +111,12 @@ def load_and_mix_datasets(
     ----------
     config:
         The ``data`` section of :class:`PostTrainingConfig`.
-    row_filter:
-        Optional predicate applied after transforms to exclude invalid
-        rows.  Each training method passes its own filter (e.g. SFT
-        checks ``messages``, DPO checks ``chosen`` / ``rejected``).
+    dataset_filter_fn:
+        Optional callable ``(dataset, num_proc) -> dataset`` applied to each
+        dataset after transforms and column selection. Each training method
+        passes its own filter (e.g. SFT drops rows whose assistant tokens
+        never enter the loss, DPO drops rows with an empty ``chosen`` or
+        ``rejected``). Bind extra arguments with :func:`functools.partial`.
         When ``None``, no filtering is applied.
     columns_to_keep:
         Optional list of columns to retain after loading/mapping. When a
@@ -205,10 +207,12 @@ def load_and_mix_datasets(
                 )
             ds = ds.select_columns(present)
 
-        # Apply method-specific row filter (e.g. SFT checks for non-empty
-        # "messages", DPO checks for non-empty "chosen" / "rejected").
-        if row_filter is not None:
-            ds = ds.filter(row_filter, num_proc=num_proc)
+        # Apply the method-specific dataset filter (e.g. SFT drops rows with
+        # an all-zero assistant loss mask, DPO drops empty preference pairs).
+        if dataset_filter_fn is not None:
+            logger.info("Filtering dataset '%s' (%d rows).", entry.name, len(ds))
+            ds = dataset_filter_fn(ds, num_proc=num_proc)
+            logger.info("Dataset '%s' has %d rows after filtering.", entry.name, len(ds))
 
         loaded_datasets.append(ds)
 
