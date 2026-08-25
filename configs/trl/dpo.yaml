@@ -26,6 +26,9 @@ model:
   name_or_path: "allenai/Olmo-3-1025-7B"
   attn_implementation: "flash_attention_3"
   dtype: "bfloat16"
+  revision: null                             # pin the model repo to a branch, tag, or commit
+  tokenizer_name_or_path: null               # null = take the tokenizer from the model repo
+  tokenizer_revision: null                   # pins the tokenizer (overrides revision above)
 
 # -- Training hyper-parameters -----------------------------------------------
 training:

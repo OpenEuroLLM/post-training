@@ -179,6 +179,13 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     _row("Attention impl", config.model.attn_implementation)
     _row("Dtype", config.model.dtype)
     _row("Revision", config.model.revision or "main")
+    tokenizer_name_or_path, tokenizer_revision = config.model.resolve_tokenizer()
+    _row(
+        "Tokenizer",
+        tokenizer_name_or_path,
+        warn=tokenizer_name_or_path != config.model.name_or_path,
+    )
+    _row("Tokenizer revision", tokenizer_revision or "main")
     _row("Chat template", config.data.chat_template)
     _row("Data seed", str(config.data.seed))
     for i, entry in enumerate(config.data.datasets):

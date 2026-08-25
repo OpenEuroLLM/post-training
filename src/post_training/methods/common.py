@@ -42,9 +42,10 @@ def resolve_torch_dtype(name: str) -> torch.dtype:
 
 def build_tokenizer(config: PostTrainingConfig) -> AutoTokenizer:
     """Load the tokenizer and apply the configured chat template."""
-    tokenizer = AutoTokenizer.from_pretrained(
-        config.model.name_or_path, revision=config.model.revision
-    )
+    tokenizer_name_or_path, revision = config.model.resolve_tokenizer()
+    logger.info("Loading tokenizer '%s' (revision=%s)", tokenizer_name_or_path, revision or "main")
+
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, revision=revision)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 

@@ -3,7 +3,7 @@
 import pytest
 import yaml
 
-from post_training.config import PostTrainingConfig
+from post_training.config import ModelConfig, PostTrainingConfig
 from post_training.methods.common import build_common_training_kwargs
 
 
@@ -107,3 +107,30 @@ def test_deepspeed_old_style_config_path_rejected(tmp_path):
 
     with pytest.raises(ValueError, match="deepspeed.config_path is no longer supported"):
         PostTrainingConfig.load(config_path)
+
+
+@pytest.mark.parametrize(
+    ("tokenizer_name_or_path", "tokenizer_revision", "expected"),
+    [
+        # No tokenizer override: the tokenizer follows the model.
+        (None, None, ("org/model", "r1")),
+        # A tokenizer revision alone pins the tokenizer inside the model repo.
+        (None, "r2", ("org/model", "r2")),
+        # A separate repo ignores model.revision, which pins a different repo.
+        ("org/tokenizer", None, ("org/tokenizer", None)),
+        ("org/tokenizer", "r2", ("org/tokenizer", "r2")),
+    ],
+)
+def test_resolve_tokenizer(tokenizer_name_or_path, tokenizer_revision, expected):
+    model = ModelConfig(
+        name_or_path="org/model",
+        revision="r1",
+        tokenizer_name_or_path=tokenizer_name_or_path,
+        tokenizer_revision=tokenizer_revision,
+    )
+
+    assert model.resolve_tokenizer() == expected
+
+
+def test_resolve_tokenizer_without_any_revision():
+    assert ModelConfig(name_or_path="org/model").resolve_tokenizer() == ("org/model", None)

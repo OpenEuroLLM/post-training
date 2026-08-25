@@ -329,7 +329,7 @@ You must specify exactly one determining factor for training duration in the `tr
 - **Offline**: `offline: true`
   Disables Hugging Face Hub / Weights & Biases network calls (essential for air-gapped nodes).
 - **Prefetch assets**: `prefetch_assets: true` (default)
-  When submitting via `scripts/submit.py`, pre-fetches models and datasets on the login node before the job is submitted to warm the shared Hugging Face caches (useful for faster startup and for `offline: true` air-gapped runs). Runs whenever `offline` or `prefetch_assets` is true — set `prefetch_assets: false` to skip this step (e.g., assets are already warm in the shared cache).
+  When submitting via `scripts/submit.py`, pre-fetches models and datasets on the login node before the job is submitted to warm the shared Hugging Face caches (useful for faster startup and for `offline: true` air-gapped runs). Runs whenever `offline` or `prefetch_assets` is true — set `prefetch_assets: false` to skip this step (e.g., assets are already warm in the shared cache). A tokenizer from a different repo or revision (`model.tokenizer_name_or_path` / `model.tokenizer_revision`) is fetched too, without its model weights.
 - **Debug**: `debug.enabled: true`
   Forces `report_to: none`, uses a separate output directory, and allows overwriting existing runs.
 - **Tokenize only**: `--tokenize-only` (CLI flag on `train.py` / `submit.py`)
@@ -444,6 +444,9 @@ model:
   name_or_path: "allenai/Olmo-3-1025-7B"
   attn_implementation: "flash_attention_3"
   dtype: "bfloat16"
+  revision: null                             # pin the model repo to a branch, tag, or commit
+  tokenizer_name_or_path: null               # null = take the tokenizer from the model repo
+  tokenizer_revision: null                   # pins the tokenizer (overrides revision above)
 
 # -- Training hyper-parameters -----------------------------------------------
 training:

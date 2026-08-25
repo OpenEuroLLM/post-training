@@ -111,10 +111,9 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
 
     # ── Lazy imports (heavy) ────────────────────────────────────────
     from datasets import load_dataset
-    from transformers import AutoTokenizer
 
-    from post_training.chat_templates.registry import get_chat_template
     from post_training.data.transforms import get_transform
+    from post_training.methods.common import build_tokenizer
 
     n = args.num_samples
 
@@ -152,9 +151,7 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
         # ── Formatted via chat template ─────────────────────────────
         if args.show_formatted:
             _print_header(f"FORMATTED (chat_template='{config.data.chat_template}')")
-            tokenizer = AutoTokenizer.from_pretrained(config.model.name_or_path)
-            template_str = get_chat_template(config.data.chat_template)
-            tokenizer.chat_template = template_str
+            tokenizer = build_tokenizer(config)
 
             for i in range(min(n, len(ds))):
                 row = ds[i]
@@ -175,9 +172,7 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
         # ── Tokens ──────────────────────────────────────────────────
         if args.show_tokens:
             _print_header("TOKENS")
-            tokenizer = AutoTokenizer.from_pretrained(config.model.name_or_path)
-            template_str = get_chat_template(config.data.chat_template)
-            tokenizer.chat_template = template_str
+            tokenizer = build_tokenizer(config)
 
             for i in range(min(n, len(ds))):
                 row = ds[i]
@@ -209,9 +204,7 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
             print(f"  Total rows : {len(ds)}")
             print(f"  Columns    : {ds.column_names}")
 
-            tokenizer = AutoTokenizer.from_pretrained(config.model.name_or_path)
-            template_str = get_chat_template(config.data.chat_template)
-            tokenizer.chat_template = template_str
+            tokenizer = build_tokenizer(config)
 
             # Sample up to 200 rows for token-length stats.
             sample_size = min(200, len(ds))

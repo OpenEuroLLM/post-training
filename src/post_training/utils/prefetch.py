@@ -31,16 +31,21 @@ logger = logging.getLogger(__name__)
 class PrefetchedPaths:
     """Resolved local snapshot directories for the models in *config*.
 
-    Substituting these back into ``config.model.name_or_path`` (and, for DPO,
+    Substituting these back into ``config.model.name_or_path``,
+    ``config.model.tokenizer_name_or_path`` (and, for DPO,
     ``config.dpo.ref_model_name_or_path``) before training starts makes
     ``from_pretrained`` treat the model as a plain local directory, skipping
     huggingface_hub's cache-resolution/filelock path entirely — the source of
     spurious "does not appear to have a file named ..." errors when many
     ranks call ``from_pretrained`` on the same shared (e.g. Lustre) cache at
     once.
+
+    ``tokenizer`` equals ``model`` when the tokenizer comes from the model
+    repo, because the model snapshot already contains the tokenizer files.
     """
 
     model: str
+    tokenizer: str
     ref_model: str | None = None
 
 
@@ -59,6 +64,48 @@ def _prefetch_model(name_or_path: str, revision: str | None = None) -> str:
     )
     local_path = snapshot_download(repo_id=name_or_path, repo_type="model", revision=revision)
     logger.info("Model '%s' cached at '%s'.", name_or_path, local_path)
+    return local_path
+
+
+# Weight formats, skipped when a repo is fetched for its tokenizer alone.
+# Denying the large blobs is safer than allowing a list of tokenizer files:
+# every tokenizer format arrives, including the sentencepiece and legacy names
+# (``spiece.model``, ``sentencepiece.bpe.model``, ``bpe.codes``, ``*.spm``) and
+# the ``additional_chat_templates/`` directory.  The worst case is a few extra
+# small files, not a missing file on an offline compute node.
+_WEIGHT_PATTERNS = [
+    "*.safetensors",
+    "*.bin",
+    "*.pt",
+    "*.pth",
+    "*.ckpt",
+    "*.h5",
+    "*.msgpack",
+    "*.gguf",
+    "*.onnx",
+    "*.onnx_data",
+    "*.ot",  # rust_model.ot
+    "*.tflite",
+    "*.mlmodel",
+    "*.npz",
+]
+
+
+def _prefetch_tokenizer(name_or_path: str, revision: str | None = None) -> str:
+    """Cache *name_or_path* without its weights; return the local directory."""
+    if _is_local(name_or_path):
+        logger.info("Tokenizer '%s' is a local path, skipping download.", name_or_path)
+        return name_or_path
+    logger.info(
+        "Downloading tokenizer '%s' (revision=%s) to HF cache...", name_or_path, revision or "main"
+    )
+    local_path = snapshot_download(
+        repo_id=name_or_path,
+        repo_type="model",
+        revision=revision,
+        ignore_patterns=_WEIGHT_PATTERNS,
+    )
+    logger.info("Tokenizer '%s' cached at '%s'.", name_or_path, local_path)
     return local_path
 
 
@@ -87,6 +134,16 @@ def prefetch_assets(config: PostTrainingConfig) -> PrefetchedPaths:
 
     model_path = _prefetch_model(config.model.name_or_path, revision=config.model.revision)
 
+    tokenizer_name_or_path, tokenizer_revision = config.model.resolve_tokenizer()
+    if (tokenizer_name_or_path, tokenizer_revision) == (
+        config.model.name_or_path,
+        config.model.revision,
+    ):
+        # The tokenizer files are part of the model snapshot fetched above.
+        tokenizer_path = model_path
+    else:
+        tokenizer_path = _prefetch_tokenizer(tokenizer_name_or_path, revision=tokenizer_revision)
+
     ref_model_path = None
     if config.method == "dpo" and config.dpo.ref_model_name_or_path is not None:
         ref_model_path = _prefetch_model(config.dpo.ref_model_name_or_path)
@@ -95,4 +152,4 @@ def prefetch_assets(config: PostTrainingConfig) -> PrefetchedPaths:
         _prefetch_dataset(entry)
 
     logger.info("All assets pre-fetched successfully.")
-    return PrefetchedPaths(model=model_path, ref_model=ref_model_path)
+    return PrefetchedPaths(model=model_path, tokenizer=tokenizer_path, ref_model=ref_model_path)
