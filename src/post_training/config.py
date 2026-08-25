@@ -29,6 +29,10 @@ class ModelConfig:
     dtype: str = "bfloat16"
     revision: str | None = None
 
+    # Tokenizer to use. If None, defaults to the model's tokenizer.
+    tokenizer_name_or_path: str | None = None
+    tokenizer_revision: str | None = None
+
 
 @dataclass
 class LRSchedulerKwargs:
