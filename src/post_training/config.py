@@ -117,6 +117,13 @@ class SFTMethodConfig:
     max_seq_length: int = 4096
     packing: bool = True
     dataset_num_proc: int | None = None
+    # What to do with a row whose supervised span starts inside max_seq_length
+    # and continues past it. Such a row trains on an answer cut mid-sentence.
+    # "warn" keeps it and says so; "drop" removes it, for when the sequence
+    # length is fixed by memory and shortening the data is the only option.
+    # Dropping is never silent: it changes the realised mixture, because
+    # data.datasets[].weight applies to the rows that survive filtering.
+    truncated_span_action: str = "warn"
 
 
 @dataclass

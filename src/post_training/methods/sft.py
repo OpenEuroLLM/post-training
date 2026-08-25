@@ -38,6 +38,9 @@ _CUT = 1  # kept, but max_length cuts the span part-way through
 _NO_ASSISTANT = 2  # dropped: no assistant tokens anywhere in the row
 _BEYOND_CAP = 3  # dropped: assistant tokens exist, all of them past max_length
 
+#: valid values for SFTMethodConfig.truncated_span_action
+_TRUNCATED_SPAN_ACTIONS = ("warn", "drop")
+
 
 def _classify_row(
     messages: list[dict],
@@ -104,6 +107,7 @@ def _filter_sft_rows(
     *,
     tokenizer: PreTrainedTokenizerBase,
     max_length: int | None = None,
+    truncated_span_action: str = "warn",
 ) -> Dataset:
     """Drop rows that contribute nothing to the SFT loss, and report what does.
 
@@ -133,6 +137,13 @@ def _filter_sft_rows(
         Optional truncation length that must match the trainer's own truncation,
         so a row whose assistant tokens fall outside the window is dropped too.
         Leave it ``None`` only if the trainer keeps every token of every row.
+    truncated_span_action:
+        ``"warn"`` (default) keeps a row whose supervised span straddles
+        ``max_length`` and reports it; ``"drop"`` removes it, for when the
+        sequence length is fixed by memory and shortening the data is the only
+        lever left. Drop still warns: it is not the quiet option, because
+        ``data.datasets[].weight`` multiplies the rows that survive this filter,
+        so an uneven drop changes the mixture the config asked for.
 
     Returns
     -------
@@ -142,8 +153,15 @@ def _filter_sft_rows(
     Raises
     ------
     ValueError
-        If no row survives either stage.
+        If no row survives either stage, or ``truncated_span_action`` is not a
+        recognised value.
     """
+    if truncated_span_action not in _TRUNCATED_SPAN_ACTIONS:
+        raise ValueError(
+            f"sft.truncated_span_action must be one of "
+            f"{', '.join(_TRUNCATED_SPAN_ACTIONS)}; got {truncated_span_action!r}."
+        )
+
     ds = ds.filter(
         lambda row: len(row["messages"]) > 0, num_proc=num_proc, desc="filtering empty messages"
     )
@@ -163,10 +181,12 @@ def _filter_sft_rows(
     )["verdict"]
 
     counts = Counter(verdicts)
+    cut_is_kept = truncated_span_action == "warn"
+    kept_verdicts = (_KEEP, _CUT) if cut_is_kept else (_KEEP,)
     keep: list[int] = []
     dropped: list[int] = []
     for index, verdict in enumerate(verdicts):
-        (keep if verdict in (_KEEP, _CUT) else dropped).append(index)
+        (keep if verdict in kept_verdicts else dropped).append(index)
 
     dropped_percent = 100 * len(dropped) / len(ds)
     # "within the length window" only when there IS one — the total-drop error
@@ -205,21 +225,28 @@ def _filter_sft_rows(
     else:
         logger.info(summary)
 
-    # The rows that stay but are damaged. This cannot be inferred from the drop
-    # count — these rows are NOT dropped, they train on a truncated answer — and
-    # nothing downstream reports it, so it is a warning at any rate above zero.
+    # Warned about in BOTH modes, at any rate above zero. Under "warn" the rows are
+    # kept, so no drop count can reveal them. Under "drop" they are gone, which is
+    # not quiet either: data.datasets[].weight multiplies surviving rows, so an
+    # uneven drop silently changes this dataset's share of the mixture.
     if counts[_CUT]:
         logger.warning(
             "%d of %d rows (%.3f%%) are cut by max_length=%d PART-WAY THROUGH their "
-            "supervised span. Those rows stay in training, and each one teaches an "
-            "answer that stops mid-sentence with no end-of-turn token — for reasoning "
-            "data, an unterminated <think> block. Raise sft.max_seq_length above the "
-            "rows' length, or drop the over-long rows upstream. Dropping them is safe; "
-            "training on them is not.",
+            "supervised span — each teaches an answer that stops mid-sentence with no "
+            "end-of-turn token, an unterminated <think> block for reasoning data. %s "
+            "Raising sft.max_seq_length above the rows' length is the fix that keeps "
+            "the data.",
             counts[_CUT],
             len(ds),
             100 * counts[_CUT] / len(ds),
             max_length,
+            (
+                "They STAY in training (sft.truncated_span_action='warn')."
+                if cut_is_kept
+                else "They were DROPPED (sft.truncated_span_action='drop'), which "
+                "shifts this dataset's share of the mixture: data.datasets[].weight "
+                "applies to the rows that survive filtering."
+            ),
         )
 
     if max_length is not None and (counts[_NO_ASSISTANT] or counts[_BEYOND_CAP]):
@@ -227,10 +254,11 @@ def _filter_sft_rows(
         # the data and template for the first, sft.max_seq_length for the second.
         logger.info(
             "Dropped rows by cause: %d with no assistant tokens at all, "
-            "%d with every assistant token beyond max_length=%d.",
+            "%d with every assistant token beyond max_length=%d%s.",
             counts[_NO_ASSISTANT],
             counts[_BEYOND_CAP],
             max_length,
+            "" if cut_is_kept else f", {counts[_CUT]} with a span cut part-way",
         )
 
     if dropped:
@@ -309,6 +337,7 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
                 # keep the overflow, so truncation-based filtering would then
                 # drop rows the trainer still trains on.
                 max_length=mc.max_seq_length,
+                truncated_span_action=mc.truncated_span_action,
             ),
             columns_to_keep=["messages"],
             features=MESSAGES_FEATURES,

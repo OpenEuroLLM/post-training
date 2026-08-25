@@ -65,6 +65,11 @@ training:
 sft:
   max_seq_length: 4096
   packing: true
+  truncated_span_action: warn                # warn | drop — a row whose assistant span
+                                             # starts inside max_seq_length and runs past
+                                             # it trains on an answer cut mid-sentence.
+                                             # "drop" removes those rows, for when the
+                                             # sequence length is fixed by memory.
 
 # -- Checkpointing -----------------------------------------------------------
 checkpointing:

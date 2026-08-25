@@ -310,6 +310,84 @@ def test_separates_the_two_reasons_a_row_was_dropped(tokenizer, caplog) -> None:
     assert "1 with every assistant token beyond max_length=64" in causes.getMessage()
 
 
+def _straddling_row(tokenizer) -> tuple[list[dict], int]:
+    """A row plus a max_length that cuts its supervised span part-way.
+
+    The prompt is long on purpose, so the cut lands deep enough into the row that
+    an ordinary short row still fits inside the same cap and can serve as the
+    control. With a short prompt the cap is ~50 tokens, every row exceeds it, and
+    the filter empties the dataset instead of dropping one row.
+    """
+    row = [{"role": "user", "content": "x" * 300}, {"role": "assistant", "content": "y" * 200}]
+    start, end = _span_bounds(tokenizer, row)
+    cut = start + 50
+    assert start < cut < end
+    assert cut > len(tokenizer.render(_exchange(0))), "control row must fit under the cap"
+    return row, cut
+
+
+def test_a_straddling_row_is_kept_by_default(tokenizer) -> None:
+    """Default is warn: the row stays, because the fix is normally to raise the
+    cap rather than to throw the data away."""
+    row, cut = _straddling_row(tokenizer)
+
+    kept = _filter_sft_rows(_sft_dataset([row]), num_proc=1, tokenizer=tokenizer, max_length=cut)
+
+    assert len(kept) == 1
+
+
+def test_a_straddling_row_is_dropped_when_asked(tokenizer) -> None:
+    """`drop` is for a sequence length fixed by memory, where shortening the
+    data is the only lever left."""
+    row, cut = _straddling_row(tokenizer)
+
+    kept = _filter_sft_rows(
+        _sft_dataset([row, _exchange(0)]),
+        num_proc=1,
+        tokenizer=tokenizer,
+        max_length=cut,
+        truncated_span_action="drop",
+    )
+
+    assert kept["messages"] == [_exchange(0)]
+
+
+def test_dropping_still_warns(tokenizer, caplog) -> None:
+    """Drop is not the quiet option. `data.datasets[].weight` multiplies the rows
+    that survive filtering, so an uneven drop changes the realised mixture — that
+    has to be visible in the log, not inferred from a row count.
+    """
+    row, cut = _straddling_row(tokenizer)
+
+    with caplog.at_level(logging.INFO, logger=SFT_LOGGER):
+        _filter_sft_rows(
+            _sft_dataset([row, _exchange(0)]),
+            num_proc=1,
+            tokenizer=tokenizer,
+            max_length=cut,
+            truncated_span_action="drop",
+        )
+
+    warned = [record for record in caplog.records if "PART-WAY" in record.getMessage()]
+    assert [record.levelno for record in warned] == [logging.WARNING]
+    assert "DROPPED" in warned[0].getMessage()
+    assert "mixture" in warned[0].getMessage()
+
+
+def test_rejects_an_unknown_truncated_span_action(tokenizer) -> None:
+    """Caught before the dataset is tokenized, not after — a typo must not cost
+    a full pass over the pool before it surfaces.
+    """
+    with pytest.raises(ValueError, match="truncated_span_action"):
+        _filter_sft_rows(
+            _sft_dataset([_exchange(0)]),
+            num_proc=1,
+            tokenizer=tokenizer,
+            max_length=4096,
+            truncated_span_action="Drop",
+        )
+
+
 # ── SFT: the failure modes that must be loud ───────────────────────────
 
 
