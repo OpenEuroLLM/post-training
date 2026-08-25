@@ -67,22 +67,32 @@ def _prefetch_model(name_or_path: str, revision: str | None = None) -> str:
     return local_path
 
 
-# Files AutoTokenizer needs, so a separate tokenizer repo does not pull weights.
-# ``config.json`` is included because AutoTokenizer falls back to its
-# ``model_type`` when ``tokenizer_config.json`` names no tokenizer class.
-_TOKENIZER_PATTERNS = [
-    "tokenizer*",  # tokenizer.json, tokenizer_config.json, tokenizer.model
-    "special_tokens_map.json",
-    "added_tokens.json",
-    "vocab.*",  # vocab.json, vocab.txt
-    "merges.txt",
-    "chat_template.jinja",
-    "config.json",
+# Weight formats, skipped when a repo is fetched for its tokenizer alone.
+# Denying the large blobs is safer than allowing a list of tokenizer files:
+# every tokenizer format arrives, including the sentencepiece and legacy names
+# (``spiece.model``, ``sentencepiece.bpe.model``, ``bpe.codes``, ``*.spm``) and
+# the ``additional_chat_templates/`` directory.  The worst case is a few extra
+# small files, not a missing file on an offline compute node.
+_WEIGHT_PATTERNS = [
+    "*.safetensors",
+    "*.bin",
+    "*.pt",
+    "*.pth",
+    "*.ckpt",
+    "*.h5",
+    "*.msgpack",
+    "*.gguf",
+    "*.onnx",
+    "*.onnx_data",
+    "*.ot",  # rust_model.ot
+    "*.tflite",
+    "*.mlmodel",
+    "*.npz",
 ]
 
 
 def _prefetch_tokenizer(name_or_path: str, revision: str | None = None) -> str:
-    """Ensure the tokenizer files of *name_or_path* are cached; return their directory."""
+    """Cache *name_or_path* without its weights; return the local directory."""
     if _is_local(name_or_path):
         logger.info("Tokenizer '%s' is a local path, skipping download.", name_or_path)
         return name_or_path
@@ -93,7 +103,7 @@ def _prefetch_tokenizer(name_or_path: str, revision: str | None = None) -> str:
         repo_id=name_or_path,
         repo_type="model",
         revision=revision,
-        allow_patterns=_TOKENIZER_PATTERNS,
+        ignore_patterns=_WEIGHT_PATTERNS,
     )
     logger.info("Tokenizer '%s' cached at '%s'.", name_or_path, local_path)
     return local_path
