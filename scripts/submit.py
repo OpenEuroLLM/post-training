@@ -146,6 +146,7 @@ def main() -> None:
     # entirely — avoiding contention when every rank loads it at once.
     if prefetched is not None:
         config.model.name_or_path = prefetched.model
+        config.model.tokenizer_name_or_path = prefetched.tokenizer
         if prefetched.ref_model is not None:
             config.dpo.ref_model_name_or_path = prefetched.ref_model
 

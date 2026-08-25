@@ -31,16 +31,21 @@ logger = logging.getLogger(__name__)
 class PrefetchedPaths:
     """Resolved local snapshot directories for the models in *config*.
 
-    Substituting these back into ``config.model.name_or_path`` (and, for DPO,
+    Substituting these back into ``config.model.name_or_path``,
+    ``config.model.tokenizer_name_or_path`` (and, for DPO,
     ``config.dpo.ref_model_name_or_path``) before training starts makes
     ``from_pretrained`` treat the model as a plain local directory, skipping
     huggingface_hub's cache-resolution/filelock path entirely — the source of
     spurious "does not appear to have a file named ..." errors when many
     ranks call ``from_pretrained`` on the same shared (e.g. Lustre) cache at
     once.
+
+    ``tokenizer`` equals ``model`` when the tokenizer comes from the model
+    repo, because the model snapshot already contains the tokenizer files.
     """
 
     model: str
+    tokenizer: str
     ref_model: str | None = None
 
 
@@ -59,6 +64,38 @@ def _prefetch_model(name_or_path: str, revision: str | None = None) -> str:
     )
     local_path = snapshot_download(repo_id=name_or_path, repo_type="model", revision=revision)
     logger.info("Model '%s' cached at '%s'.", name_or_path, local_path)
+    return local_path
+
+
+# Files AutoTokenizer needs, so a separate tokenizer repo does not pull weights.
+# ``config.json`` is included because AutoTokenizer falls back to its
+# ``model_type`` when ``tokenizer_config.json`` names no tokenizer class.
+_TOKENIZER_PATTERNS = [
+    "tokenizer*",  # tokenizer.json, tokenizer_config.json, tokenizer.model
+    "special_tokens_map.json",
+    "added_tokens.json",
+    "vocab.*",  # vocab.json, vocab.txt
+    "merges.txt",
+    "chat_template.jinja",
+    "config.json",
+]
+
+
+def _prefetch_tokenizer(name_or_path: str, revision: str | None = None) -> str:
+    """Ensure the tokenizer files of *name_or_path* are cached; return their directory."""
+    if _is_local(name_or_path):
+        logger.info("Tokenizer '%s' is a local path, skipping download.", name_or_path)
+        return name_or_path
+    logger.info(
+        "Downloading tokenizer '%s' (revision=%s) to HF cache...", name_or_path, revision or "main"
+    )
+    local_path = snapshot_download(
+        repo_id=name_or_path,
+        repo_type="model",
+        revision=revision,
+        allow_patterns=_TOKENIZER_PATTERNS,
+    )
+    logger.info("Tokenizer '%s' cached at '%s'.", name_or_path, local_path)
     return local_path
 
 
@@ -87,6 +124,16 @@ def prefetch_assets(config: PostTrainingConfig) -> PrefetchedPaths:
 
     model_path = _prefetch_model(config.model.name_or_path, revision=config.model.revision)
 
+    tokenizer_name_or_path, tokenizer_revision = config.model.resolve_tokenizer()
+    if (tokenizer_name_or_path, tokenizer_revision) == (
+        config.model.name_or_path,
+        config.model.revision,
+    ):
+        # The tokenizer files are part of the model snapshot fetched above.
+        tokenizer_path = model_path
+    else:
+        tokenizer_path = _prefetch_tokenizer(tokenizer_name_or_path, revision=tokenizer_revision)
+
     ref_model_path = None
     if config.method == "dpo" and config.dpo.ref_model_name_or_path is not None:
         ref_model_path = _prefetch_model(config.dpo.ref_model_name_or_path)
@@ -95,4 +142,4 @@ def prefetch_assets(config: PostTrainingConfig) -> PrefetchedPaths:
         _prefetch_dataset(entry)
 
     logger.info("All assets pre-fetched successfully.")
-    return PrefetchedPaths(model=model_path, ref_model=ref_model_path)
+    return PrefetchedPaths(model=model_path, tokenizer=tokenizer_path, ref_model=ref_model_path)
