@@ -29,9 +29,26 @@ class ModelConfig:
     dtype: str = "bfloat16"
     revision: str | None = None
 
-    # Tokenizer to use. If None, defaults to the model's tokenizer.
+    # Tokenizer source. If ``tokenizer_name_or_path`` is None the tokenizer
+    # comes from the model repo, and ``tokenizer_revision`` then pins it to a
+    # revision other than ``revision``.
     tokenizer_name_or_path: str | None = None
     tokenizer_revision: str | None = None
+
+    def resolve_tokenizer(self) -> tuple[str, str | None]:
+        """Return the ``(name_or_path, revision)`` pair to load the tokenizer from.
+
+        ``tokenizer_name_or_path`` points at a different repo, so ``revision``
+        does not apply to it: such a tokenizer is pinned by
+        ``tokenizer_revision`` alone.  Without ``tokenizer_name_or_path`` the
+        tokenizer comes from the model repo, where ``tokenizer_revision``
+        overrides ``revision``.
+        """
+        if self.tokenizer_name_or_path is not None:
+            return self.tokenizer_name_or_path, self.tokenizer_revision
+        if self.tokenizer_revision is not None:
+            return self.name_or_path, self.tokenizer_revision
+        return self.name_or_path, self.revision
 
 
 @dataclass
