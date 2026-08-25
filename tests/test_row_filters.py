@@ -23,6 +23,12 @@ use two marker-bearing templates deliberately:
 `tests/test_chat_template_masking.py` pins that span-level behaviour itself.
 Here it is the input to the filter.
 
+`max_length` splits the outcomes three ways, and the tests below pin each: a
+span entirely inside the window is kept intact, a span entirely past it is
+dropped, and a span that STRADDLES the window is kept but damaged — it trains
+on an answer cut mid-sentence.  Only the third is invisible to a keep/drop
+count, so it is the one that needs a warning rather than a filter.
+
 No tokenizer is downloaded.  `_CharTokenizer` renders the real registered
 templates through transformers' own generation tracker — the same code path
 `return_assistant_tokens_mask=True` uses — and then treats one character as
@@ -231,6 +237,157 @@ def test_keeps_a_row_whose_assistant_turn_fits_inside_max_length(tokenizer) -> N
     assert len(kept) == 1
 
 
+def _span_bounds(tokenizer, conversation: list[dict]) -> tuple[int, int]:
+    """(first, last) index of the supervised span. One char == one token here."""
+    mask = tokenizer.apply_chat_template(
+        conversation, return_dict=True, return_assistant_tokens_mask=True
+    )["assistant_masks"]
+    return mask.index(1), len(mask) - 1 - mask[::-1].index(1)
+
+
+def test_keeps_a_row_whose_supervised_span_max_length_straddles(tokenizer, caplog) -> None:
+    """The case a keep/drop count cannot show.
+
+    The span starts inside the window and continues past it, so the row DOES
+    produce gradient and is kept — while teaching an answer that stops
+    mid-sentence with no end-of-turn token.  Under final-turn-only supervision
+    the assistant content sits at the end of the row, so this is what a cap
+    slightly below the row length produces: not a dropped row, a damaged one.
+    """
+    row = [{"role": "user", "content": "q"}, {"role": "assistant", "content": "y" * 200}]
+    start, end = _span_bounds(tokenizer, row)
+    straddling = start + 10
+    assert start < straddling < end
+
+    with caplog.at_level(logging.INFO, logger=SFT_LOGGER):
+        kept = _filter_sft_rows(
+            _sft_dataset([row]), num_proc=1, tokenizer=tokenizer, max_length=straddling
+        )
+
+    assert len(kept) == 1
+    cut = [record for record in caplog.records if "PART-WAY" in record.getMessage()]
+    assert [record.levelno for record in cut] == [logging.WARNING]
+
+
+def test_does_not_warn_when_every_supervised_span_fits(tokenizer, caplog) -> None:
+    row = _exchange(0)
+    _, end = _span_bounds(tokenizer, row)
+
+    with caplog.at_level(logging.INFO, logger=SFT_LOGGER):
+        _filter_sft_rows(_sft_dataset([row]), num_proc=1, tokenizer=tokenizer, max_length=end + 1)
+
+    assert not [record for record in caplog.records if "PART-WAY" in record.getMessage()]
+
+
+def test_does_not_warn_about_truncation_when_no_max_length_is_set(tokenizer, caplog) -> None:
+    """With no cap there is nothing to cut, however long the row is."""
+    row = [{"role": "user", "content": "q"}, {"role": "assistant", "content": "y" * 5000}]
+
+    with caplog.at_level(logging.INFO, logger=SFT_LOGGER):
+        kept = _filter_sft_rows(_sft_dataset([row]), num_proc=1, tokenizer=tokenizer)
+
+    assert len(kept) == 1
+    assert not [record for record in caplog.records if "PART-WAY" in record.getMessage()]
+
+
+def test_separates_the_two_reasons_a_row_was_dropped(tokenizer, caplog) -> None:
+    """The two causes call for opposite fixes — change the data, or raise the
+    cap — so a single drop count sends the reader to the wrong one half the time.
+    """
+    prompt_only = [{"role": "user", "content": "orphan"}]
+    beyond_cap = [{"role": "user", "content": "x" * 400}, {"role": "assistant", "content": "a"}]
+
+    with caplog.at_level(logging.INFO, logger=SFT_LOGGER):
+        _filter_sft_rows(
+            _sft_dataset([_exchange(0), prompt_only, beyond_cap]),
+            num_proc=1,
+            tokenizer=tokenizer,
+            max_length=64,
+        )
+
+    causes = next(record for record in caplog.records if "by cause" in record.getMessage())
+    assert "1 with no assistant tokens at all" in causes.getMessage()
+    assert "1 with every assistant token beyond max_length=64" in causes.getMessage()
+
+
+def _straddling_row(tokenizer) -> tuple[list[dict], int]:
+    """A row plus a max_length that cuts its supervised span part-way.
+
+    The prompt is long on purpose, so the cut lands deep enough into the row that
+    an ordinary short row still fits inside the same cap and can serve as the
+    control. With a short prompt the cap is ~50 tokens, every row exceeds it, and
+    the filter empties the dataset instead of dropping one row.
+    """
+    row = [{"role": "user", "content": "x" * 300}, {"role": "assistant", "content": "y" * 200}]
+    start, end = _span_bounds(tokenizer, row)
+    cut = start + 50
+    assert start < cut < end
+    assert cut > len(tokenizer.render(_exchange(0))), "control row must fit under the cap"
+    return row, cut
+
+
+def test_a_straddling_row_is_kept_by_default(tokenizer) -> None:
+    """Default is warn: the row stays, because the fix is normally to raise the
+    cap rather than to throw the data away."""
+    row, cut = _straddling_row(tokenizer)
+
+    kept = _filter_sft_rows(_sft_dataset([row]), num_proc=1, tokenizer=tokenizer, max_length=cut)
+
+    assert len(kept) == 1
+
+
+def test_a_straddling_row_is_dropped_when_asked(tokenizer) -> None:
+    """`drop` is for a sequence length fixed by memory, where shortening the
+    data is the only lever left."""
+    row, cut = _straddling_row(tokenizer)
+
+    kept = _filter_sft_rows(
+        _sft_dataset([row, _exchange(0)]),
+        num_proc=1,
+        tokenizer=tokenizer,
+        max_length=cut,
+        truncated_span_action="drop",
+    )
+
+    assert kept["messages"] == [_exchange(0)]
+
+
+def test_dropping_still_warns(tokenizer, caplog) -> None:
+    """Drop is not the quiet option. `data.datasets[].weight` multiplies the rows
+    that survive filtering, so an uneven drop changes the realised mixture — that
+    has to be visible in the log, not inferred from a row count.
+    """
+    row, cut = _straddling_row(tokenizer)
+
+    with caplog.at_level(logging.INFO, logger=SFT_LOGGER):
+        _filter_sft_rows(
+            _sft_dataset([row, _exchange(0)]),
+            num_proc=1,
+            tokenizer=tokenizer,
+            max_length=cut,
+            truncated_span_action="drop",
+        )
+
+    warned = [record for record in caplog.records if "PART-WAY" in record.getMessage()]
+    assert [record.levelno for record in warned] == [logging.WARNING]
+    assert "DROPPED" in warned[0].getMessage()
+    assert "mixture" in warned[0].getMessage()
+
+
+def test_rejects_an_unknown_truncated_span_action(tokenizer) -> None:
+    """Caught before the dataset is tokenized, not after — a typo must not cost
+    a full pass over the pool before it surfaces.
+    """
+    with pytest.raises(ValueError, match="truncated_span_action"):
+        _filter_sft_rows(
+            _sft_dataset([_exchange(0)]),
+            num_proc=1,
+            tokenizer=tokenizer,
+            max_length=4096,
+            truncated_span_action="Drop",
+        )
+
+
 # ── SFT: the failure modes that must be loud ───────────────────────────
 
 
@@ -278,6 +435,26 @@ def test_total_drop_error_names_max_length_only_when_it_is_set(tokenizer) -> Non
     with pytest.raises(ValueError) as with_length:
         _filter_sft_rows(ds, num_proc=1, tokenizer=tokenizer, max_length=4096)
     assert "max_length of 4096" in str(with_length.value)
+
+
+def test_total_drop_error_blames_the_cap_when_every_row_has_an_assistant_turn(
+    tokenizer,
+) -> None:
+    """Both causes empty the dataset, and they need opposite fixes.  When every
+    row does have an assistant turn, the template is exonerated and saying
+    otherwise sends the reader on a long detour through their jinja.
+    """
+    rows = [
+        [{"role": "user", "content": "x" * 400}, {"role": "assistant", "content": f"a{i}"}]
+        for i in range(3)
+    ]
+
+    with pytest.raises(ValueError) as excinfo:
+        _filter_sft_rows(_sft_dataset(rows), num_proc=1, tokenizer=tokenizer, max_length=32)
+
+    message = str(excinfo.value)
+    assert "max_seq_length problem" in message
+    assert "not a template problem" in message
 
 
 def test_requires_the_tokenizer_as_a_keyword_argument() -> None:
