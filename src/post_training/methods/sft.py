@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from collections import Counter
 from functools import partial
@@ -46,6 +47,7 @@ def _classify_row(
     messages: list[dict],
     tokenizer: PreTrainedTokenizerBase,
     max_length: int | None,
+    tools: str | list[dict] | None = None,
 ) -> int:
     """Say what ``max_length`` does to one row's supervised span.
 
@@ -73,6 +75,12 @@ def _classify_row(
     """
     rendered = tokenizer.apply_chat_template(
         messages,
+        # Rendered WITH the tools, because the trainer renders with them. A tool
+        # declaration adds the template's whole "# Tools" preamble — hundreds of
+        # tokens — so a filter that left it out would measure a different length
+        # than the one max_length is applied to, and its verdict would be wrong
+        # for exactly the rows that carry tools.
+        tools=json.loads(tools) if isinstance(tools, str) else tools,
         return_dict=True,
         return_assistant_tokens_mask=True,
     )
@@ -96,7 +104,13 @@ MESSAGES_FEATURES = Features(
                 "content": Value("string"),
                 "role": Value("string"),
             }
-        )
+        ),
+        # A JSON string, matching what TRL reads: it does
+        # `json.loads(tools) if isinstance(tools, str) else tools`
+        # (trl/trainer/sft_trainer.py). Keeping it a string avoids declaring an
+        # arbitrary nested tool schema in Features, and datasets fills it with
+        # null for a dataset that has no tools, so mixed sources concatenate.
+        "tools": Value("string"),
     }
 )
 
@@ -174,7 +188,9 @@ def _filter_sft_rows(
 
     # remove_columns keeps the map cache tiny: it holds the verdict alone, not a copy of the data.
     verdicts = ds.map(
-        lambda row: {"verdict": _classify_row(row["messages"], tokenizer, max_length)},
+        lambda row: {
+            "verdict": _classify_row(row["messages"], tokenizer, max_length, tools=row.get("tools"))
+        },
         num_proc=num_proc,
         remove_columns=ds.column_names,
         desc="computing assistant loss masks",
@@ -339,7 +355,7 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
                 max_length=mc.max_seq_length,
                 truncated_span_action=mc.truncated_span_action,
             ),
-            columns_to_keep=["messages"],
+            columns_to_keep=["messages", "tools"],
             features=MESSAGES_FEATURES,
         )
 

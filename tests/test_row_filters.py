@@ -38,6 +38,7 @@ and the `max_length` cuts carry the same meaning as a real tokenizer's.
 
 from __future__ import annotations
 
+import json
 import logging
 
 import pytest
@@ -45,7 +46,7 @@ from datasets import Dataset
 
 from post_training.chat_templates.registry import get_chat_template
 from post_training.methods.dpo import _filter_dpo_rows
-from post_training.methods.sft import _filter_sft_rows
+from post_training.methods.sft import _classify_row, _filter_sft_rows
 
 SFT_LOGGER = "post_training.methods.sft"
 
@@ -73,28 +74,31 @@ class _CharTokenizer:
     def chat_template(self) -> str:
         return get_chat_template(self.template_name)
 
-    def _render(self, conversation: list[dict]) -> tuple[str, list[tuple[int, int]]]:
+    def _render(
+        self, conversation: list[dict], tools: list[dict] | None = None
+    ) -> tuple[str, list[tuple[int, int]]]:
         utils = pytest.importorskip("transformers.utils.chat_template_utils")
         if self.template_name not in _COMPILED:
             _COMPILED[self.template_name] = utils._compile_jinja_template(self.chat_template)
         return utils._render_with_assistant_indices(
-            _COMPILED[self.template_name], conversation, None, None, False
+            _COMPILED[self.template_name], conversation, tools, None, False
         )
 
-    def render(self, conversation: list[dict]) -> str:
-        rendered, _ = self._render(conversation)
+    def render(self, conversation: list[dict], tools: list[dict] | None = None) -> str:
+        rendered, _ = self._render(conversation, tools)
         return rendered
 
     def apply_chat_template(
         self,
         conversation: list[dict],
         *,
+        tools: list[dict] | None = None,
         return_dict: bool = False,
         return_assistant_tokens_mask: bool = False,
         truncation: bool = False,
         max_length: int | None = None,
     ) -> dict:
-        rendered, indices = self._render(conversation)
+        rendered, indices = self._render(conversation, tools)
 
         input_ids = [ord(character) for character in rendered]
         assistant_masks = [0] * len(rendered)
@@ -514,6 +518,56 @@ def test_reports_each_distinct_role_sequence_once(tokenizer, caplog) -> None:
 
     assert "4 dropped rows (2 unique)" in report.getMessage()
     assert sorted(body.splitlines()) == ["user", "user -> assistant -> user"]
+
+
+# ── SFT: tool declarations ─────────────────────────────────────────────
+
+TOOL_SCHEMA = [{"type": "function", "function": {"name": "lookup", "description": "d"}}]
+
+
+def test_a_tools_declaration_counts_toward_max_length(tokenizer) -> None:
+    """Why carrying the column and rendering it have to land together.
+
+    A tool declaration emits the template's whole "# Tools" preamble ahead of the
+    conversation, which pushes the assistant span later. A filter that rendered
+    without tools would measure a shorter row than the one max_length is applied
+    to, and would keep rows whose supervised span the trainer truncates away.
+    """
+    row = _exchange(0)
+    bare = len(tokenizer.render(row))
+    with_tools = len(tokenizer.render(row, TOOL_SCHEMA))
+    assert with_tools > bare, "the tools preamble must lengthen the render"
+
+    # A cap that fits the bare row but not the same row once tools are declared.
+    cap = bare
+    assert (
+        len(_filter_sft_rows(_sft_dataset([row]), num_proc=1, tokenizer=tokenizer, max_length=cap))
+        == 1
+    )
+
+    ds = Dataset.from_dict({"messages": [row], "tools": [json.dumps(TOOL_SCHEMA)]})
+    with pytest.raises(ValueError, match="zero loss"):
+        _filter_sft_rows(ds, num_proc=1, tokenizer=tokenizer, max_length=cap)
+
+
+def test_tools_are_parsed_from_a_json_string(tokenizer) -> None:
+    """TRL reads the column with
+    `json.loads(tools) if isinstance(tools, str) else tools`, so the filter must
+    too. Left as a string, the template would iterate over its characters and
+    render something else entirely.
+    """
+    row = [{"role": "user", "content": "q"}, {"role": "assistant", "content": "a"}]
+    as_string = _classify_row(row, tokenizer, None, tools=json.dumps(TOOL_SCHEMA))
+    as_list = _classify_row(row, tokenizer, None, tools=TOOL_SCHEMA)
+
+    assert as_string == as_list
+
+
+def test_a_row_without_tools_is_unaffected(tokenizer) -> None:
+    """The column is null for most rows, and null must render exactly as before."""
+    row = _exchange(0)
+    assert tokenizer.render(row, None) == tokenizer.render(row)
+    assert _classify_row(row, tokenizer, None, tools=None) == _classify_row(row, tokenizer, None)
 
 
 # ── DPO ────────────────────────────────────────────────────────────────
