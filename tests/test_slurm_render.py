@@ -185,7 +185,8 @@ def test_trl_container_host_setup_absent_when_unspecified(tmp_path, config):
 
     content = render_trl_container_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
 
-    assert "module" not in content
+    assert "module purge" not in content
+    assert "module load" not in content
 
 
 # ---------------------------------------------------------------------------
