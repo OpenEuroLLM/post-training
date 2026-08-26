@@ -140,6 +140,56 @@ def test_trl_container_qos_mem_absent_when_none(tmp_path, config):
 
 
 # ---------------------------------------------------------------------------
+# environment modules — TRL container template
+# ---------------------------------------------------------------------------
+
+
+def test_trl_container_modules_rendered(tmp_path, config):
+    """Configured host modules are loaded before the cluster environment file."""
+    config.slurm.modules = ["singularity/4.1.0", "cuda/12.4"]
+    config.slurm.module_purge = True
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_container_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    commands = [
+        "module purge",
+        "module load singularity/4.1.0",
+        "module load cuda/12.4",
+        'source "/shared/env/cluster.env"',
+    ]
+    assert all(command in content for command in commands)
+    assert [content.index(command) for command in commands] == sorted(
+        content.index(command) for command in commands
+    )
+
+
+def test_trl_container_module_purge_omitted_when_disabled(tmp_path, config):
+    """Modules can be loaded without first purging the inherited module set."""
+    config.slurm.modules = ["singularity/4.1.0"]
+    config.slurm.module_purge = False
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_container_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    assert "module load singularity/4.1.0" in content
+    assert "module purge" not in content
+
+
+def test_trl_container_host_setup_absent_when_unspecified(tmp_path, config):
+    """No module setup is rendered when the module list is empty."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_container_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    assert "module purge" not in content
+    assert "module load" not in content
+
+
+# ---------------------------------------------------------------------------
 # --tokenize-only forwarding — TRL templates and backend dispatch
 # ---------------------------------------------------------------------------
 

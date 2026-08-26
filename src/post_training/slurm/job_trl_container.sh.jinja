@@ -30,6 +30,16 @@
 
 set -euo pipefail
 
+{% if modules %}
+# ── Environment modules ────────────────────────────────────────────────────
+{% if module_purge %}
+module purge
+{% endif %}
+{% for mod in modules %}
+module load {{ mod }}
+{% endfor %}
+{% endif %}
+
 # ── Source cluster environment ────────────────────────────────────────────
 {% if env_file %}source "{{ env_file }}"{% endif %}
 
