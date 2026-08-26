@@ -7,6 +7,7 @@ YAML loading, merging, and CLI overrides.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -361,10 +362,26 @@ class PostTrainingConfig:
     # ------------------------------------------------------------------
 
     def _validate(self) -> None:
-        """Run cross-field validation and compute derived values."""
+        """Run cross-field validation."""
         from post_training.backend import get_backend
 
         get_backend(self.backend).validate(self)
+
+    def resolve_max_steps(self) -> int | None:
+        """Return the effective step limit without mutating the configured budget.
+
+        ``None`` denotes epoch-based training. Validation guarantees that one
+        of the remaining branches applies for TRL step-based training.
+        """
+        t = self.training
+        if t.max_steps is not None:
+            return t.max_steps
+        if t.num_training_samples is not None:
+            return math.ceil(t.num_training_samples / t.effective_batch_size)
+        if t.num_training_tokens is not None:
+            tokens_per_step = t.effective_batch_size * self.sft.max_seq_length
+            return math.ceil(t.num_training_tokens / tokens_per_step)
+        return None
 
     def resolve_gradient_accumulation_steps(self, world_size: int) -> int:
         """Compute gradient accumulation steps from the effective batch size.

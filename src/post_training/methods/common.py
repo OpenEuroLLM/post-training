@@ -88,7 +88,7 @@ def build_common_training_kwargs(
 
     # Determine training duration kwargs. When num_train_epochs is set, max_steps
     # must be -1 (disabled) so the Trainer uses epoch-based stopping. Otherwise,
-    # max_steps is always set (possibly derived from num_training_samples/tokens).
+    # resolve max_steps without mutating the configured sample/token budget.
     if t.num_train_epochs is not None:
         duration_kwargs: dict[str, Any] = {
             "num_train_epochs": t.num_train_epochs,
@@ -96,8 +96,11 @@ def build_common_training_kwargs(
         }
         logger.info("Training duration: %.2f epochs", t.num_train_epochs)
     else:
-        duration_kwargs = {"max_steps": t.max_steps}
-        logger.info("Training duration: %d steps", t.max_steps)
+        max_steps = config.resolve_max_steps()
+        if max_steps is None:
+            raise ValueError("Step-based training requires a resolvable max_steps value.")
+        duration_kwargs = {"max_steps": max_steps}
+        logger.info("Training duration: %d steps", max_steps)
 
     return dict(
         output_dir=str(run_dir / "checkpoints"),
