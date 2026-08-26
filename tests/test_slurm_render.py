@@ -178,6 +178,16 @@ def test_trl_container_module_purge_omitted_when_disabled(tmp_path, config):
     assert "module purge" not in content
 
 
+def test_trl_container_host_setup_absent_when_unspecified(tmp_path, config):
+    """No module setup is rendered when the module list is empty."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_container_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    assert "module" not in content
+
+
 # ---------------------------------------------------------------------------
 # --tokenize-only forwarding — TRL templates and backend dispatch
 # ---------------------------------------------------------------------------
