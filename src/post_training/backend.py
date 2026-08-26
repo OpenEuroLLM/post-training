@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import math
 import os
 import re
 import shutil
@@ -144,6 +143,9 @@ class TRLBackend(Backend):
                 f"You set: {', '.join(specified)}."
             )
 
+        if t.max_steps is not None and t.max_steps <= 0:
+            raise ValueError("training.max_steps must be a positive integer.")
+
         if t.num_train_epochs is not None and t.num_train_epochs <= 0:
             raise ValueError("training.num_train_epochs must be a positive number.")
 
@@ -158,13 +160,9 @@ class TRLBackend(Backend):
             if config.sft.max_seq_length <= 0:
                 raise ValueError("sft.max_seq_length must be positive.")
 
-            tokens_per_step = t.effective_batch_size * config.sft.max_seq_length
-            t.max_steps = math.ceil(t.num_training_tokens / tokens_per_step)
-
         if t.num_training_samples is not None:
             if t.num_training_samples <= 0:
                 raise ValueError("training.num_training_samples must be a positive integer.")
-            t.max_steps = math.ceil(t.num_training_samples / t.effective_batch_size)
 
     def generate_run_name(self, config: PostTrainingConfig, timestamp: str) -> str:
         model_short = _shorten_model_name(config.model.name_or_path)

@@ -155,7 +155,13 @@ def main() -> None:
 
     # ── Debug mode overrides ────────────────────────────────────────
     if config.debug.enabled:
-        logger.info("Debug mode ON — training for %d steps.", config.training.max_steps)
+        max_steps = config.resolve_max_steps()
+        if max_steps is None:
+            logger.info(
+                "Debug mode ON — training for %.2f epochs.", config.training.num_train_epochs
+            )
+        else:
+            logger.info("Debug mode ON — training for %d steps.", max_steps)
         config.logging.report_to = ["none"]
 
     # ── Set up run directory ────────────────────────────────────────

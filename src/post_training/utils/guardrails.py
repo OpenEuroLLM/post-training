@@ -84,10 +84,11 @@ def _deepspeed_summary(config: PostTrainingConfig) -> str:
 
 def _duration_summary(config: PostTrainingConfig) -> str:
     t = config.training
+    max_steps = config.resolve_max_steps()
     if t.num_training_tokens is not None:
-        return f"{t.num_training_tokens:,} tokens → {t.max_steps:,} steps"
+        return f"{t.num_training_tokens:,} tokens → {max_steps:,} steps"
     if t.num_training_samples is not None:
-        return f"{t.num_training_samples:,} samples → {t.max_steps:,} steps"
+        return f"{t.num_training_samples:,} samples → {max_steps:,} steps"
     if t.max_steps is not None:
         return f"{t.max_steps:,} steps"
     if t.num_train_epochs is not None:

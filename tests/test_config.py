@@ -79,6 +79,75 @@ def test_deepspeed_empty_dict_normalized_to_none(tmp_path, monkeypatch):
     assert kwargs["deepspeed"] is None
 
 
+@pytest.mark.parametrize(
+    ("budget_field", "budget_value"),
+    [
+        ("num_training_samples", 33),
+        ("num_training_tokens", 2_097_152),
+    ],
+)
+def test_derived_step_budget_round_trips_without_mutation(
+    tmp_path, monkeypatch, budget_field, budget_value
+):
+    """A frozen sample/token budget remains valid when train.py reloads it."""
+    monkeypatch.setenv("WORLD_SIZE", "1")
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "method": "sft",
+                "backend": "trl",
+                "training": {
+                    budget_field: budget_value,
+                    "effective_batch_size": 32,
+                    "per_device_train_batch_size": 1,
+                },
+                "sft": {"max_seq_length": 32_768, "packing": True},
+                "data": {
+                    "datasets": [
+                        {
+                            "name": "dummy",
+                            "path": "dummy/path",
+                            "weight": 1.0,
+                        }
+                    ]
+                },
+            }
+        )
+    )
+
+    config = PostTrainingConfig.load(config_path)
+    assert config.training.max_steps is None
+    assert config.resolve_max_steps() == 2
+    assert build_common_training_kwargs(config, tmp_path)["max_steps"] == 2
+
+    frozen_path = tmp_path / "frozen.yaml"
+    config.save(frozen_path)
+    reloaded = PostTrainingConfig.load(frozen_path)
+
+    assert reloaded.training.max_steps is None
+    assert reloaded.resolve_max_steps() == 2
+
+
+def test_explicit_and_derived_step_budgets_conflict(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "method": "sft",
+                "backend": "trl",
+                "training": {
+                    "max_steps": 2,
+                    "num_training_tokens": 2_097_152,
+                },
+            }
+        )
+    )
+
+    with pytest.raises(ValueError, match="Training length is over-specified"):
+        PostTrainingConfig.load(config_path)
+
+
 def test_deepspeed_old_style_config_path_rejected(tmp_path):
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
