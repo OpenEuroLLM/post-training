@@ -94,6 +94,29 @@ def has_generation_markers(template: str | None) -> bool:
     return bool(_GENERATION_OPEN_RE.search(template) and _GENERATION_CLOSE_RE.search(template))
 
 
+def terminator_from_render(rendered: str, added_tokens: dict[str, int]) -> str | None:
+    """The added token a rendered conversation ends on, or ``None``.
+
+    This is how the turn terminator is established: **by looking at what the
+    template actually produced**, never from a ``{template: terminator}`` table.
+    A table goes stale the moment a template changes and the failure is silent —
+    the model learns to emit one token while the config stops on another.
+
+    Pure string logic on purpose, so it is testable without a tokenizer or a
+    model. The caller renders (see ``build_tokenizer``) and passes the result in
+    together with ``tokenizer.get_added_vocab()``.
+
+    ``None`` is the conservative answer and means *change nothing*: it covers a
+    template whose terminator is not an added token, one that could not be
+    rendered, and any shape nobody has considered.
+    """
+    tail = (rendered or "").rstrip("\n")
+    matches = [t for t in added_tokens if t and tail.endswith(t)]
+    if not matches:
+        return None
+    return max(matches, key=len)  # longest wins: '<|im_end|>' over 'end|>'
+
+
 def get_chat_template(name: str) -> str:
     """Return the Jinja source string for the template registered as *name*.
 

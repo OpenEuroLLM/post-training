@@ -16,6 +16,7 @@ from trl import SFTConfig, SFTTrainer
 from post_training.chat_templates.registry import has_generation_markers
 from post_training.data.loader import load_and_mix_datasets
 from post_training.methods.common import (
+    align_generation_eos,
     build_callbacks,
     build_common_training_kwargs,
     build_model_init_kwargs,
@@ -364,5 +365,6 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
     )
 
     sanitize_generation_config(trainer)
+    align_generation_eos(trainer)
     prioritize_metric_callbacks(trainer)
     return trainer

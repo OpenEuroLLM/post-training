@@ -19,7 +19,7 @@ from transformers.integrations import WandbCallback
 from post_training.callbacks.inference_checkpoint import InferenceCheckpointCallback
 from post_training.callbacks.mfu import MFUCallback
 from post_training.callbacks.throughput import ThroughputCallback
-from post_training.chat_templates.registry import get_chat_template
+from post_training.chat_templates.registry import get_chat_template, terminator_from_render
 
 if TYPE_CHECKING:
     from post_training.config import PostTrainingConfig
@@ -52,7 +52,86 @@ def build_tokenizer(config: PostTrainingConfig) -> AutoTokenizer:
     template_str = get_chat_template(config.data.chat_template)
     tokenizer.chat_template = template_str
     logger.info("Chat template set to '%s'.", config.data.chat_template)
+
+    # The template decides what ends a turn, and SFT trains the model to emit
+    # exactly that. When it is not the tokenizer's `eos_token`, generation has
+    # nothing to stop on: the model emits the token it was trained to emit and
+    # nobody is listening, so it runs to `max_new_tokens` on every prompt.
+    # `qwen3` ends on `<|im_end|>`; the `olmo3-*` templates already end on
+    # `eos_token`, for which this is a no-op.
+    # Set after the pad fallback above, so `pad_token` keeps the model's own eos
+    # rather than inheriting the turn terminator.
+    # Rendered through the tokenizer's own `apply_chat_template`, so what we
+    # inspect is what training will actually produce — and through the public API
+    # rather than transformers' private jinja helpers.
+    terminator = None
+    try:
+        probe = [{"role": "user", "content": "q"}, {"role": "assistant", "content": "a"}]
+        rendered = tokenizer.apply_chat_template(probe, tokenize=False)
+        terminator = terminator_from_render(rendered, tokenizer.get_added_vocab())
+    except Exception:  # noqa: BLE001 - an unrenderable template must not break the run
+        logger.warning(
+            "Could not render chat template '%s' to find its turn terminator; "
+            "leaving eos_token as %s.",
+            config.data.chat_template,
+            tokenizer.eos_token,
+        )
+    if terminator is not None and terminator != tokenizer.eos_token:
+        logger.info(
+            "Chat template '%s' terminates turns with %s, not the tokenizer's "
+            "eos_token %s. Setting eos_token to %s so generation stops on what "
+            "the model is trained to emit.",
+            config.data.chat_template,
+            terminator,
+            tokenizer.eos_token,
+            terminator,
+        )
+        tokenizer.eos_token = terminator
     return tokenizer
+
+
+def align_generation_eos(trainer: Any) -> None:
+    """Make the trained checkpoint stop on the token the template taught it.
+
+    Runs after the trainer exists, because the model's ``generation_config`` is
+    what ``generate()`` actually reads — **not** ``tokenizer.eos_token``. The two
+    are independent, and the model's copy comes from the checkpoint: Prelude
+    ships no ``generation_config.json`` at all and falls back to ``config.json``'s
+    ``eos_token_id``, while OLMo's is an empty ``{}``. Either way the value is the
+    model's pretraining terminator, which the SFT data never contains.
+
+    The terminator is read off the tokenizer, which :func:`build_tokenizer` has
+    already aligned to the template, and the pretraining eos is read off the
+    model, which is where it lives. The pretraining eos is KEPT as a secondary
+    stop id: the model has a prior to emit it that SFT decays without erasing, so
+    a stray one should stop cleanly rather than render as text. Qwen ships a
+    two-element list for the same reason.
+
+    A no-op when the two already agree — which is the case for every ``olmo3-*``
+    template, since those terminate on ``eos_token``.
+    """
+    model = getattr(trainer, "model", None)
+    tokenizer = getattr(trainer, "processing_class", None)
+    if model is None or tokenizer is None:
+        return
+    gc = getattr(model, "generation_config", None)
+    terminator_id = getattr(tokenizer, "eos_token_id", None)
+    if gc is None or terminator_id is None:
+        return
+
+    existing = gc.eos_token_id
+    existing = existing if isinstance(existing, list) else [existing]
+    existing = [i for i in existing if i is not None]
+    if existing == [terminator_id]:
+        return  # already correct; touch nothing
+
+    gc.eos_token_id = [terminator_id] + [i for i in existing if i != terminator_id]
+    logger.info(
+        "generation_config.eos_token_id set to %s (%s from the chat template, "
+        "then the model's own).",
+        gc.eos_token_id,
+        tokenizer.eos_token,
+    )
 
 
 def build_model_init_kwargs(config: PostTrainingConfig) -> dict[str, Any]:
