@@ -178,6 +178,58 @@ def test_native_dataset_preserves_extra_message_fields(monkeypatch):
     assert mixed[0]["messages"][1]["function_calls"] == 'lookup(query="x")'
 
 
+def test_tools_column_survives_mixing_and_is_null_where_absent(monkeypatch):
+    """A tool-declaring dataset mixed with one that has no `tools` column.
+
+    `select_columns` leaves the two with different schemas, and
+    `concatenate_datasets` reconciles that by filling null rather than by
+    dropping the column — so no normalisation step is needed. Pinned because the
+    alternative would be silent: losing the column would disable tool support
+    for the whole mix without an error.
+    """
+    _patch_load_dataset(
+        monkeypatch,
+        {
+            "dataset-a": Dataset.from_dict(
+                {
+                    "messages": [
+                        [
+                            {"role": "user", "content": "look it up"},
+                            {"role": "assistant", "content": "done"},
+                        ]
+                    ],
+                    "tools": ['[{"name":"lookup"}]'],
+                    "unused": ["drop me"],
+                }
+            ),
+            "dataset-b": Dataset.from_dict(
+                {
+                    "messages": [
+                        [
+                            {"role": "user", "content": "no tools here"},
+                            {"role": "assistant", "content": "fine"},
+                        ]
+                    ]
+                }
+            ),
+        },
+    )
+
+    mixed = loader.load_and_mix_datasets(
+        _config(
+            DatasetEntry(name="a", path="dataset-a"),
+            DatasetEntry(name="b", path="dataset-b"),
+        ),
+        columns_to_keep=["messages", "tools"],
+    )
+
+    assert set(mixed.column_names) == {"messages", "tools"}
+    tools = list(mixed["tools"])
+    assert len(tools) == 2
+    assert '[{"name":"lookup"}]' in tools
+    assert None in tools
+
+
 def test_native_plain_chat_dataset_skips_schema_cast(monkeypatch):
     _patch_load_dataset(monkeypatch, {"dataset-a": _dataset("a", 2)})
     features = Features(
