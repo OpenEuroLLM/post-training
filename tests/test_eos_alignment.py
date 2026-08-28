@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from post_training.chat_templates.registry import get_chat_template, terminator_from_render
+from post_training.chat_templates.registry import get_chat_template, infer_end_token_from_render
 from post_training.methods.common import align_generation_eos
 
 # OLMo's ids, used throughout so the numbers mean something.
@@ -52,23 +52,23 @@ class _Trainer:
 
 
 def test_reads_the_terminator_off_the_render():
-    assert terminator_from_render("<|im_start|>a<|im_end|>", ADDED) == "<|im_end|>"
+    assert infer_end_token_from_render("<|im_start|>a<|im_end|>", ADDED) == "<|im_end|>"
 
 
 def test_a_trailing_newline_does_not_hide_it():
     """qwen3 emits '<|im_end|>\\n' after a turn."""
-    assert terminator_from_render("...<|im_end|>\n", ADDED) == "<|im_end|>"
+    assert infer_end_token_from_render("...<|im_end|>\n", ADDED) == "<|im_end|>"
 
 
 def test_returns_none_when_the_render_ends_on_ordinary_text():
     """The conservative answer: the caller then changes nothing."""
-    assert terminator_from_render("...just an answer", ADDED) is None
-    assert terminator_from_render("", ADDED) is None
+    assert infer_end_token_from_render("...just an answer", ADDED) is None
+    assert infer_end_token_from_render("", ADDED) is None
 
 
 def test_longest_match_wins():
     added = {"<|im_end|>": 1, "end|>": 2}
-    assert terminator_from_render("x<|im_end|>", added) == "<|im_end|>"
+    assert infer_end_token_from_render("x<|im_end|>", added) == "<|im_end|>"
 
 
 @pytest.mark.parametrize("name", ["qwen3", "chatml"])
@@ -84,7 +84,7 @@ def test_chatml_style_templates_terminate_on_im_end(name):
         None,
         False,
     )
-    assert terminator_from_render(rendered, ADDED) == "<|im_end|>"
+    assert infer_end_token_from_render(rendered, ADDED) == "<|im_end|>"
 
 
 @pytest.mark.parametrize("name", ["olmo3", "olmo3-instruct-sft", "olmo3-think-sft", "tulu3"])
@@ -102,7 +102,7 @@ def test_olmo_style_templates_terminate_on_the_native_eos(name):
         False,
         eos_token="<|endoftext|>",
     )
-    assert terminator_from_render(rendered, ADDED) == "<|endoftext|>"
+    assert infer_end_token_from_render(rendered, ADDED) == "<|endoftext|>"
 
 
 # ── writing it into the checkpoint ────────────────────────────────────

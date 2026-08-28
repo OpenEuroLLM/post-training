@@ -19,7 +19,7 @@ from transformers.integrations import WandbCallback
 from post_training.callbacks.inference_checkpoint import InferenceCheckpointCallback
 from post_training.callbacks.mfu import MFUCallback
 from post_training.callbacks.throughput import ThroughputCallback
-from post_training.chat_templates.registry import get_chat_template, terminator_from_render
+from post_training.chat_templates.registry import get_chat_template, infer_end_token_from_render
 
 if TYPE_CHECKING:
     from post_training.config import PostTrainingConfig
@@ -64,11 +64,11 @@ def build_tokenizer(config: PostTrainingConfig) -> AutoTokenizer:
     # Rendered through the tokenizer's own `apply_chat_template`, so what we
     # inspect is what training will actually produce — and through the public API
     # rather than transformers' private jinja helpers.
-    terminator = None
+    end_token = None
     try:
         probe = [{"role": "user", "content": "q"}, {"role": "assistant", "content": "a"}]
         rendered = tokenizer.apply_chat_template(probe, tokenize=False)
-        terminator = terminator_from_render(rendered, tokenizer.get_added_vocab())
+        end_token = infer_end_token_from_render(rendered, tokenizer.get_added_vocab())
     except Exception:  # noqa: BLE001 - an unrenderable template must not break the run
         logger.warning(
             "Could not render chat template '%s' to find its turn terminator; "
@@ -76,17 +76,17 @@ def build_tokenizer(config: PostTrainingConfig) -> AutoTokenizer:
             config.data.chat_template,
             tokenizer.eos_token,
         )
-    if terminator is not None and terminator != tokenizer.eos_token:
+    if end_token is not None and end_token != tokenizer.eos_token:
         logger.info(
             "Chat template '%s' terminates turns with %s, not the tokenizer's "
             "eos_token %s. Setting eos_token to %s so generation stops on what "
             "the model is trained to emit.",
             config.data.chat_template,
-            terminator,
+            end_token,
             tokenizer.eos_token,
-            terminator,
+            end_token,
         )
-        tokenizer.eos_token = terminator
+        tokenizer.eos_token = end_token
     return tokenizer
 
 

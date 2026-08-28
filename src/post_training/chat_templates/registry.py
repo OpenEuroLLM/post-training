@@ -94,8 +94,14 @@ def has_generation_markers(template: str | None) -> bool:
     return bool(_GENERATION_OPEN_RE.search(template) and _GENERATION_CLOSE_RE.search(template))
 
 
-def terminator_from_render(rendered: str, added_tokens: dict[str, int]) -> str | None:
+def infer_end_token_from_render(rendered: str, added_tokens: dict[str, int]) -> str | None:
     """The added token a rendered conversation ends on, or ``None``.
+
+    Deliberately not named for the eos or for a "stop token": what comes back is
+    a TEMPLATE-side observation, and under ``qwen3`` it is ``<|im_end|>``, which
+    is not the model's eos and not a stop token until ``align_generation_eos``
+    makes it one. Under the ``olmo3-*`` templates it happens to be the eos, but
+    only because those templates terminate on it.
 
     This is how the turn terminator is established: **by looking at what the
     template actually produced**, never from a ``{template: terminator}`` table.
