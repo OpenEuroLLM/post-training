@@ -157,6 +157,14 @@ class DPOMethodConfig:
     ref_model_name_or_path: str | None = None
     max_seq_length: int = 2048
     dataset_num_proc: int | None = None
+    # Cache the reference log-probs up front so no reference model is held in
+    # memory during training. TRL computes them inside the trainer constructor,
+    # so `--tokenize-only` is enough to fill the cache.
+    precompute_ref_log_probs: bool = False
+    # Identifies the reference weights in the cache key. None derives it from
+    # the model identity: "<model.name_or_path>@<model.revision>". Change it
+    # by hand when the weights at that path change but the path does not.
+    ref_logps_cache_key: str | None = None
 
 
 @dataclass
