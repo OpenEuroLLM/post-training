@@ -190,6 +190,8 @@ def render_llamafactory_slurm_script(
         wall_time=config.slurm.wall_time,
         signal_time_seconds=config.slurm.signal_time_seconds,
         max_failures=config.slurm.max_failures,
+        modules=config.slurm.modules,
+        module_purge=config.slurm.module_purge,
         run_dir=str(run_dir.resolve()),
         # Container
         container_image=config.container.image,
