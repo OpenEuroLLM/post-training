@@ -481,3 +481,38 @@ def test_llamafactory_cuda_device_max_connections_not_set(tmp_path, config):
     content = render_llamafactory_slurm_script(config, run_dir).read_text()
 
     assert "export CUDA_DEVICE_MAX_CONNECTIONS" not in content
+
+
+# ---------------------------------------------------------------------------
+# offline flag — LlamaFactory template
+# ---------------------------------------------------------------------------
+
+
+def test_llamafactory_offline_enabled(tmp_path, config):
+    """offline: true switches HF and WandB to offline mode inside the container."""
+    config.offline = True
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert "export HF_HUB_OFFLINE=1" in content
+    assert "export HF_DATASETS_OFFLINE=1" in content
+    assert "export TRANSFORMERS_OFFLINE=1" in content
+    assert "export WANDB_MODE=offline" in content
+    assert "OFFLINE=0" not in content
+
+
+def test_llamafactory_offline_disabled(tmp_path, config):
+    """offline: false clears the HF offline flags, overriding any value from the env file."""
+    config.offline = False
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert "export HF_HUB_OFFLINE=0" in content
+    assert "export HF_DATASETS_OFFLINE=0" in content
+    assert "export TRANSFORMERS_OFFLINE=0" in content
+    assert "OFFLINE=1" not in content
+    assert "WANDB_MODE" not in content

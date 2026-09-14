@@ -192,6 +192,7 @@ def render_llamafactory_slurm_script(
         max_failures=config.slurm.max_failures,
         modules=config.slurm.modules,
         module_purge=config.slurm.module_purge,
+        offline=config.offline,
         run_dir=str(run_dir.resolve()),
         # Container
         container_image=config.container.image,

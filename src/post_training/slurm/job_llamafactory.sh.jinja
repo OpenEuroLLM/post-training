@@ -109,15 +109,24 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     export NNODES=\"\$SLURM_NNODES\"
     export NPROC_PER_NODE=${GPUS_PER_NODE}
 
-    # Forward HF cache/offline settings from host env
+    # Forward HF cache paths from host env
     export HF_HOME=${HF_HOME}
     export HF_HUB_CACHE=${HF_HUB_CACHE}
     export HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE}
     export HF_DATASETS_CACHE=${HF_DATASETS_CACHE:-${HF_HOME}/datasets}
+    export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
+    # LlamaFactory jobs do not run scripts/train.py, so set offline mode here, after the env file.
+{% if offline %}
+    export HF_HUB_OFFLINE=1
     export HF_DATASETS_OFFLINE=1
     export TRANSFORMERS_OFFLINE=1
-    export HF_HUB_OFFLINE=1
-    export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+    export WANDB_MODE=offline
+{% else %}
+    export HF_HUB_OFFLINE=0
+    export HF_DATASETS_OFFLINE=0
+    export TRANSFORMERS_OFFLINE=0
+{% endif %}
 
     cd {{ repo_dir }}
 
