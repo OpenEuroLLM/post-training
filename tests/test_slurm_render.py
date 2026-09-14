@@ -421,3 +421,18 @@ def test_llamafactory_container_custom_path(tmp_path, config):
     content = render_llamafactory_slurm_script(config, run_dir).read_text()
 
     assert 'export PATH=\\"/opt/conda/bin:/usr/local/bin:/usr/bin:/bin\\"' in content
+
+
+# ---------------------------------------------------------------------------
+# CUDA_DEVICE_MAX_CONNECTIONS — LlamaFactory template
+# ---------------------------------------------------------------------------
+
+
+def test_llamafactory_cuda_device_max_connections_not_set(tmp_path, config):
+    """The LlamaFactory job does not serialize CUDA streams via CUDA_DEVICE_MAX_CONNECTIONS."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert "export CUDA_DEVICE_MAX_CONNECTIONS" not in content
