@@ -6,7 +6,9 @@ script under ``set -euo pipefail``. These tests execute the script instead.
 
 import os
 import shutil
+import signal
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -21,10 +23,25 @@ from post_training.slurm.launcher import (
 BASH = shutil.which("bash")
 pytestmark = pytest.mark.skipif(BASH is None, reason="bash is not available")
 
-# Stub bodies, keyed by command name. Each stub logs to $STUB_LOG_DIR/<name>.log.
+# Stub bodies, keyed by command name. The stubs record their calls in $STUB_LOG_DIR.
 _STUBS = {
-    "srun": 'echo "$@" >> "$STUB_LOG_DIR/srun.log"\nexit "${FAKE_SRUN_EXIT:-0}"\n',
-    "scontrol": 'case "$1" in\n    show) echo "$SLURM_JOB_NODELIST" ;;\nesac\n',
+    "srun": (
+        'echo "$@" >> "$STUB_LOG_DIR/srun.log"\n'
+        'if [ -n "${FAKE_SRUN_SLEEP:-}" ]; then\n'
+        '    touch "$STUB_LOG_DIR/srun.started"\n'
+        '    sleep "$FAKE_SRUN_SLEEP"\n'
+        "fi\n"
+        'exit "${FAKE_SRUN_EXIT:-0}"\n'
+    ),
+    "scontrol": (
+        'case "$1" in\n'
+        '    show) echo "$SLURM_JOB_NODELIST" ;;\n'
+        "    requeue)\n"
+        '        echo "$@" >> "$STUB_LOG_DIR/requeue.log"\n'
+        '        exit "${FAKE_REQUEUE_EXIT:-0}"\n'
+        "        ;;\n"
+        "esac\n"
+    ),
     "sbatch": 'echo "$@" >> "$STUB_LOG_DIR/sbatch.log"\n',
     "getent": 'echo "127.0.0.1 $2"\n',
 }
@@ -35,6 +52,8 @@ _RENDERERS = {
     ),
     "llamafactory": render_llamafactory_slurm_script,
 }
+
+_MAX_FAILURES = PostTrainingConfig().slurm.max_failures
 
 
 @pytest.fixture(params=sorted(_RENDERERS))
@@ -85,6 +104,36 @@ def _run_job(script: Path, env: dict[str, str]) -> subprocess.CompletedProcess:
     return subprocess.run([BASH, str(script)], env=env, capture_output=True, text=True, timeout=30)
 
 
+def _run_job_with_sigusr1(
+    script: Path, env: dict[str, str], log_dir: Path, tmp_path: Path
+) -> tuple[int, str]:
+    """Run the job, send SIGUSR1 to the batch shell while srun runs, return (exit code, stderr).
+
+    Output goes to files, not pipes: the sleeping srun stub outlives the batch
+    shell and would hold a pipe open. The stub is killed with its process group.
+    """
+    env = {**env, "FAKE_SRUN_SLEEP": "5"}
+    stderr_path = tmp_path / "job.err"
+    with (tmp_path / "job.out").open("w") as stdout, stderr_path.open("w") as stderr:
+        proc = subprocess.Popen(
+            [BASH, str(script)], env=env, stdout=stdout, stderr=stderr, start_new_session=True
+        )
+        try:
+            deadline = time.monotonic() + 10
+            while not (log_dir / "srun.started").exists():
+                assert time.monotonic() < deadline, "the srun stub did not start"
+                time.sleep(0.05)
+            proc.send_signal(signal.SIGUSR1)
+            returncode = proc.wait(timeout=30)
+        finally:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            proc.wait()
+    return returncode, stderr_path.read_text()
+
+
 # ---------------------------------------------------------------------------
 # HF cache variables
 # ---------------------------------------------------------------------------
@@ -112,3 +161,53 @@ def test_hf_datasets_cache_is_optional(job_script, job_env, log_dir):
 
     assert result.returncode == 0, result.stderr
     assert "HF_DATASETS_CACHE=/hf/datasets" in (log_dir / "srun.log").read_text()
+
+
+# ---------------------------------------------------------------------------
+# Failure handling and requeue
+# ---------------------------------------------------------------------------
+
+
+def test_failed_srun_is_counted_and_resubmitted(job_script, job_env, log_dir):
+    """A failed srun increments failure_count, resubmits the script and keeps the exit code."""
+    job_env["FAKE_SRUN_EXIT"] = "3"
+
+    result = _run_job(job_script, job_env)
+
+    assert result.returncode == 3, result.stderr
+    assert (job_script.parent / "failure_count").read_text().strip() == "1"
+    assert (log_dir / "sbatch.log").read_text().strip() == str(job_script)
+
+
+def test_failed_srun_at_max_failures_stops(job_script, job_env, log_dir):
+    """The failure that reaches max_failures stops the job instead of resubmitting."""
+    (job_script.parent / "failure_count").write_text(f"{_MAX_FAILURES - 1}\n")
+    job_env["FAKE_SRUN_EXIT"] = "3"
+
+    result = _run_job(job_script, job_env)
+
+    assert result.returncode == 1, result.stderr
+    assert (job_script.parent / "failure_count").read_text().strip() == str(_MAX_FAILURES)
+    assert not (log_dir / "sbatch.log").exists()
+
+
+def test_sigusr1_requeues_without_resubmit(job_script, job_env, log_dir, tmp_path):
+    """SIGUSR1 requeues the job, and the failure handler does not also resubmit it."""
+    returncode, stderr = _run_job_with_sigusr1(job_script, job_env, log_dir, tmp_path)
+
+    assert returncode == 0, stderr
+    assert (log_dir / "requeue.log").read_text().strip() == "requeue 12345"
+    assert not (log_dir / "sbatch.log").exists()
+    assert (job_script.parent / "failure_count").read_text().strip() == "0"
+
+
+def test_sigusr1_with_failed_requeue_exits(job_script, job_env, log_dir, tmp_path):
+    """If scontrol requeue fails, the job exits at once with an error and does not resubmit."""
+    job_env["FAKE_REQUEUE_EXIT"] = "1"
+
+    returncode, stderr = _run_job_with_sigusr1(job_script, job_env, log_dir, tmp_path)
+
+    assert returncode != 0
+    assert "scontrol requeue failed" in stderr
+    assert not (log_dir / "sbatch.log").exists()
+    assert (job_script.parent / "failure_count").read_text().strip() == "0"

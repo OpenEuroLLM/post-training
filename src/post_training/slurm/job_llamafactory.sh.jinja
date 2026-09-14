@@ -86,9 +86,14 @@ if [ ! -f "$FAILURE_COUNT_FILE" ]; then
     echo 0 > "$FAILURE_COUNT_FILE"
 fi
 
+REQUEUED=0
 handle_signal() {
     echo "[$(date)] Received SIGUSR1 — timeout approaching. Requeuing..."
-    scontrol requeue $SLURM_JOB_ID
+    if ! scontrol requeue "$SLURM_JOB_ID"; then
+        echo "[$(date)] scontrol requeue failed. Exiting." >&2
+        exit 1
+    fi
+    REQUEUED=1
 }
 trap handle_signal USR1
 
@@ -133,8 +138,15 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     llamafactory-cli train {{ llamafactory_config }}
   " &
 
-wait $!
-EXIT_CODE=$?
+# Capture the srun exit code without letting set -e exit before the failure handler.
+EXIT_CODE=0
+wait $! || EXIT_CODE=$?
+
+# A requeued job restarts on its own; a resubmit as well would start a second job.
+if [ "$REQUEUED" -eq 1 ]; then
+    echo "[$(date)] Job requeued. Skipping the failure handler."
+    exit 0
+fi
 
 # Handle failure / resubmit
 if [ $EXIT_CODE -ne 0 ]; then
@@ -144,6 +156,8 @@ if [ $EXIT_CODE -ne 0 ]; then
     if [ $FAILURES -lt $MAX_FAILURES ]; then
         echo "[$(date)] Failure $FAILURES/$MAX_FAILURES. Resubmitting..."
         sbatch "$0"
+        # Report this failure to SLURM even though a new job was submitted.
+        exit $EXIT_CODE
     else
         echo "[$(date)] Max failures reached ($MAX_FAILURES). Stopping."
         exit 1
