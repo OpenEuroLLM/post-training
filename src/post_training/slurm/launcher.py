@@ -24,6 +24,10 @@ _TEMPLATE_NAME = "job.sh.jinja"
 _LLAMAFACTORY_TEMPLATE_NAME = "job_llamafactory.sh.jinja"
 _TRL_CONTAINER_TEMPLATE_NAME = "job_trl_container.sh.jinja"
 
+# HF cache variables that the container job scripts forward into the container.
+# scripts/submit.py checks them at submission, and the job script checks them again at start.
+REQUIRED_HF_CACHE_VARS = ("HF_HOME", "HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE")
+
 
 def render_trl_slurm_script(
     config: PostTrainingConfig,
@@ -144,6 +148,7 @@ def render_trl_container_slurm_script(
         container_image=config.container.image,
         bind_mounts=config.container.bind_mounts,
         env_file=config.container.env_file,
+        required_hf_vars=REQUIRED_HF_CACHE_VARS,
         container_path=config.container.path,
     )
 
@@ -190,6 +195,7 @@ def render_llamafactory_slurm_script(
         container_image=config.container.image,
         bind_mounts=config.container.bind_mounts,
         env_file=config.container.env_file,
+        required_hf_vars=REQUIRED_HF_CACHE_VARS,
         container_path=config.container.path,
         # LlamaFactory
         llamafactory_config=str(run_dir / "llamafactory_config.yaml"),

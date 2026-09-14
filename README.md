@@ -177,6 +177,8 @@ container:
   env_file: env/cluster.env  # required when image is set; sourced before launch
 ```
 
+The env file must export `HF_HOME`, `HF_HUB_CACHE`, and `HUGGINGFACE_HUB_CACHE`. `scripts/submit.py` refuses to submit if any of them is unset, and the job checks again before launching the container.
+
 Both the LlamaFactory and containerized TRL backends use this mechanism. Building containers for different HPCs is a work in progress, so if your cluster specific container is not available yet, please use the `uv` environment instead (or raise a pull request with a recipe for your cluster-specific container!). For TRL, use the `uv` environment by setting `container: null` or `container.image: null`; LlamaFactory requires a container image.
 
 ## 🧩 Feature Guide

@@ -33,6 +33,18 @@ set -euo pipefail
 # ── Source cluster environment ────────────────────────────────────────────
 {% if env_file %}source "{{ env_file }}"{% endif %}
 
+# ── Check the HF cache variables ──────────────────────────────────────────
+MISSING_HF_VARS=""
+for var in {{ required_hf_vars | join(" ") }}; do
+    if [ -z "${!var:-}" ]; then
+        MISSING_HF_VARS="$MISSING_HF_VARS $var"
+    fi
+done
+if [ -n "$MISSING_HF_VARS" ]; then
+    echo "ERROR:$MISSING_HF_VARS not set. Export them in container.env_file." >&2
+    exit 1
+fi
+
 # ── Distributed setup ─────────────────────────────────────────────────────
 MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 MASTER_ADDR=$(getent hosts "$MASTER_ADDR" | awk '{print $1}')

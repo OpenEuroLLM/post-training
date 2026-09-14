@@ -23,7 +23,7 @@ if str(_PROJECT_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 
 from post_training.config import PostTrainingConfig
-from post_training.slurm.launcher import generate_and_submit
+from post_training.slurm.launcher import REQUIRED_HF_CACHE_VARS, generate_and_submit
 from post_training.utils.guardrails import run_guardrails
 from post_training.utils.logging import setup_logging
 from post_training.utils.paths import setup_run_directory
@@ -75,6 +75,23 @@ def _apply_hf_env_from_file(env_file: str) -> None:
         logger.info("Applied HF cache vars from %s: %s", env_file, ", ".join(applied))
 
 
+def _check_required_hf_vars(config: PostTrainingConfig) -> None:
+    """Refuse a container job that would stop at start for a missing HF cache variable.
+
+    Call after _apply_hf_env_from_file(): os.environ then holds the submitting
+    shell's values, which sbatch passes to the job, plus the env file's exports.
+    The job script checks again at start, for differences on the compute node.
+    """
+    if config.container is None or not config.container.image:
+        return
+    missing = [var for var in REQUIRED_HF_CACHE_VARS if not os.environ.get(var)]
+    if missing:
+        raise ValueError(
+            f"{', '.join(missing)} not set. Export them in container.env_file "
+            f"({config.container.env_file}) as 'export NAME=value' lines."
+        )
+
+
 def _parse_args() -> tuple[str, list[str], bool]:
     parser = argparse.ArgumentParser(description="Submit a SLURM training job.")
     parser.add_argument(
@@ -115,6 +132,8 @@ def main() -> None:
 
     if config.container is not None and config.container.env_file:
         _apply_hf_env_from_file(config.container.env_file)
+
+    _check_required_hf_vars(config)
 
     prefetched = None
     if config.offline or config.prefetch_assets:
