@@ -297,6 +297,8 @@ class LlamaFactoryBackend(Backend):
             raise ValueError("llamafactory must be set when backend='llamafactory'.")
         if config.container is None or not config.container.image:
             raise ValueError("container.image must be set when backend='llamafactory'.")
+        if not config.llamafactory.get("model_name_or_path"):
+            raise ValueError("llamafactory.model_name_or_path must be set.")
 
         # post_freeze() owns these two settings, so a requeued or resubmitted job resumes.
         lf = config.llamafactory

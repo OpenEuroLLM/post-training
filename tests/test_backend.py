@@ -145,12 +145,25 @@ def _llamafactory_config(**block) -> PostTrainingConfig:
         bind_mounts=["/scratch:/scratch"],
         env_file="/shared/env/cluster.env",
     )
-    cfg.llamafactory = {"stage": "sft", "do_train": True, **block}
+    cfg.llamafactory = {
+        "model_name_or_path": "org/model",
+        "stage": "sft",
+        "do_train": True,
+        **block,
+    }
     return cfg
 
 
 def _frozen_llamafactory_config(run_dir) -> dict:
     return yaml.safe_load((run_dir / "llamafactory_config.yaml").read_text())
+
+
+def test_llamafactory_validate_requires_model_name_or_path():
+    cfg = _llamafactory_config()
+    del cfg.llamafactory["model_name_or_path"]
+
+    with pytest.raises(ValueError, match="llamafactory.model_name_or_path"):
+        LlamaFactoryBackend().validate(cfg)
 
 
 def test_llamafactory_validate_rejects_output_dir():
