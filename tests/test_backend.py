@@ -1,5 +1,6 @@
 """Tests for the submission-time behavior of TRLBackend and LlamaFactoryBackend."""
 
+import json
 import logging
 from pathlib import Path
 
@@ -179,8 +180,9 @@ def test_llamafactory_run_dir_has_checkpoints_subdir():
     assert LlamaFactoryBackend().run_dir_subdirs() == ["checkpoints"]
 
 
-def test_llamafactory_post_freeze_writes_resumable_output_dir(tmp_path):
+def test_llamafactory_post_freeze_writes_resumable_output_dir(tmp_path, monkeypatch):
     """Checkpoints go to <run_dir>/checkpoints with resume enabled; config.yaml keeps the user block."""
+    monkeypatch.chdir(tmp_path)
     cfg = _llamafactory_config(learning_rate=1e-5)
     run_dir = tmp_path / "outputs" / "my-run"
     run_dir.mkdir(parents=True)
@@ -193,3 +195,213 @@ def test_llamafactory_post_freeze_writes_resumable_output_dir(tmp_path):
     assert frozen["learning_rate"] == 1e-5
     assert "output_dir" not in cfg.llamafactory
     assert "overwrite_output_dir" not in cfg.llamafactory
+
+
+# ---------------------------------------------------------------------------
+# LlamaFactoryBackend — frozen DeepSpeed and dataset configs, input paths
+# ---------------------------------------------------------------------------
+
+_DATASET_INFO = {
+    "local_file": {"file_name": "sft.jsonl", "formatting": "sharegpt"},
+    "absolute_file": {"file_name": "/datasets/abs.jsonl"},
+    "local_script": {"script_url": "my_script"},
+    "hub": {"hf_hub_url": "org/dataset"},
+}
+
+
+def _make_llamafactory_repo(repo_dir: Path) -> None:
+    """A submission directory with a DeepSpeed JSON and a LlamaFactory dataset registry."""
+    (repo_dir / "configs" / "deepspeed").mkdir(parents=True)
+    (repo_dir / "configs" / "deepspeed" / "zero3.json").write_text(
+        '{"zero_optimization": {"stage": 3}}'
+    )
+    (repo_dir / "data" / "llamafactory").mkdir(parents=True)
+    (repo_dir / "data" / "llamafactory" / "dataset_info.json").write_text(json.dumps(_DATASET_INFO))
+
+
+def test_llamafactory_validate_rejects_missing_deepspeed_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(ValueError, match="llamafactory.deepspeed"):
+        LlamaFactoryBackend().validate(_llamafactory_config(deepspeed="configs/ds/missing.json"))
+
+
+def test_llamafactory_validate_accepts_inline_deepspeed_dict(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    LlamaFactoryBackend().validate(
+        _llamafactory_config(deepspeed={"zero_optimization": {"stage": 2}})
+    )
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        {"dataset": "long_sft", "dataset_dir": "data/llamafactory"},
+        {"dataset": "long_sft"},  # LlamaFactory's default dataset_dir is "data"
+        {"eval_dataset": "long_sft_eval"},
+    ],
+)
+def test_llamafactory_validate_rejects_missing_dataset_info(tmp_path, monkeypatch, block):
+    """A named dataset needs <dataset_dir>/dataset_info.json, or the job stops at start."""
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(ValueError, match="dataset_info.json"):
+        LlamaFactoryBackend().validate(_llamafactory_config(**block))
+
+
+@pytest.mark.parametrize("dataset_dir", ["ONLINE", "REMOTE:org/registry"])
+def test_llamafactory_validate_skips_registry_check_for_hub_registries(
+    tmp_path, monkeypatch, dataset_dir
+):
+    monkeypatch.chdir(tmp_path)
+
+    LlamaFactoryBackend().validate(
+        _llamafactory_config(dataset="org/dataset", dataset_dir=dataset_dir)
+    )
+
+
+def test_llamafactory_post_freeze_copies_deepspeed_json(tmp_path, monkeypatch):
+    repo_dir = tmp_path / "repo"
+    _make_llamafactory_repo(repo_dir)
+    monkeypatch.chdir(repo_dir)
+    cfg = _llamafactory_config(deepspeed="configs/deepspeed/zero3.json")
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    LlamaFactoryBackend().post_freeze(cfg, run_dir)
+
+    copy_path = run_dir.resolve() / "llamafactory" / "zero3.json"
+    assert _frozen_llamafactory_config(run_dir)["deepspeed"] == str(copy_path)
+    assert copy_path.read_text() == (repo_dir / "configs" / "deepspeed" / "zero3.json").read_text()
+    assert cfg.llamafactory["deepspeed"] == "configs/deepspeed/zero3.json"
+
+
+def test_llamafactory_post_freeze_keeps_inline_deepspeed_dict(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    inline = {"zero_optimization": {"stage": 2}}
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    LlamaFactoryBackend().post_freeze(_llamafactory_config(deepspeed=inline), run_dir)
+
+    assert _frozen_llamafactory_config(run_dir)["deepspeed"] == inline
+
+
+def test_llamafactory_post_freeze_freezes_dataset_registry(tmp_path, monkeypatch):
+    """Relative local entries point back at the source; the job reads the frozen registry."""
+    repo_dir = tmp_path / "repo"
+    _make_llamafactory_repo(repo_dir)
+    monkeypatch.chdir(repo_dir)
+    cfg = _llamafactory_config(dataset="local_file", dataset_dir="data/llamafactory")
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    LlamaFactoryBackend().post_freeze(cfg, run_dir)
+
+    source_dir = (repo_dir / "data" / "llamafactory").resolve()
+    frozen_dir = run_dir.resolve() / "llamafactory"
+    frozen = _frozen_llamafactory_config(run_dir)
+    assert frozen["dataset_dir"] == str(frozen_dir)
+    assert frozen["media_dir"] == str(source_dir)
+    registry = json.loads((frozen_dir / "dataset_info.json").read_text())
+    assert registry["local_file"] == {
+        "file_name": str(source_dir / "sft.jsonl"),
+        "formatting": "sharegpt",
+    }
+    assert registry["absolute_file"] == _DATASET_INFO["absolute_file"]
+    assert registry["local_script"] == {"script_url": str(source_dir / "my_script")}
+    assert registry["hub"] == _DATASET_INFO["hub"]
+    assert cfg.llamafactory["dataset_dir"] == "data/llamafactory"
+
+
+def test_llamafactory_post_freeze_online_registry_is_not_copied(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    LlamaFactoryBackend().post_freeze(
+        _llamafactory_config(dataset="org/dataset", dataset_dir="ONLINE"), run_dir
+    )
+
+    frozen = _frozen_llamafactory_config(run_dir)
+    assert frozen["dataset_dir"] == "ONLINE"
+    assert "media_dir" not in frozen
+    assert not (run_dir / "llamafactory" / "dataset_info.json").exists()
+
+
+def test_llamafactory_post_freeze_makes_existing_input_paths_absolute(tmp_path, monkeypatch):
+    """Existing relative input paths survive the job's cd; hub IDs, new paths and outputs do not change."""
+    repo_dir = tmp_path / "repo"
+    for local in ("models/local-model", "adapters/a", "adapters/b", "media", "exports"):
+        (repo_dir / local).mkdir(parents=True)
+    monkeypatch.chdir(repo_dir)
+    cfg = _llamafactory_config(
+        model_name_or_path="models/local-model",
+        adapter_name_or_path="adapters/a,adapters/b",
+        media_dir="media",
+        ref_model="org/ref-model",
+        tokenized_path="data/tokenized",
+        export_dir="exports",
+        dataset_dir="ONLINE",
+    )
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    LlamaFactoryBackend().post_freeze(cfg, run_dir)
+
+    root = repo_dir.resolve()
+    frozen = _frozen_llamafactory_config(run_dir)
+    assert frozen["model_name_or_path"] == str(root / "models" / "local-model")
+    assert frozen["adapter_name_or_path"] == f"{root / 'adapters' / 'a'},{root / 'adapters' / 'b'}"
+    assert frozen["media_dir"] == str(root / "media")
+    assert frozen["ref_model"] == "org/ref-model"
+    assert frozen["tokenized_path"] == "data/tokenized"
+    assert frozen["export_dir"] == "exports"
+
+
+def test_llamafactory_post_freeze_keeps_existing_copies(tmp_path, monkeypatch, caplog):
+    """A new submit into the same run directory keeps the copies its checkpoints were made with."""
+    repo_dir = tmp_path / "repo"
+    _make_llamafactory_repo(repo_dir)
+    monkeypatch.chdir(repo_dir)
+    cfg = _llamafactory_config(
+        deepspeed="configs/deepspeed/zero3.json",
+        dataset="local_file",
+        dataset_dir="data/llamafactory",
+    )
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+    LlamaFactoryBackend().post_freeze(cfg, run_dir)
+    frozen_dir = run_dir / "llamafactory"
+    first_deepspeed = (frozen_dir / "zero3.json").read_text()
+    first_registry = (frozen_dir / "dataset_info.json").read_text()
+
+    (repo_dir / "configs" / "deepspeed" / "zero3.json").write_text(
+        '{"zero_optimization": {"stage": 2}}'
+    )
+    (repo_dir / "data" / "llamafactory" / "dataset_info.json").write_text("{}")
+    with caplog.at_level(logging.WARNING):
+        LlamaFactoryBackend().post_freeze(cfg, run_dir)
+
+    assert (frozen_dir / "zero3.json").read_text() == first_deepspeed
+    assert (frozen_dir / "dataset_info.json").read_text() == first_registry
+    assert "already exists" in caplog.text
+
+
+def test_llamafactory_post_freeze_recovers_from_interrupted_copy(tmp_path, monkeypatch):
+    """A leftover .tmp from a killed submission is replaced by a complete copy."""
+    repo_dir = tmp_path / "repo"
+    _make_llamafactory_repo(repo_dir)
+    monkeypatch.chdir(repo_dir)
+    run_dir = tmp_path / "outputs" / "my-run"
+    (run_dir / "llamafactory").mkdir(parents=True)
+    (run_dir / "llamafactory" / "zero3.json.tmp").write_text('{"zero_opt')
+
+    LlamaFactoryBackend().post_freeze(
+        _llamafactory_config(deepspeed="configs/deepspeed/zero3.json"), run_dir
+    )
+
+    copy_path = run_dir / "llamafactory" / "zero3.json"
+    assert copy_path.read_text() == (repo_dir / "configs" / "deepspeed" / "zero3.json").read_text()
+    assert not (run_dir / "llamafactory" / "zero3.json.tmp").exists()
