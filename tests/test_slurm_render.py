@@ -1,5 +1,7 @@
 """Automated tests for SLURM template rendering."""
 
+from pathlib import Path
+
 import pytest
 
 from post_training.backend import LlamaFactoryBackend, TRLBackend
@@ -516,3 +518,34 @@ def test_llamafactory_offline_disabled(tmp_path, config):
     assert "export TRANSFORMERS_OFFLINE=0" in content
     assert "OFFLINE=1" not in content
     assert "WANDB_MODE" not in content
+
+
+# ---------------------------------------------------------------------------
+# working directory and PYTHONPATH — LlamaFactory template
+# ---------------------------------------------------------------------------
+
+
+def test_llamafactory_runs_in_run_directory(tmp_path, config, monkeypatch):
+    """The job runs in the run directory, not in the directory that submit.py ran from."""
+    submit_dir = tmp_path / "repo"
+    submit_dir.mkdir()
+    monkeypatch.chdir(submit_dir)
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert f'cd \\"{run_dir.resolve()}\\"' in content
+    assert f"cd {Path.cwd()}" not in content
+    assert f"llamafactory-cli train {run_dir.resolve() / 'llamafactory_config.yaml'}" in content
+
+
+def test_llamafactory_unsets_pythonpath(tmp_path, config):
+    """LlamaFactory does not import post_training, so no PYTHONPATH reaches the container."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert "unset PYTHONPATH" in content
+    assert "PYTHONPATH=" not in content

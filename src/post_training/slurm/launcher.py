@@ -201,8 +201,7 @@ def render_llamafactory_slurm_script(
         required_hf_vars=REQUIRED_HF_CACHE_VARS,
         container_path=config.container.path,
         # LlamaFactory
-        llamafactory_config=str(run_dir / "llamafactory_config.yaml"),
-        repo_dir=str(Path.cwd()),
+        llamafactory_config=str(run_dir.resolve() / "llamafactory_config.yaml"),
     )
 
     slurm_dir = run_dir / "slurm"

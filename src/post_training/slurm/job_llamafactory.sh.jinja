@@ -107,7 +107,7 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
 
     # Prevent host Python/PATH from interfering with container
     export PATH=\"{{ container_path }}\"
-    export PYTHONPATH=\"{{ repo_dir }}/src\"
+    unset PYTHONPATH
     export PYTHONNOUSERSITE=1
 
     export NODE_RANK=\"\$SLURM_NODEID\"
@@ -133,7 +133,7 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     export TRANSFORMERS_OFFLINE=0
 {% endif %}
 
-    cd {{ repo_dir }}
+    cd \"{{ run_dir }}\"
 
     llamafactory-cli train {{ llamafactory_config }}
   " &
