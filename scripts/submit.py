@@ -163,7 +163,9 @@ def main() -> None:
     # the original repo id) are done. train.py then loads a local directory
     # path, so from_pretrained skips HF Hub's cache-resolution/filelock path
     # entirely — avoiding contention when every rank loads it at once.
-    if prefetched is not None:
+    # LlamaFactory gets its snapshot paths in post_freeze() instead, so
+    # config.yaml keeps the user's llamafactory block and TRL defaults.
+    if prefetched is not None and config.backend == "trl":
         config.model.name_or_path = prefetched.model
         config.model.tokenizer_name_or_path = prefetched.tokenizer
         if prefetched.ref_model is not None:
@@ -176,7 +178,7 @@ def main() -> None:
     # Copy any backend-specific artifacts for reproducibility.
     from post_training.backend import get_backend
 
-    get_backend(config.backend).post_freeze(config, run_dir)
+    get_backend(config.backend).post_freeze(config, run_dir, prefetched)
 
     job_id = generate_and_submit(
         config, run_dir, str(frozen.resolve()), tokenize_only=tokenize_only

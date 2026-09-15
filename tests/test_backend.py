@@ -418,3 +418,45 @@ def test_llamafactory_post_freeze_recovers_from_interrupted_copy(tmp_path, monke
     copy_path = run_dir / "llamafactory" / "zero3.json"
     assert copy_path.read_text() == (repo_dir / "configs" / "deepspeed" / "zero3.json").read_text()
     assert not (run_dir / "llamafactory" / "zero3.json.tmp").exists()
+
+
+# ---------------------------------------------------------------------------
+# Prefetched snapshots
+# ---------------------------------------------------------------------------
+
+
+def test_trl_post_freeze_accepts_prefetched_paths(tmp_path):
+    """TRL substitutes snapshots into config.yaml in submit.py, so post_freeze ignores them."""
+    from post_training.utils.prefetch import PrefetchedPaths
+
+    cfg = PostTrainingConfig()
+    cfg.container = None
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    TRLBackend().post_freeze(cfg, run_dir, PrefetchedPaths(model="/m", tokenizer="/m"))
+
+    assert not (run_dir / "src").exists()
+
+
+def test_llamafactory_post_freeze_writes_prefetched_snapshots(tmp_path, monkeypatch):
+    """The job loads the prefetched snapshot directories; config.yaml keeps the Hub IDs."""
+    from post_training.utils.prefetch import PrefetchedPaths
+
+    monkeypatch.chdir(tmp_path)
+    cfg = _llamafactory_config(model_name_or_path="org/model", ref_model="org/ref")
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+    prefetched = PrefetchedPaths(
+        model="/cache/org/model@main",
+        tokenizer="/cache/org/model@main",
+        ref_model="/cache/org/ref@main",
+    )
+
+    LlamaFactoryBackend().post_freeze(cfg, run_dir, prefetched)
+
+    frozen = _frozen_llamafactory_config(run_dir)
+    assert frozen["model_name_or_path"] == "/cache/org/model@main"
+    assert frozen["ref_model"] == "/cache/org/ref@main"
+    assert cfg.llamafactory["model_name_or_path"] == "org/model"
+    assert cfg.llamafactory["ref_model"] == "org/ref"

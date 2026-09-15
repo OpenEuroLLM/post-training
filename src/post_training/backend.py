@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from post_training.config import PostTrainingConfig
+    from post_training.utils.prefetch import PrefetchedPaths
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +54,17 @@ class Backend(ABC):
         """Render the SLURM batch script and return its path."""
 
     @abstractmethod
-    def post_freeze(self, config: PostTrainingConfig, run_dir: Path) -> None:
-        """Copy any extra artifacts into the run directory after config freeze."""
+    def post_freeze(
+        self,
+        config: PostTrainingConfig,
+        run_dir: Path,
+        prefetched: PrefetchedPaths | None = None,
+    ) -> None:
+        """Copy any extra artifacts into the run directory after config freeze.
+
+        *prefetched* holds the local snapshot directories from the login-node
+        prefetch, or None when the prefetch did not run.
+        """
 
 
 # ---------------------------------------------------------------------------
@@ -193,8 +203,11 @@ class TRLBackend(Backend):
             config, run_dir, frozen_config_path, tokenize_only=tokenize_only
         )
 
-    def post_freeze(self, config, run_dir):
+    def post_freeze(self, config, run_dir, prefetched=None):
         """Freeze src/post_training and scripts/ into run_dir for containerized runs.
+
+        *prefetched* is not used: submit.py writes the TRL snapshot paths into
+        config.yaml itself.
 
         Done here (at submission time) rather than inside the SLURM job script,
         so a job that sits queued isn't affected by later repo changes. Each
@@ -343,7 +356,7 @@ class LlamaFactoryBackend(Backend):
 
         return render_llamafactory_slurm_script(config, run_dir)
 
-    def post_freeze(self, config, run_dir):
+    def post_freeze(self, config, run_dir, prefetched=None):
         """Freeze the job's inputs into run_dir and write llamafactory_config.yaml.
 
         The DeepSpeed JSON and dataset_info.json are copied into run_dir/llamafactory/,
@@ -354,6 +367,12 @@ class LlamaFactoryBackend(Backend):
         run_dir = run_dir.resolve()
         frozen_dir = run_dir / "llamafactory"
         lf_config = copy.deepcopy(config.llamafactory)
+
+        # Every rank then loads a plain local directory, not a Hub ID through the cache locks.
+        if prefetched is not None:
+            lf_config["model_name_or_path"] = prefetched.model
+            if prefetched.ref_model is not None:
+                lf_config["ref_model"] = prefetched.ref_model
 
         for key in _LLAMAFACTORY_INPUT_PATH_KEYS:
             if isinstance(lf_config.get(key), str):
