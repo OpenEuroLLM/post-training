@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -232,11 +233,24 @@ class LlamaFactoryBackend(Backend):
         if config.container is None or not config.container.image:
             raise ValueError("container.image must be set when backend='llamafactory'.")
 
+        # post_freeze() owns these two settings, so a requeued or resubmitted job resumes.
+        lf = config.llamafactory
+        if "output_dir" in lf:
+            raise ValueError(
+                "llamafactory.output_dir must not be set: the submission writes checkpoints to "
+                "<run_dir>/checkpoints so that a requeued job resumes. Remove it."
+            )
+        if lf.get("overwrite_output_dir"):
+            raise ValueError(
+                "llamafactory.overwrite_output_dir: true stops a requeued job from resuming "
+                "from its checkpoints. Remove it."
+            )
+
     def generate_run_name(self, config: PostTrainingConfig, timestamp: str) -> str:
         return f"llamafactory-{config.method}-{timestamp}"
 
     def run_dir_subdirs(self) -> list[str]:
-        return []
+        return ["checkpoints"]
 
     def render_slurm_script(self, config, run_dir, frozen_config_path, *, tokenize_only=False):
         # LlamaFactory has no --tokenize-only equivalent; submit.py rejects it before this point.
@@ -246,9 +260,20 @@ class LlamaFactoryBackend(Backend):
         return render_llamafactory_slurm_script(config, run_dir)
 
     def post_freeze(self, config, run_dir):
+        """Write llamafactory_config.yaml, the file llamafactory-cli reads.
+
+        Only this file carries the submission-owned values; config.yaml keeps the
+        user's block, so a new submit from it passes validation again.
+        """
+        lf_config = copy.deepcopy(config.llamafactory)
+        # LlamaFactory resumes from the last checkpoint-N in output_dir only when
+        # overwrite_output_dir is false.
+        lf_config["output_dir"] = str(run_dir.resolve() / "checkpoints")
+        lf_config["overwrite_output_dir"] = False
+
         lf_config_path = run_dir / "llamafactory_config.yaml"
         with open(lf_config_path, "w") as f:
-            yaml.dump(config.llamafactory, f, default_flow_style=False)
+            yaml.dump(lf_config, f, default_flow_style=False)
 
 
 # ---------------------------------------------------------------------------

@@ -59,10 +59,8 @@ llamafactory:
   group_by_length: true
 
   # output
-  output_dir: output/long-context
   logging_steps: 5
   plot_loss: true
-  overwrite_output_dir: true
   save_only_model: false
   report_to: none
 
