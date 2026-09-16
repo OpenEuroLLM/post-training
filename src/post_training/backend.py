@@ -66,12 +66,33 @@ class Backend(ABC):
         prefetch, or None when the prefetch did not run.
         """
 
+    def check_explicit_keys(self, explicit: dict) -> None:
+        """Check the keys that the YAML file and the CLI overrides set.
+
+        *explicit* holds only those keys, before the schema defaults fill in.
+        The default accepts every key.
+        """
+
 
 # ---------------------------------------------------------------------------
 # TRL
 # ---------------------------------------------------------------------------
 
 _SUPPORTED_METHODS = ("sft", "dpo")
+
+# Config sections that only the TRL backend reads. A LlamaFactory run takes all
+# training settings from its llamafactory block, so it rejects these.
+TRL_SECTIONS = (
+    "model",
+    "training",
+    "checkpointing",
+    "data",
+    "sft",
+    "dpo",
+    "deepspeed",
+    "accelerate",
+    "logging",
+)
 
 
 def _shorten_model_name(name_or_path: str) -> str:
@@ -357,6 +378,23 @@ class LlamaFactoryBackend(Backend):
                     "llamafactory.dataset_dir. Relative paths start at the directory where "
                     "submit.py runs."
                 )
+
+    def check_explicit_keys(self, explicit: dict) -> None:
+        """Reject TRL sections, including null values and CLI overrides."""
+        trl_keys: list[str] = []
+        for section in TRL_SECTIONS:
+            if section not in explicit:
+                continue
+            value = explicit[section]
+            if isinstance(value, dict) and value:
+                trl_keys.extend(f"{section}.{key}" for key in value)
+            else:
+                trl_keys.append(section)
+        if trl_keys:
+            raise ValueError(
+                "backend: llamafactory takes all training settings from the llamafactory "
+                f"block. Remove these TRL keys: {', '.join(trl_keys)}."
+            )
 
     def generate_run_name(self, config: PostTrainingConfig, timestamp: str) -> str:
         """llamafactory-<stage>-<model>-<datasets joined with +>-<timestamp>.

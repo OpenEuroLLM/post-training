@@ -341,12 +341,20 @@ class PostTrainingConfig:
                 file_cfg = OmegaConf.create(file_dict)
 
         merged: DictConfig = OmegaConf.merge(schema, file_cfg)
+        explicit_cfg = file_cfg
 
         if cli_overrides:
             cli_cfg = OmegaConf.from_dotlist(cli_overrides)
             merged = OmegaConf.merge(merged, cli_cfg)
+            explicit_cfg = OmegaConf.merge(file_cfg, cli_cfg)
 
         config: PostTrainingConfig = OmegaConf.to_object(merged)  # type: ignore[assignment]
+
+        from post_training.backend import get_backend
+
+        # The keys the user wrote, in the file or on the CLI, before defaults fill in.
+        explicit = OmegaConf.to_container(explicit_cfg, resolve=False)
+        get_backend(config.backend).check_explicit_keys(explicit)
         config._validate()
         return config
 
@@ -354,8 +362,21 @@ class PostTrainingConfig:
     # Saving
     # ------------------------------------------------------------------
     def save(self, yaml_path: str | Path) -> None:
-        """Save the configuration to a YAML file."""
-        OmegaConf.save(self, yaml_path)
+        """Save the configuration to a YAML file.
+
+        A LlamaFactory config is saved without the TRL sections: they have no effect
+        on it, and load() rejects them.
+        """
+        if self.backend != "llamafactory":
+            OmegaConf.save(self, yaml_path)
+            return
+
+        from post_training.backend import TRL_SECTIONS
+
+        frozen = OmegaConf.to_container(OmegaConf.structured(self))
+        for section in TRL_SECTIONS:
+            frozen.pop(section, None)
+        OmegaConf.save(OmegaConf.create(frozen), yaml_path)
 
     # ------------------------------------------------------------------
     # Validation & derived values

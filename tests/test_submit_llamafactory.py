@@ -10,7 +10,6 @@ import pytest
 import yaml
 
 import post_training.utils.prefetch as prefetch_module
-from post_training.config import PostTrainingConfig
 from post_training.slurm.launcher import REQUIRED_HF_CACHE_VARS
 
 # scripts/ is not a Python package, so load submit.py from its path.
@@ -83,11 +82,22 @@ def test_llamafactory_job_loads_the_prefetched_snapshot(submitted):
     assert len(submitted_scripts) == 1
 
 
-def test_llamafactory_config_yaml_keeps_the_hub_id_and_trl_fields(submitted):
-    """config.yaml keeps the user's llamafactory block, and the unused TRL model fields stay at their defaults."""
+def test_llamafactory_config_yaml_keeps_the_hub_id_without_trl_sections(submitted):
+    """config.yaml keeps the user's llamafactory block and holds no TRL section."""
     run_dir, _ = submitted
 
     frozen = yaml.safe_load((run_dir / "config.yaml").read_text())
     assert frozen["llamafactory"]["model_name_or_path"] == "org/lf-model"
-    assert frozen["model"]["name_or_path"] == PostTrainingConfig().model.name_or_path
-    assert frozen["model"]["tokenizer_name_or_path"] is None
+    trl_sections = {"model", "training", "checkpointing", "data", "sft", "dpo", "deepspeed"}
+    assert not set(frozen) & (trl_sections | {"accelerate", "logging"})
+
+
+def test_llamafactory_resubmit_from_frozen_config(submitted, monkeypatch):
+    """A new submit from the frozen config.yaml passes the TRL-section check."""
+    run_dir, submitted_scripts = submitted
+    frozen = str(run_dir / "config.yaml")
+    monkeypatch.setattr(sys, "argv", ["submit.py", "--config", frozen, "--confirm"])
+
+    _submit.main()
+
+    assert len(submitted_scripts) == 2

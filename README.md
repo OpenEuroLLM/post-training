@@ -409,8 +409,13 @@ python scripts/submit.py --config configs/llamafactory/long-context.yaml
 - DeepSpeed: `configs/deepspeed/z3_partial_offload.json`
 - Dataset registry: `data/llamafactory/dataset_info.json`
 
+### Configuration
+
+- Set every training setting in the `llamafactory` block, with LlamaFactory's own keys. The TRL sections (`model`, `training`, `checkpointing`, `data`, `sft`, `dpo`, `deepspeed`, `accelerate`, `logging`) stop the submission with an error, also when they are null or come from a CLI override.
+
 ### Run directory
 
+- The frozen `<run_dir>/config.yaml` holds only the `llamafactory` block and the submission keys, so you can submit again from it.
 - The run name is `llamafactory-<stage>-<model>-<datasets>-<timestamp>`, built from `llamafactory.stage` (default `sft`), `model_name_or_path`, and the names in `dataset` joined with `+`. Set `run_name` for a long dataset mix, because a directory name cannot exceed 255 bytes.
 - `scripts/submit.py` copies the DeepSpeed JSON and `dataset_info.json` into `<run_dir>/llamafactory/`, and the job runs in `<run_dir>`. Later edits in the repository do not change a queued or resumed run. A new submit with the same `run_name` keeps the existing copies.
 - Relative paths in the `llamafactory` block start at the directory where you run `submit.py`. Existing input paths (models, adapters, `media_dir`, ...) are made absolute; output paths such as `export_dir` stay relative to `<run_dir>`.
