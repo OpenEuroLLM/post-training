@@ -112,80 +112,17 @@ This guide fine-tunes a given checkpoint with SFT on a SLURM cluster, with train
 1. **[Tokenize the datasets](#step-1-tokenize-the-datasets)**: a `--tokenize-only` job on 1 GPU. It loads, filters, tokenizes, and packs the data, writes the result to the Hugging Face datasets cache, and exits.
 2. **[Train](#step-2-train)**: the full job. It finds the processed data in the cache, skips preprocessing, and trains.
 
-Tokenizing first keeps the multi-node allocation from sitting idle during CPU-bound preprocessing, and it surfaces data and chat-template problems in a small job. The examples use paths from LUMI; replace them with your cluster's.
+Tokenizing first keeps the multi-node allocation from sitting idle during CPU-bound preprocessing, and it surfaces data and chat-template problems in a small job.
+
+The example config is [`configs/trl/prelude-sft.yaml`](configs/trl/prelude-sft.yaml). It fine-tunes a 9B checkpoint on LUMI, with the tokenizer from a separate repo. For your own run, copy it and replace the checkpoint, data, container paths, and SLURM account.
 
 ### Before you start
 
-#### Install the submission environment
+The login node needs only the base dependencies from [Installation](#installation), because the training stack lives in the container. Run every `submit.py` command from the repository root, inside that environment. Relative paths in the config (`container.env_file`, `paths.output_base`) resolve against the root, and `submit.py` copies the code from it.
 
-The login node only prefetches assets and submits jobs; the training stack lives in the container. From the repository root, install the base dependencies:
+#### Configure the container
 
-```bash
-uv sync
-source .venv/bin/activate
-```
-
-Run every `submit.py` command from the repository root. Relative paths in the config (`container.env_file`, `paths.output_base`) resolve against it, and `submit.py` copies the code from it.
-
-#### Configure the container and the checkpoint
-
-Start from the reference config:
-
-```bash
-cp configs/trl/sft.yaml configs/trl/my-sft.yaml
-```
-
-Then set the run name, container, checkpoint, data, and SLURM fields. This example fine-tunes a 9B checkpoint on LUMI:
-
-```yaml
-run_name: oellm-9b-256k-theta64m-prelude-anneal300b-sft   # fixed, so both jobs share one run directory
-offline: false                                            # true if compute nodes have no internet
-
-container:
-  image: /scratch/project_465002530/containers/post-training-rocm7.2.4-py3.12-torch2.9.1-trl1.7.0-olmo-patched.sif
-  bind_mounts:
-    - /pfs/lustrep3/scratch/project_465002530/users/krishnak/post-training/   # the repository, with outputs/
-    - /scratch/project_465002530/users/krishnak
-  path: /opt/venv/bin:/opt/rocm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-  env_file: env/lumi.env
-
-model:
-  name_or_path: birgermoell/oellm-9b-256k-theta64m-prelude-anneal300b      # the checkpoint to fine-tune
-  attn_implementation: flash_attention_2
-  dtype: bfloat16
-  tokenizer_name_or_path: openeurollm/tokenizer-256k                      # tokenizer from a separate repo
-  tokenizer_revision: qwen3-tokens
-
-training:
-  max_steps: null                  # the reference config sets max_steps; keep exactly one duration field
-  num_train_epochs: 2
-
-sft:
-  max_seq_length: 32768
-  packing: true
-  dataset_num_proc: 32             # workers for tokenizing and packing (null = one process)
-
-data:
-  chat_template: qwen3             # must carry {% generation %} markers
-  num_proc: 32                     # workers for loading, transforms, and filtering
-  datasets:
-    - name: "dolci-instruct-sft"
-      path: "allenai/Dolci-Instruct-SFT"
-      split: "train"
-      weight: 1.0
-      transform: null
-
-slurm:
-  account: "project_465002530"
-  partition: "standard-g"
-  num_nodes: 4
-  gpus_per_node: 8
-  cpus_per_task: 56
-  mem: "256G"
-  wall_time: "36:00:00"            # keep the quotes
-```
-
-The container fields:
+The fields in `prelude-sft.yaml` that the container run depends on:
 
 - **`container.image`**: the job runs `accelerate launch scripts/train.py` in this image through `singularity exec`. The image must hold the Python packages from `pyproject.toml`, with a PyTorch build for the cluster's GPUs. The `post_training` code does not come from the image; see `run_name` below.
 - **`container.path`**: the job sets `PATH` inside the container to exactly this value, so it must contain the directory with `python` and `accelerate`. This image keeps them in `/opt/venv/bin`. The default is `/usr/local/bin:/usr/bin:/bin`.
@@ -213,7 +150,7 @@ export HF_DATASETS_CACHE=$HF_HOME/datasets
 ### Step 1: Tokenize the datasets
 
 ```bash
-python scripts/submit.py --config configs/trl/my-sft.yaml --tokenize-only
+python scripts/submit.py --config configs/trl/prelude-sft.yaml --tokenize-only
 ```
 
 On the login node, `submit.py`:
@@ -228,7 +165,7 @@ In the container, the job loads the tokenizer and chat template, then loads and 
 Preprocessing is CPU-bound. Keep `data.num_proc` and `sft.dataset_num_proc` at or below `slurm.cpus_per_task`, and give the job enough wall time. `slurm.*` overrides do not change the processed data, so Step 1 can use its own:
 
 ```bash
-python scripts/submit.py --config configs/trl/my-sft.yaml --tokenize-only 'slurm.wall_time="08:00:00"'
+python scripts/submit.py --config configs/trl/prelude-sft.yaml --tokenize-only 'slurm.wall_time="08:00:00"'
 ```
 
 > [!NOTE]
@@ -243,7 +180,7 @@ Before Step 2, read `<run_dir>/slurm/slurm-<id>.out`:
 ### Step 2: Train
 
 ```bash
-python scripts/submit.py --config configs/trl/my-sft.yaml
+python scripts/submit.py --config configs/trl/prelude-sft.yaml
 ```
 
 Use the same config and the same overrides as Step 1, except for `slurm.*`. `submit.py` renders `<run_dir>/slurm/job.sh` again without `--tokenize-only` and submits it on all nodes. In the container, each preprocessing stage finds its output in the datasets cache and loads it, and training starts. Before the wall time runs out, the job requeues itself and resumes from the latest checkpoint in `<run_dir>/checkpoints/`.
