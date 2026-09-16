@@ -9,6 +9,7 @@ This repo supports two training backends:
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [SFT on a Checkpoint with Singularity](#-sft-on-a-checkpoint-with-singularity)
 - [Project Structure](#-project-structure)
 - [Design Philosophy](#-design-philosophy)
 - [Feature Guide](#-feature-guide)
@@ -101,6 +102,101 @@ For cluster environments, use the submission script. It auto-generates a SLURM b
 ```bash
 python scripts/submit.py --config configs/trl/sft.yaml
 ```
+
+For the full tokenize-then-train workflow in a container, see [SFT on a Checkpoint with Singularity](#-sft-on-a-checkpoint-with-singularity).
+
+## 🚀 SFT on a Checkpoint with Singularity
+
+This guide fine-tunes a given checkpoint with SFT on a SLURM cluster, with training inside a Singularity (or Apptainer) container. It takes two jobs, both submitted from the login node with the same config:
+
+1. **[Tokenize the datasets](#step-1-tokenize-the-datasets)**: a `--tokenize-only` job on 1 GPU. It loads, filters, tokenizes, and packs the data, writes the result to the Hugging Face datasets cache, and exits.
+2. **[Train](#step-2-train)**: the full job. It finds the processed data in the cache, skips preprocessing, and trains.
+
+Tokenizing first keeps the multi-node allocation from sitting idle during CPU-bound preprocessing, and it surfaces data and chat-template problems in a small job.
+
+The example config is [`configs/trl/prelude-sft.yaml`](configs/trl/prelude-sft.yaml). It fine-tunes a 9B checkpoint on LUMI, with the tokenizer from a separate repo. For your own run, copy it and replace the checkpoint, data, container paths, and SLURM account.
+
+### Before you start
+
+The login node needs only the base dependencies from [Installation](#installation), because the training stack lives in the container. Run every `submit.py` command from the repository root, inside that environment. Relative paths in the config (`container.env_file`, `paths.output_base`) resolve against the root, and `submit.py` copies the code from it.
+
+#### Configure the container
+
+The fields in `prelude-sft.yaml` that the container run depends on:
+
+- **`container.image`**: the job runs `accelerate launch scripts/train.py` in this image through `singularity exec`. The image must hold the Python packages from `pyproject.toml`, with a PyTorch build for the cluster's GPUs. The `post_training` code does not come from the image; see `run_name` below.
+- **`container.path`**: the job sets `PATH` inside the container to exactly this value, so it must contain the directory with `python` and `accelerate`. This image keeps them in `/opt/venv/bin`. The default is `/usr/local/bin:/usr/bin:/bin`.
+- **`container.bind_mounts`**: Singularity `--bind` specs. Bind every host path the job reads or writes: the run directory under `paths.output_base`, the Hugging Face cache, and any local checkpoint or dataset. Bind each path as `src` alone, so it keeps the same path inside the container:
+  - `submit.py` resolves `paths.output_base` to its real path, following symlinks. Bind that real path; here, the repository under `/pfs/lustrep3/...`.
+  - The frozen config refers to the prefetched checkpoint and tokenizer by their host paths in the Hugging Face cache.
+- **`container.env_file`**: a shell file that sets the Hugging Face cache; see [the next section](#write-the-env-file).
+- **`run_name`**: at submission, `submit.py` copies `src/post_training/` and `scripts/` into the run directory, and the job runs that copy. With a fixed `run_name`, Step 2 reuses the copy from Step 1, so both jobs run the same transforms and chat templates. The Step 2 submission review warns that the frozen source "will NOT be replaced"; that is expected. To pick up a code change, delete `<run_dir>/src` and `<run_dir>/scripts`, then run Step 1 again.
+
+#### Write the env file
+
+The job sources `container.env_file` on the host before it starts the container, then passes the Hugging Face cache variables into the container. The repository ships `env/jupiter.env` as an example. Create one for your cluster, such as `env/lumi.env`:
+
+```bash
+export HF_HOME=/scratch/<project>/<user>/hf_cache
+export HF_HUB_CACHE=$HF_HOME/hub
+export HUGGINGFACE_HUB_CACHE=$HF_HOME/hub
+export HF_DATASETS_CACHE=$HF_HOME/datasets
+```
+
+- Export `HF_HOME`, `HF_HUB_CACHE`, and `HUGGINGFACE_HUB_CACHE`. The job script runs with `set -u`, so a missing one stops it with `unbound variable`. `HF_DATASETS_CACHE` defaults to `$HF_HOME/datasets`.
+- Use `export NAME=value` lines. `submit.py` reads these lines before it prefetches, so the login node downloads into the cache that the job reads.
+- Keep `HF_HOME` inside a bind mount.
+
+### Step 1: Tokenize the datasets
+
+```bash
+python scripts/submit.py --config configs/trl/prelude-sft.yaml --tokenize-only
+```
+
+On the login node, `submit.py`:
+
+1. reads the Hugging Face cache variables from the env file,
+2. downloads the checkpoint, tokenizer, and datasets into that cache (`prefetch_assets: true`, the default),
+3. prints a submission review and asks for confirmation (`--confirm` skips it),
+4. freezes the config and code into the run directory, and submits the job on 1 node with 1 GPU. The other `slurm` values (account, partition, CPUs, memory, wall time) stay as configured.
+
+In the container, the job loads the tokenizer and chat template, then loads and filters the datasets. It builds the trainer, which loads the checkpoint, then tokenizes and packs the data. It prints one decoded sample and exits.
+
+Preprocessing is CPU-bound. Keep `data.num_proc` and `sft.dataset_num_proc` at or below `slurm.cpus_per_task`, and give the job enough wall time. `slurm.*` overrides do not change the processed data, so Step 1 can use its own:
+
+```bash
+python scripts/submit.py --config configs/trl/prelude-sft.yaml --tokenize-only 'slurm.wall_time="08:00:00"'
+```
+
+> [!NOTE]
+> Quote `slurm.wall_time` on the command line as shown. Unquoted, `24:00:00` parses as the integer `86400`, which SLURM reads as minutes.
+
+Before Step 2, read `<run_dir>/slurm/slurm-<id>.out`:
+
+- It shows the `Tokenized dataset preview` block and `--tokenize-only set — exiting after trainer initialization.` Check that the preview follows the chat template's format.
+- A warning `... rows, ... with an all-zero assistant mask` means more than 1% of the rows were dropped. A warning that rows are cut `PART-WAY THROUGH their supervised span` means those rows train on truncated answers. Raise `sft.max_seq_length`, or set `sft.truncated_span_action: drop`, then run Step 1 again.
+- A `ValueError` stops the job if the chat template lacks `{% generation %}` markers or if no row survives the filter.
+
+### Step 2: Train
+
+```bash
+python scripts/submit.py --config configs/trl/prelude-sft.yaml
+```
+
+Use the same config and the same overrides as Step 1, except for `slurm.*`. `submit.py` renders `<run_dir>/slurm/job.sh` again without `--tokenize-only` and submits it on all nodes. In the container, each preprocessing stage finds its output in the datasets cache and loads it, and training starts. Before the wall time runs out, the job requeues itself and resumes from the latest checkpoint in `<run_dir>/checkpoints/`.
+
+The cache is hit only when every input to the data pipeline is unchanged. Between the two steps, keep these identical:
+
+| Keep identical | Why |
+|---|---|
+| `data.*` | datasets, weights, transforms, seed, and chat template |
+| `sft.max_seq_length`, `sft.packing`, `sft.truncated_span_action` | row filtering, truncation, and packing |
+| `model.name_or_path`, `model.revision`, `model.tokenizer_name_or_path`, `model.tokenizer_revision` | the tokenizer |
+| `container.image` | the library versions that compute the cache keys |
+| `container.env_file` | the cache location (`HF_DATASETS_CACHE`) |
+| `run_name` | the frozen transforms and chat templates |
+
+To confirm the cache hit, open the training job's `<run_dir>/slurm/slurm-<id>.err`: the `Tokenizing train dataset` and `Packing train dataset` progress bars must not appear. If they do, an input in the table changed, or `datasets` warned in Step 1 that a function `couldn't be hashed properly`. Either way, the training job processes the data again from scratch.
 
 ## 📂 Project Structure
 
@@ -268,6 +364,7 @@ Templates that are safe for SFT today:
 |------|--------|-------|
 | `olmo3-instruct-sft` | `allenai/OLMo-3-7B-Instruct-SFT` (HF Hub) | Use to reproduce the Instruct-SFT recipe. |
 | `olmo3-think-sft`    | `allenai/Olmo-3-7B-Think-SFT` (HF Hub)    | Use to reproduce the Think-SFT recipe. |
+| `qwen3`              | `Qwen/Qwen3-8B` (HF Hub)                  | Assistant turns whose `<think>` block the template strips stay out of the loss. |
 
 Templates that are *not* safe for SFT (kept for inference / DPO compatibility):
 
@@ -333,7 +430,7 @@ You must specify exactly one determining factor for training duration in the `tr
 - **Debug**: `debug.enabled: true`
   Forces `report_to: none`, uses a separate output directory, and allows overwriting existing runs.
 - **Tokenize only**: `--tokenize-only` (CLI flag on `train.py` / `submit.py`)
-  Exits immediately after the trainer is initialized — dataset loading, tokenization, and packing all run, but the training loop is never entered. Useful for pretokenizing the dataset before committing to a full run. When passed to `submit.py`, the job is automatically constrained to 1 node and 1 GPU.
+  Exits immediately after the trainer is initialized — dataset loading, tokenization, and packing all run, but the training loop is never entered. Useful for pretokenizing the dataset before committing to a full run. When passed to `submit.py`, the job is automatically constrained to 1 node and 1 GPU. See [SFT on a Checkpoint with Singularity](#-sft-on-a-checkpoint-with-singularity) for the full workflow.
 
   ```bash
   python scripts/submit.py --config configs/trl/sft.yaml --tokenize-only
