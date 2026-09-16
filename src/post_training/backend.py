@@ -263,7 +263,22 @@ _LLAMAFACTORY_INPUT_PATH_KEYS = (
 _LLAMAFACTORY_INPUT_PATH_LIST_KEYS = ("adapter_name_or_path",)
 
 _LLAMAFACTORY_DEFAULT_DATASET_DIR = "data"
+_LLAMAFACTORY_DEFAULT_STAGE = "sft"
 _LLAMAFACTORY_REGISTRY = "dataset_info.json"
+
+
+def llamafactory_dataset_names(
+    lf: dict, keys: tuple[str, ...] = ("dataset", "eval_dataset")
+) -> list[str]:
+    """The dataset names under *keys*, split like LlamaFactory's split_arg()."""
+    names: list[str] = []
+    for key in keys:
+        value = lf.get(key)
+        if isinstance(value, str):
+            value = value.split(",")
+        if isinstance(value, list):
+            names.extend(str(name).strip() for name in value if str(name).strip())
+    return names
 
 
 def _is_local_registry(dataset_dir: str) -> bool:
@@ -344,7 +359,21 @@ class LlamaFactoryBackend(Backend):
                 )
 
     def generate_run_name(self, config: PostTrainingConfig, timestamp: str) -> str:
-        return f"llamafactory-{config.method}-{timestamp}"
+        """llamafactory-<stage>-<model>-<datasets joined with +>-<timestamp>.
+
+        Built from the llamafactory block only; the TRL key `method` is not used.
+        """
+        lf = config.llamafactory
+        parts = [
+            "llamafactory",
+            str(lf.get("stage") or _LLAMAFACTORY_DEFAULT_STAGE),
+            _shorten_model_name(str(lf["model_name_or_path"]).rstrip("/")),
+        ]
+        names = llamafactory_dataset_names(lf, keys=("dataset",))
+        if names:
+            parts.append("+".join(_shorten_dataset_name(name) for name in names))
+        parts.append(timestamp)
+        return "-".join(parts)
 
     def run_dir_subdirs(self) -> list[str]:
         return ["checkpoints"]

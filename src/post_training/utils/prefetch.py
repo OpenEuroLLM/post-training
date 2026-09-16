@@ -25,6 +25,8 @@ from typing import TYPE_CHECKING
 from datasets import load_dataset
 from huggingface_hub import hf_hub_download, snapshot_download
 
+from post_training.backend import llamafactory_dataset_names
+
 if TYPE_CHECKING:
     from post_training.config import DatasetEntry, PostTrainingConfig
 
@@ -184,18 +186,6 @@ class _HubDataset:
     split: str = "train"
 
 
-def _llamafactory_dataset_names(lf: dict) -> list[str]:
-    """The names in `dataset` and `eval_dataset`, split like LlamaFactory's split_arg()."""
-    names: list[str] = []
-    for key in ("dataset", "eval_dataset"):
-        value = lf.get(key)
-        if isinstance(value, str):
-            value = value.split(",")
-        if isinstance(value, list):
-            names.extend(str(name).strip() for name in value if str(name).strip())
-    return names
-
-
 def _llamafactory_has_tokenized_data(path: str) -> bool:
     """Same test as LlamaFactory's has_tokenized_data(): a directory that is not empty."""
     tokenized = Path(path)
@@ -236,7 +226,7 @@ def _read_llamafactory_registry(dataset_dir: str) -> dict:
 
 def _plan_llamafactory_datasets(lf: dict) -> tuple[list[_HubDataset], list[str]]:
     """Return the Hub loads to pre-fetch, and the datasets the prefetch cannot fetch."""
-    names = _llamafactory_dataset_names(lf)
+    names = llamafactory_dataset_names(lf)
     tokenized_path = lf.get("tokenized_path")
     if isinstance(tokenized_path, str) and _llamafactory_has_tokenized_data(tokenized_path):
         logger.info(

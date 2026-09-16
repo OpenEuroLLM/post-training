@@ -411,6 +411,7 @@ python scripts/submit.py --config configs/llamafactory/long-context.yaml
 
 ### Run directory
 
+- The run name is `llamafactory-<stage>-<model>-<datasets>-<timestamp>`, built from `llamafactory.stage` (default `sft`), `model_name_or_path`, and the names in `dataset` joined with `+`. Set `run_name` for a long dataset mix, because a directory name cannot exceed 255 bytes.
 - `scripts/submit.py` copies the DeepSpeed JSON and `dataset_info.json` into `<run_dir>/llamafactory/`, and the job runs in `<run_dir>`. Later edits in the repository do not change a queued or resumed run. A new submit with the same `run_name` keeps the existing copies.
 - Relative paths in the `llamafactory` block start at the directory where you run `submit.py`. Existing input paths (models, adapters, `media_dir`, ...) are made absolute; output paths such as `export_dir` stay relative to `<run_dir>`.
 - LlamaFactory writes checkpoints and the final model to `<run_dir>/checkpoints/`, and a requeued or resubmitted job resumes from the last checkpoint. Do not set `output_dir` or `overwrite_output_dir`; validation rejects them.

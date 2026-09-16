@@ -460,3 +460,74 @@ def test_llamafactory_post_freeze_writes_prefetched_snapshots(tmp_path, monkeypa
     assert frozen["ref_model"] == "/cache/org/ref@main"
     assert cfg.llamafactory["model_name_or_path"] == "org/model"
     assert cfg.llamafactory["ref_model"] == "org/ref"
+
+
+# ---------------------------------------------------------------------------
+# LlamaFactoryBackend — run name from the llamafactory block
+# ---------------------------------------------------------------------------
+
+_TIMESTAMP = "20260917-101500"
+
+
+def _llamafactory_run_name(cfg: PostTrainingConfig) -> str:
+    return LlamaFactoryBackend().generate_run_name(cfg, _TIMESTAMP)
+
+
+def test_llamafactory_run_name_single_dataset():
+    """eval_dataset does not enter the name."""
+    cfg = _llamafactory_config(
+        model_name_or_path="ontocord/1.7b-MixtureVitae-300BT",
+        dataset="long_sft",
+        eval_dataset="long_sft_eval",
+    )
+
+    assert (
+        _llamafactory_run_name(cfg)
+        == f"llamafactory-sft-17b-mixturevitae-300bt-long_sft-{_TIMESTAMP}"
+    )
+
+
+@pytest.mark.parametrize(
+    "datasets", ["dolci_instruct_sft, Tulu3-SFT", ["dolci_instruct_sft", "Tulu3-SFT"]]
+)
+def test_llamafactory_run_name_joins_datasets_with_plus(datasets):
+    cfg = _llamafactory_config(dataset=datasets)
+
+    assert (
+        _llamafactory_run_name(cfg)
+        == f"llamafactory-sft-model-dolci_instruct_sft+tulu3-sft-{_TIMESTAMP}"
+    )
+
+
+def test_llamafactory_run_name_without_datasets():
+    assert _llamafactory_run_name(_llamafactory_config()) == f"llamafactory-sft-model-{_TIMESTAMP}"
+
+
+def test_llamafactory_run_name_uses_the_stage():
+    cfg = _llamafactory_config(stage="dpo", dataset="prefs")
+
+    assert _llamafactory_run_name(cfg) == f"llamafactory-dpo-model-prefs-{_TIMESTAMP}"
+
+
+def test_llamafactory_run_name_ignores_the_top_level_method():
+    """Without llamafactory.stage the name uses LlamaFactory's default stage, not the TRL key."""
+    cfg = _llamafactory_config()
+    del cfg.llamafactory["stage"]
+    cfg.method = "dpo"
+
+    assert _llamafactory_run_name(cfg) == f"llamafactory-sft-model-{_TIMESTAMP}"
+
+
+def test_llamafactory_run_name_local_model_with_trailing_slash():
+    cfg = _llamafactory_config(model_name_or_path="/scratch/models/Prelude-9B/")
+
+    assert _llamafactory_run_name(cfg) == f"llamafactory-sft-prelude-9b-{_TIMESTAMP}"
+
+
+def test_llamafactory_run_name_hub_dataset_id():
+    cfg = _llamafactory_config(dataset_dir="ONLINE", dataset="allenai/Dolci-Instruct-SFT")
+
+    assert (
+        _llamafactory_run_name(cfg)
+        == f"llamafactory-sft-model-allenai_dolci-instruct-sft-{_TIMESTAMP}"
+    )
