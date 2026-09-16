@@ -9,7 +9,7 @@ This repo supports two training backends:
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [SFT on a Checkpoint with Singularity](#-sft-on-a-checkpoint-with-singularity)
+- [Run SFT using a pre-built container](#-run-sft-using-a-pre-built-container)
 - [Project Structure](#-project-structure)
 - [Design Philosophy](#-design-philosophy)
 - [Feature Guide](#-feature-guide)
@@ -103,9 +103,9 @@ For cluster environments, use the submission script. It auto-generates a SLURM b
 python scripts/submit.py --config configs/trl/sft.yaml
 ```
 
-For the full tokenize-then-train workflow in a container, see [SFT on a Checkpoint with Singularity](#-sft-on-a-checkpoint-with-singularity).
+For the full tokenize-then-train workflow in a container, see [Run SFT using a pre-built container](#-run-sft-using-a-pre-built-container).
 
-## 🚀 SFT on a Checkpoint with Singularity
+## 🚀 Run SFT using a pre-built container
 
 This guide fine-tunes a given checkpoint with SFT on a SLURM cluster, with training inside a Singularity (or Apptainer) container. It takes two jobs, both submitted from the login node with the same config:
 
@@ -122,15 +122,13 @@ The login node needs only the base dependencies from [Installation](#installatio
 
 #### Configure the container
 
-The fields in `prelude-sft.yaml` that the container run depends on:
+Set these fields in your copy of `prelude-sft.yaml`:
 
-- **`container.image`**: the job runs `accelerate launch scripts/train.py` in this image through `singularity exec`. The image must hold the Python packages from `pyproject.toml`, with a PyTorch build for the cluster's GPUs. The `post_training` code does not come from the image; see `run_name` below.
-- **`container.path`**: the job sets `PATH` inside the container to exactly this value, so it must contain the directory with `python` and `accelerate`. This image keeps them in `/opt/venv/bin`. The default is `/usr/local/bin:/usr/bin:/bin`.
-- **`container.bind_mounts`**: Singularity `--bind` specs. Bind every host path the job reads or writes: the run directory under `paths.output_base`, the Hugging Face cache, and any local checkpoint or dataset. Bind each path as `src` alone, so it keeps the same path inside the container:
-  - `submit.py` resolves `paths.output_base` to its real path, following symlinks. Bind that real path; here, the repository under `/pfs/lustrep3/...`.
-  - The frozen config refers to the prefetched checkpoint and tokenizer by their host paths in the Hugging Face cache.
-- **`container.env_file`**: a shell file that sets the Hugging Face cache; see [the next section](#write-the-env-file).
-- **`run_name`**: at submission, `submit.py` copies `src/post_training/` and `scripts/` into the run directory, and the job runs that copy. With a fixed `run_name`, Step 2 reuses the copy from Step 1, so both jobs run the same transforms and chat templates. The Step 2 submission review warns that the frozen source "will NOT be replaced"; that is expected. To pick up a code change, delete `<run_dir>/src` and `<run_dir>/scripts`, then run Step 1 again.
+- **`container.image`**: the Singularity image. It must contain the training stack.
+- **`container.path`**: `PATH` inside the container. It must include the directory with `python` and `accelerate`.
+- **`container.bind_mounts`**: the host paths the job uses: the output directory, the Hugging Face cache, and any local checkpoint or dataset. Bind each one at the same path, and use real paths, not symlinks.
+- **`container.env_file`**: sets the Hugging Face cache; see [Write the env file](#write-the-env-file).
+- **`run_name`**: a fixed name, so both steps share one run directory and the same frozen code.
 
 #### Write the env file
 
@@ -430,7 +428,7 @@ You must specify exactly one determining factor for training duration in the `tr
 - **Debug**: `debug.enabled: true`
   Forces `report_to: none`, uses a separate output directory, and allows overwriting existing runs.
 - **Tokenize only**: `--tokenize-only` (CLI flag on `train.py` / `submit.py`)
-  Exits immediately after the trainer is initialized — dataset loading, tokenization, and packing all run, but the training loop is never entered. Useful for pretokenizing the dataset before committing to a full run. When passed to `submit.py`, the job is automatically constrained to 1 node and 1 GPU. See [SFT on a Checkpoint with Singularity](#-sft-on-a-checkpoint-with-singularity) for the full workflow.
+  Exits immediately after the trainer is initialized — dataset loading, tokenization, and packing all run, but the training loop is never entered. Useful for pretokenizing the dataset before committing to a full run. When passed to `submit.py`, the job is automatically constrained to 1 node and 1 GPU. See [Run SFT using a pre-built container](#-run-sft-using-a-pre-built-container) for the full workflow.
 
   ```bash
   python scripts/submit.py --config configs/trl/sft.yaml --tokenize-only
