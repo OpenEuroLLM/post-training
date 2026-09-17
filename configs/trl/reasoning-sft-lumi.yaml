@@ -1,0 +1,117 @@
+# Reasoning continuation profile validated against the OpenEuroLLM 9B Qwen3
+# checkpoint family. Replace only the site-specific paths and the materialized
+# data artifact before running the tokenize-only gate described in the guide.
+method: sft
+backend: trl
+run_name: oellm-9b-anneal300b-reasoning-sft
+offline: true
+prefetch_assets: true
+
+container:
+  image: /scratch/<project>/containers/post-training-rocm7.2.4-py3.12-torch2.9.1-trl1.7.0-olmo-patched.sif
+  bind_mounts:
+    - /scratch/<project>
+  path: /opt/venv/bin:/opt/rocm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  env_file: env/lumi.env
+
+model:
+  name_or_path: Neonkraft/oellm-9b-256k-theta64m-prelude-anneal300b-instruct-sft
+  revision: 85bf18fb4f0bee6ac6270f06b1d1c6b3be200f31
+  attn_implementation: flash_attention_2
+  dtype: bfloat16
+  tokenizer_name_or_path: null
+  tokenizer_revision: null
+
+training:
+  # 64 packed 16K sequences/step * 500 steps = 524,288,000 training tokens.
+  num_training_tokens: 524288000
+  learning_rate: 1.5e-6
+  effective_batch_size: 64
+  per_device_train_batch_size: 1
+  warmup_steps: 15
+  lr_scheduler_type: cosine
+  lr_scheduler_kwargs: null
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  weight_decay: 0.0
+  adam_epsilon: 1.0e-8
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
+  bf16: true
+  seed: 20260917
+  use_liger_kernel: true
+  liger_kernel_config:
+    fused_linear_cross_entropy: true
+    cross_entropy: false
+    rope: false
+    rms_norm: false
+    swiglu: false
+
+sft:
+  max_seq_length: 16384
+  packing: true
+  dataset_num_proc: 6
+  # Never train a reasoning trace cut before </think> or its final answer.
+  truncated_span_action: drop
+
+checkpointing:
+  save_strategy: steps
+  save_steps: 100
+  save_total_limit: 5
+  inference_checkpoint_steps: 100
+  inference_checkpoint_path: inference_checkpoints
+
+data:
+  chat_template: qwen3
+  num_proc: 6
+  seed: 20260917
+  datasets:
+    # The production recipe is token-balanced, globally deduplicated and quality
+    # gated before training. Point this at that immutable, materialized artifact;
+    # do not replace it with row weights over the raw source datasets.
+    - name: reasoning-anneal300b-v1
+      path: /scratch/<project>/<user>/post-training-data/reasoning-anneal300b-v1/train.parquet
+      split: train
+      weight: 1.0
+      transform: null
+
+# FSDP is the tested 8-node path for this 9B/16K profile. Keep DeepSpeed off so
+# Accelerate uses the frozen profile below.
+deepspeed: null
+
+accelerate:
+  config_file: configs/accelerate/fsdp-lumi.yaml
+  mixed_precision: bf16
+  use_deepspeed: false
+  same_network: true
+  rdzv_backend: static
+  dynamo_backend: "no"
+
+logging:
+  report_to: []
+  wandb_project: oellm-reasoning
+  logging_steps: 10
+  include_num_input_tokens_seen: non_padding
+
+slurm:
+  account: <project>
+  partition: standard-g
+  num_nodes: 8
+  gpus_per_node: 8
+  cpus_per_task: 56
+  mem: 256G
+  wall_time: "24:00:00"
+  job_name: oellm-reasoning-sft
+  signal_time_seconds: 300
+  max_failures: 1
+  modules: []
+  module_purge: false
+
+debug:
+  enabled: false
+  override_existing: false
+
+paths:
+  output_base: outputs
+  debug_base: outputs/debug

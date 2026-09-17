@@ -110,6 +110,8 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     export WANDB_DIR=\"{{ run_dir }}\"
 
     accelerate launch \
+{% if accelerate_config_file %}      --config_file {{ accelerate_config_file }} \
+{% endif -%}
       --num_machines \$NNODES \
       --num_processes $WORLD_SIZE \
       --machine_rank \$NODE_RANK \
