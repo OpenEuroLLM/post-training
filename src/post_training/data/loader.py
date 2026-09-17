@@ -153,10 +153,11 @@ def load_and_mix_datasets(
     loaded_datasets: list[Dataset] = []
     for entry in entries:
         logger.info(
-            "Loading dataset '%s' from '%s' (data_dir=%s, subset=%s, split=%s, "
-            "weight=%s, transform=%s)",
+            "Loading dataset '%s' from '%s' (revision=%s, data_dir=%s, subset=%s, "
+            "split=%s, weight=%s, transform=%s)",
             entry.name,
             entry.path,
+            entry.revision,
             entry.data_dir,
             entry.subset,
             entry.split,
@@ -170,6 +171,8 @@ def load_and_mix_datasets(
             load_kwargs["data_dir"] = entry.data_dir
         if entry.subset is not None:
             load_kwargs["name"] = entry.subset
+        if entry.revision is not None and not Path(entry.path).exists():
+            load_kwargs["revision"] = entry.revision
 
         ds = _load_dataset_entry(entry.path, entry.split, **load_kwargs)
 

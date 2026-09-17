@@ -128,6 +128,8 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
             load_kwargs["name"] = entry.subset
         if getattr(entry, "data_dir", None) is not None:
             load_kwargs["data_dir"] = entry.data_dir
+        if getattr(entry, "revision", None) is not None and not Path(entry.path).exists():
+            load_kwargs["revision"] = entry.revision
 
         ds = load_dataset(entry.path, split=entry.split, **load_kwargs)
 

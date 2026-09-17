@@ -2,7 +2,7 @@
 
 import pytest
 
-from post_training.config import PostTrainingConfig
+from post_training.config import DatasetEntry, PostTrainingConfig
 from post_training.utils import prefetch
 
 
@@ -78,3 +78,29 @@ def test_local_tokenizer_path_is_not_downloaded(downloads, tmp_path):
 
     assert downloads == [("org/model", None, None)]
     assert paths.tokenizer == str(tmp_path)
+
+
+def test_dataset_revision_is_prefetched(monkeypatch):
+    calls = []
+
+    def fake_load_dataset(path, **kwargs):
+        calls.append((path, kwargs))
+
+    monkeypatch.setattr(prefetch, "load_dataset", fake_load_dataset)
+
+    prefetch._prefetch_dataset(
+        DatasetEntry(
+            name="reasoning",
+            path="org/reasoning",
+            revision="deadbeef",
+            subset="math",
+            split="train",
+        )
+    )
+
+    assert calls == [
+        (
+            "org/reasoning",
+            {"split": "train", "name": "math", "revision": "deadbeef"},
+        )
+    ]

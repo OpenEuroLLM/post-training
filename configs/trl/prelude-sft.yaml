@@ -54,6 +54,7 @@ data:
   datasets:
     - name: "dolci-instruct-sft"
       path: "allenai/Dolci-Instruct-SFT"     # HuggingFace dataset path
+      revision: bd3c8f3a9b2cc5a9682e44b96ddd0bb2ff027221
       split: "train"
       weight: 1.0
       transform: null                        # null = already conversational
