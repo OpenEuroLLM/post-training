@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -37,8 +38,12 @@ def _filter_dpo_rows(ds: Dataset, num_proc: int) -> Dataset:
     )
 
 
-def build_ref_logps_cache_key(config: PostTrainingConfig) -> str:
+def build_ref_logps_cache_key(config: PostTrainingConfig, run_name: str) -> str:
     """Return the reference-model half of TRL's reference log-prob cache key.
+
+    ``dpo.ref_logps_cache_key`` is the entire key when set. Otherwise the key
+    joins the model identity and the run name with hyphens.
+    TRL adds the dataset fingerprint as the other half.
 
     With ``precompute_ref_log_probs=True`` TRL keeps no separate reference
     model; it treats the policy weights at step 0 as the reference. So the
@@ -46,8 +51,9 @@ def build_ref_logps_cache_key(config: PostTrainingConfig) -> str:
     """
     if config.dpo.ref_logps_cache_key is not None:
         return config.dpo.ref_logps_cache_key
-    revision = config.model.revision or "main"
-    return f"{config.model.name_or_path}@{revision}"
+    parts = [config.model.name_or_path, config.model.revision or "main", run_name]
+    # Hyphens replace "/", "@" and the like, so the logged key pastes into YAML as is.
+    return re.sub(r"[^A-Za-z0-9._-]+", "-", "-".join(parts)).strip("-")
 
 
 class StableCacheKeyDPOTrainer(DPOTrainer):
@@ -75,7 +81,7 @@ class StableCacheKeyDPOTrainer(DPOTrainer):
         # two runs can be compared without reading the arrow cache directory.
         logger.info(
             "Reference log-prob cache key for the %s dataset: "
-            "dataset_fingerprint=%s, ref_model_key=%s",
+            "dataset_fingerprint=%s, ref_logps_cache_key=%s",
             name,
             dataset._fingerprint,
             self._ref_logps_cache_key,
@@ -126,7 +132,7 @@ def build_dpo_trainer(config: PostTrainingConfig, run_dir: Path) -> DPOTrainer:
         train_dataset=dataset,
         args=dpo_config,
         callbacks=build_callbacks(config, run_dir),
-        ref_logps_cache_key=build_ref_logps_cache_key(config),
+        ref_logps_cache_key=build_ref_logps_cache_key(config, run_dir.name),
     )
     sanitize_generation_config(trainer)
     align_generation_eos(trainer)

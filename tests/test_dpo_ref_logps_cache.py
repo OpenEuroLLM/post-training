@@ -9,15 +9,17 @@ writes a cache the second run never finds, and pays for the precomputation
 twice.  That second pass is exactly what ZeRO-3 was chosen to avoid.
 
 ``StableCacheKeyDPOTrainer`` swaps the weight hash for a key built from the
-model identity, which no DeepSpeed stage can change.  Two things need pinning:
-the key itself, and the swap.  The swap must cover the precompute call and
-must be undone afterwards, including when the call raises — a leaked patch
-would silently disable the weight hash for the rest of the process.
+model identity and the run name, which no DeepSpeed stage can change.  Two
+things need pinning: the key itself, and the swap.  The swap must cover the
+precompute call and must be undone afterwards, including when the call
+raises — a leaked patch would silently disable the weight hash for the rest
+of the process.
 """
 
 from __future__ import annotations
 
 import pytest
+from omegaconf import OmegaConf
 from trl import DPOTrainer
 from trl.trainer import dpo_trainer as trl_dpo_trainer
 
@@ -37,32 +39,51 @@ def config():
 # ---------------------------------------------------------------------------
 
 
-def test_key_defaults_to_the_model_identity(config):
-    assert build_ref_logps_cache_key(config) == "allenai/Olmo-3-1025-7B@main"
+def test_key_defaults_to_the_model_and_run_name(config):
+    key = build_ref_logps_cache_key(config, "dpo-olmo-run")
+
+    assert key == "allenai-Olmo-3-1025-7B-main-dpo-olmo-run"
 
 
 def test_key_carries_the_pinned_revision(config):
     """A pinned revision names different weights, so it must change the key."""
     config.model.revision = "abc1234"
 
-    assert build_ref_logps_cache_key(config) == "allenai/Olmo-3-1025-7B@abc1234"
+    key = build_ref_logps_cache_key(config, "dpo-olmo-run")
+
+    assert key == "allenai-Olmo-3-1025-7B-abc1234-dpo-olmo-run"
 
 
-def test_explicit_key_overrides_the_derived_one(config):
-    """The escape hatch for weights that change under a fixed path."""
+def test_key_changes_with_the_run_name(config):
+    assert build_ref_logps_cache_key(config, "run-a") != build_ref_logps_cache_key(config, "run-b")
+
+
+def test_explicit_key_is_the_entire_key(config):
+    """The key a --tokenize-only run logged, pasted into the training run's config."""
     config.dpo.ref_logps_cache_key = "olmo3-sft-epoch2"
+    config.model.revision = "abc1234"
 
-    assert build_ref_logps_cache_key(config) == "olmo3-sft-epoch2"
+    assert build_ref_logps_cache_key(config, "another-run") == "olmo3-sft-epoch2"
+
+
+def test_key_from_a_snapshot_path_pastes_into_yaml(config):
+    """After prefetch the model is a local snapshot path full of slashes."""
+    config.model.name_or_path = "/cache/hub/models--allenai--Olmo/snapshots/0123abc"
+
+    key = build_ref_logps_cache_key(config, "dpo-olmo-run")
+
+    assert key == "cache-hub-models--allenai--Olmo-snapshots-0123abc-main-dpo-olmo-run"
+    assert OmegaConf.create(f"ref_logps_cache_key: {key}").ref_logps_cache_key == key
 
 
 def test_key_ignores_the_deepspeed_stage(config):
     """The point of the whole change: stage 3 and stage 2 agree on one key."""
     config.deepspeed = {"zero_optimization": {"stage": 3}}
-    stage_3_key = build_ref_logps_cache_key(config)
+    stage_3_key = build_ref_logps_cache_key(config, "dpo-olmo-run")
 
     config.deepspeed = {"zero_optimization": {"stage": 2}}
 
-    assert build_ref_logps_cache_key(config) == stage_3_key
+    assert build_ref_logps_cache_key(config, "dpo-olmo-run") == stage_3_key
 
 
 # ---------------------------------------------------------------------------

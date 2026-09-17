@@ -162,8 +162,9 @@ class DPOMethodConfig:
     # so `--tokenize-only` is enough to fill the cache.
     precompute_ref_log_probs: bool = False
     # Identifies the reference weights in the cache key. None derives it from
-    # the model identity: "<model.name_or_path>@<model.revision>". Change it
-    # by hand when the weights at that path change but the path does not.
+    # the model and the run: "<model.name_or_path>-<model.revision>-<run_name>",
+    # with "/" turned into "-". Paste the key that a --tokenize-only run logs
+    # here to reuse its cache, or change it by hand when the weights change.
     ref_logps_cache_key: str | None = None
 
 
