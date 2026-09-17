@@ -75,6 +75,31 @@ def _apply_hf_env_from_file(env_file: str) -> None:
         logger.info("Applied HF cache vars from %s: %s", env_file, ", ".join(applied))
 
 
+def _uses_zero3(config: PostTrainingConfig) -> bool:
+    """Return True when the job launches DeepSpeed with ZeRO stage 3."""
+    if not (config.accelerate.use_deepspeed and config.deepspeed):
+        return False
+    return config.deepspeed.get("zero_optimization", {}).get("stage") == 3
+
+
+def _shrink_allocation_for_tokenize_only(config: PostTrainingConfig) -> None:
+    """Drop a --tokenize-only job to one GPU on one node.
+
+    DPO under ZeRO-3 keeps the requested allocation: the model is sharded
+    across those GPUs when the trainer constructor precomputes reference log-probs.
+    """
+    if config.method == "dpo" and _uses_zero3(config):
+        logger.info(
+            "--tokenize-only with DPO under ZeRO-3: using 1 node x %d GPU(s).",
+            config.slurm.gpus_per_node,
+        )
+        config.slurm.num_nodes = 1
+        return
+
+    config.slurm.num_nodes = 1
+    config.slurm.gpus_per_node = 1
+
+
 def _parse_args() -> tuple[str, list[str], bool]:
     parser = argparse.ArgumentParser(description="Submit a SLURM training job.")
     parser.add_argument(
@@ -110,8 +135,7 @@ def main() -> None:
                 "--tokenize-only is only supported with backend=trl "
                 "(LlamaFactory uses llamafactory-cli, which has no equivalent flag)."
             )
-        config.slurm.num_nodes = 1
-        config.slurm.gpus_per_node = 1
+        _shrink_allocation_for_tokenize_only(config)
 
     if config.container is not None and config.container.env_file:
         _apply_hf_env_from_file(config.container.env_file)
