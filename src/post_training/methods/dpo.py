@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -56,6 +57,19 @@ def build_ref_logps_cache_key(config: PostTrainingConfig, run_name: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "-", "-".join(parts)).strip("-")
 
 
+@dataclass(frozen=True)
+class _PrepareDatasetArgs:
+    """The ``DPOConfig`` fields that ``DPOTrainer._prepare_dataset`` reads.
+
+    A field that a newer TRL reads, but that is missing here, raises
+    ``AttributeError`` instead of silently entering the fingerprint.
+    """
+
+    dataset_num_proc: int | None
+    max_length: int | None
+    truncation_mode: str
+
+
 class StableCacheKeyDPOTrainer(DPOTrainer):
     """A :class:`DPOTrainer` whose reference log-prob cache ignores the ZeRO stage.
 
@@ -69,12 +83,29 @@ class StableCacheKeyDPOTrainer(DPOTrainer):
     The substitution costs the staleness protection that the weight hash gives.
     Rebuild the cache, or set ``dpo.ref_logps_cache_key``, when the weights
     change but the model path does not.
+
+    The other half of the key, the dataset fingerprint, must not depend on the
+    allocation either; see :meth:`_prepare_dataset`.
     """
 
     def __init__(self, *args, ref_logps_cache_key: str, **kwargs):
         self._ref_logps_cache_key = ref_logps_cache_key
         # TRL precomputes inside the constructor, so the key must exist first.
         super().__init__(*args, **kwargs)
+
+    def _prepare_dataset(self, dataset, processing_class, args, dataset_name):
+        # TRL >= 1.9 drops over-long prompts with a lambda that reads
+        # `args.max_length`. `datasets` hashes that lambda with its closure, so the
+        # whole DPOConfig enters the dataset fingerprint: the world size (through
+        # gradient_accumulation_steps), the DeepSpeed config, the output dir. None
+        # of them changes the rows, yet each one hides the cache from the next run.
+        # Hand TRL only the fields it reads here, so only they are hashed.
+        dataset_args = _PrepareDatasetArgs(
+            dataset_num_proc=args.dataset_num_proc,
+            max_length=args.max_length,
+            truncation_mode=args.truncation_mode,
+        )
+        return super()._prepare_dataset(dataset, processing_class, dataset_args, dataset_name)
 
     def _precompute_ref_logps(self, dataset: Dataset, name: str, batch_size: int) -> Dataset:
         # `_fingerprint` is the other half of TRL's cache key. Log both halves so

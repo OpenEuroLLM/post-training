@@ -14,13 +14,17 @@ things need pinning: the key itself, and the swap.  The swap must cover the
 precompute call and must be undone afterwards, including when the call
 raises — a leaked patch would silently disable the weight hash for the rest
 of the process.
+
+The dataset fingerprint is the other half of the key.  From TRL 1.9 it hashes
+the whole ``DPOConfig`` unless the subclass narrows ``args`` first.
 """
 
 from __future__ import annotations
 
 import pytest
+from datasets import Dataset
 from omegaconf import OmegaConf
-from trl import DPOTrainer
+from trl import DPOConfig, DPOTrainer
 from trl.trainer import dpo_trainer as trl_dpo_trainer
 
 from post_training.config import PostTrainingConfig
@@ -140,3 +144,73 @@ def test_hash_module_is_restored_after_a_failure(monkeypatch):
         _uninitialized_trainer("olmo@main")._precompute_ref_logps(_FakeDataset(), "train", 1)
 
     assert trl_dpo_trainer.hash_module is original
+
+
+# ---------------------------------------------------------------------------
+# the dataset half: _prepare_dataset
+# ---------------------------------------------------------------------------
+
+
+def _trl_1_9_prepare_dataset(self, dataset, processing_class, args, dataset_name):
+    """The step of TRL 1.9's ``_prepare_dataset`` that hashes ``args``: a filter lambda over it."""
+    return dataset.filter(lambda example: len(example["prompt_ids"]) < args.max_length)
+
+
+def _dpo_config(output_dir, gradient_accumulation_steps, max_length=2):
+    return DPOConfig(
+        output_dir=str(output_dir),
+        report_to="none",
+        use_cpu=True,
+        bf16=False,
+        max_length=max_length,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+    )
+
+
+@pytest.fixture
+def tokenized():
+    return Dataset.from_dict({"prompt_ids": [[1, 2], [3]]})
+
+
+def test_raw_dpo_config_leaks_the_allocation_into_the_fingerprint(tmp_path, tokenized):
+    """The control: TRL 1.9's filter on the full DPOConfig of a 1-GPU and a 4-GPU job."""
+    tokenize_only = _dpo_config(tmp_path / "tokenize", gradient_accumulation_steps=4)
+    training = _dpo_config(tmp_path / "train", gradient_accumulation_steps=1)
+
+    tokenize_only_fp = _trl_1_9_prepare_dataset(
+        None, tokenized, None, tokenize_only, "train"
+    )._fingerprint
+    training_fp = _trl_1_9_prepare_dataset(None, tokenized, None, training, "train")._fingerprint
+
+    assert tokenize_only_fp != training_fp
+
+
+def test_fingerprint_ignores_the_allocation(monkeypatch, tmp_path, tokenized):
+    """A 1-GPU precompute run and a 4-GPU training run must share one cache."""
+    monkeypatch.setattr(DPOTrainer, "_prepare_dataset", _trl_1_9_prepare_dataset)
+    trainer = _uninitialized_trainer("olmo@main")
+    tokenize_only = _dpo_config(tmp_path / "tokenize", gradient_accumulation_steps=4)
+    training = _dpo_config(tmp_path / "train", gradient_accumulation_steps=1)
+
+    tokenize_only_fp = trainer._prepare_dataset(
+        tokenized, None, tokenize_only, "train"
+    )._fingerprint
+    training_fp = trainer._prepare_dataset(tokenized, None, training, "train")._fingerprint
+
+    assert tokenize_only_fp == training_fp
+
+
+def test_fingerprint_still_tracks_max_length(monkeypatch, tmp_path, tokenized):
+    """max_length decides which rows survive, so it must stay in the fingerprint."""
+    monkeypatch.setattr(DPOTrainer, "_prepare_dataset", _trl_1_9_prepare_dataset)
+    trainer = _uninitialized_trainer("olmo@main")
+
+    short = trainer._prepare_dataset(
+        tokenized, None, _dpo_config(tmp_path, 1, max_length=2), "train"
+    )
+    long = trainer._prepare_dataset(
+        tokenized, None, _dpo_config(tmp_path, 1, max_length=4), "train"
+    )
+
+    assert (len(short), len(long)) == (1, 2)
+    assert short._fingerprint != long._fingerprint
