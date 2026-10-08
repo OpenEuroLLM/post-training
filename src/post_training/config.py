@@ -216,6 +216,9 @@ class AccelerateConfig:
     same_network: bool = True
     rdzv_backend: str = "static"
     dynamo_backend: str = "inductor"
+    # Without `--dynamo_use_dynamic`, accelerate compiles with dynamic=False, so
+    # every new sequence length recompiles. Turn on for unpacked data (e.g. DPO).
+    dynamo_use_dynamic: bool = False
 
 
 @dataclass

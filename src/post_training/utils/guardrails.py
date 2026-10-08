@@ -251,6 +251,7 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     _row("DeepSpeed", _deepspeed_summary(config))
     _row("Mixed precision", config.accelerate.mixed_precision)
     _row("Dynamo backend", config.accelerate.dynamo_backend)
+    _row("Dynamo dynamic shapes", str(config.accelerate.dynamo_use_dynamic))
     _row("RDZV backend", config.accelerate.rdzv_backend)
 
     # ------------------------------------------------------------------

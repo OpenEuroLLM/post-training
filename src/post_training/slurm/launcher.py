@@ -77,6 +77,7 @@ def render_trl_slurm_script(
         # Accelerate flags
         mixed_precision=config.accelerate.mixed_precision,
         dynamo_backend=config.accelerate.dynamo_backend,
+        dynamo_use_dynamic=config.accelerate.dynamo_use_dynamic,
         use_deepspeed=config.accelerate.use_deepspeed and bool(config.deepspeed),
         deepspeed_multinode_launcher=config.accelerate.deepspeed_multinode_launcher,
         same_network=config.accelerate.same_network,
@@ -136,6 +137,7 @@ def render_trl_container_slurm_script(
         # Accelerate flags
         mixed_precision=config.accelerate.mixed_precision,
         dynamo_backend=config.accelerate.dynamo_backend,
+        dynamo_use_dynamic=config.accelerate.dynamo_use_dynamic,
         use_deepspeed=config.accelerate.use_deepspeed and bool(config.deepspeed),
         deepspeed_multinode_launcher=config.accelerate.deepspeed_multinode_launcher,
         same_network=config.accelerate.same_network,

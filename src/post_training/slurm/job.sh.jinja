@@ -68,6 +68,8 @@ export LAUNCHER="accelerate launch \
     --main_process_port $MASTER_PORT \
     --mixed_precision {{ mixed_precision }} \
     --dynamo_backend {{ dynamo_backend }} \
+{% if dynamo_use_dynamic %}    --dynamo_use_dynamic \
+{% endif -%}
 {% if use_deepspeed -%}
     --use_deepspeed \
     --deepspeed_multinode_launcher {{ deepspeed_multinode_launcher }} \

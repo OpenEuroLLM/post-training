@@ -421,3 +421,31 @@ def test_llamafactory_container_custom_path(tmp_path, config):
     content = render_llamafactory_slurm_script(config, run_dir).read_text()
 
     assert 'export PATH=\\"/opt/conda/bin:/usr/local/bin:/usr/bin:/bin\\"' in content
+
+
+# ---------------------------------------------------------------------------
+# dynamo_use_dynamic — TRL templates
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("render", [render_trl_slurm_script, render_trl_container_slurm_script])
+def test_trl_dynamo_use_dynamic_rendered(tmp_path, config, render):
+    """--dynamo_use_dynamic follows --dynamo_backend when enabled."""
+    config.accelerate.dynamo_use_dynamic = True
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    lines = render(config, run_dir, "configs/trl/dpo.yaml").read_text().splitlines()
+
+    backend = next(i for i, line in enumerate(lines) if "--dynamo_backend" in line)
+    assert lines[backend + 1].strip() == "--dynamo_use_dynamic \\"
+
+
+@pytest.mark.parametrize("render", [render_trl_slurm_script, render_trl_container_slurm_script])
+def test_trl_dynamo_use_dynamic_absent_by_default(tmp_path, config, render):
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render(config, run_dir, "configs/trl/dpo.yaml").read_text()
+
+    assert "--dynamo_use_dynamic" not in content
