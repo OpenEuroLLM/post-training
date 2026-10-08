@@ -77,6 +77,18 @@ def _deepspeed_summary(config: PostTrainingConfig) -> str:
     return f"ZeRO stage {stage}"
 
 
+def _fsdp_summary(config: PostTrainingConfig) -> str:
+    """Return a short description of the FSDP config, e.g. 'FSDP1 FULL_SHARD, ...'."""
+    fsdp = config.fsdp
+    if fsdp is None:
+        return "disabled"
+    wrap = fsdp.auto_wrap_policy
+    if wrap == "TRANSFORMER_BASED_WRAP":
+        classes = fsdp.transformer_layer_cls_to_wrap
+        wrap += f" ({', '.join(classes) if classes else 'model _no_split_modules'})"
+    return f"FSDP1 {fsdp.sharding_strategy}, {wrap}, {fsdp.state_dict_type}"
+
+
 # ---------------------------------------------------------------------------
 # Training-duration helpers
 # ---------------------------------------------------------------------------
@@ -249,6 +261,7 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     # ------------------------------------------------------------------
     _section("Training (Distributed)")
     _row("DeepSpeed", _deepspeed_summary(config))
+    _row("FSDP", _fsdp_summary(config))
     _row("Mixed precision", config.accelerate.mixed_precision)
     _row("Dynamo backend", config.accelerate.dynamo_backend)
     _row("RDZV backend", config.accelerate.rdzv_backend)

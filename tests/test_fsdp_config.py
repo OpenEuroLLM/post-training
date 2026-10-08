@@ -10,6 +10,7 @@ from post_training.config import (
     GradientCheckpointingKwargs,
     PostTrainingConfig,
 )
+from post_training.utils.guardrails import _fsdp_summary
 
 
 def _fsdp_config() -> PostTrainingConfig:
@@ -142,3 +143,17 @@ def test_fsdp_rejected_for_llamafactory():
 
     with pytest.raises(ValueError, match="only supported with backend='trl'"):
         LlamaFactoryBackend().validate(cfg)
+
+
+def test_guardrails_fsdp_summary():
+    cfg = _fsdp_config()
+
+    assert _fsdp_summary(cfg) == (
+        "FSDP1 FULL_SHARD, TRANSFORMER_BASED_WRAP (model _no_split_modules), SHARDED_STATE_DICT"
+    )
+
+    cfg.fsdp.transformer_layer_cls_to_wrap = ["Olmo3DecoderLayer"]
+    assert "TRANSFORMER_BASED_WRAP (Olmo3DecoderLayer)" in _fsdp_summary(cfg)
+
+    cfg.fsdp = None
+    assert _fsdp_summary(cfg) == "disabled"
