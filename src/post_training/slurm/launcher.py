@@ -140,6 +140,7 @@ def render_trl_container_slurm_script(
         deepspeed_multinode_launcher=config.accelerate.deepspeed_multinode_launcher,
         same_network=config.accelerate.same_network,
         rdzv_backend=config.accelerate.rdzv_backend,
+        fsdp=config.fsdp,
         # Container
         container_image=config.container.image,
         bind_mounts=config.container.bind_mounts,

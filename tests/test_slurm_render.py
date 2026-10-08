@@ -3,7 +3,7 @@
 import pytest
 
 from post_training.backend import LlamaFactoryBackend, TRLBackend
-from post_training.config import ContainerConfig, PostTrainingConfig
+from post_training.config import ContainerConfig, FSDPConfig, PostTrainingConfig
 from post_training.slurm.launcher import (
     render_llamafactory_slurm_script,
     render_trl_container_slurm_script,
@@ -421,3 +421,75 @@ def test_llamafactory_container_custom_path(tmp_path, config):
     content = render_llamafactory_slurm_script(config, run_dir).read_text()
 
     assert 'export PATH=\\"/opt/conda/bin:/usr/local/bin:/usr/bin:/bin\\"' in content
+
+
+# ---------------------------------------------------------------------------
+# fsdp — TRL container template
+# ---------------------------------------------------------------------------
+
+
+def _launch_lines(content: str) -> list[str]:
+    """Return the stripped lines of the `accelerate launch` command."""
+    lines = content.splitlines()
+    start = next(i for i, line in enumerate(lines) if "accelerate launch" in line)
+    end = next(i for i in range(start, len(lines)) if "scripts/train.py" in lines[i])
+    return [line.strip() for line in lines[start : end + 1]]
+
+
+def test_trl_container_fsdp_flags_rendered(tmp_path, config):
+    config.deepspeed = None
+    config.fsdp = FSDPConfig()
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_container_slurm_script(config, run_dir, "configs/trl/dpo.yaml").read_text()
+    launch = _launch_lines(content)
+
+    for flag in (
+        "--use_fsdp \\",
+        "--fsdp_version 1 \\",
+        "--fsdp_sharding_strategy FULL_SHARD \\",
+        "--fsdp_auto_wrap_policy TRANSFORMER_BASED_WRAP \\",
+        "--fsdp_backward_prefetch BACKWARD_PRE \\",
+        "--fsdp_forward_prefetch false \\",
+        "--fsdp_state_dict_type SHARDED_STATE_DICT \\",
+        "--fsdp_use_orig_params true \\",
+        "--fsdp_offload_params false \\",
+        "--fsdp_cpu_ram_efficient_loading true \\",
+        "--fsdp_sync_module_states true \\",
+        "--fsdp_activation_checkpointing false \\",
+    ):
+        assert flag in launch
+    # null wrap classes and min_num_params leave accelerate's defaults in place.
+    assert "--fsdp_transformer_layer_cls_to_wrap" not in content
+    assert "--fsdp_min_num_params" not in content
+    assert "--use_deepspeed" not in content
+    # Every line before train.py continues the command.
+    assert all(line.endswith("\\") for line in launch[:-1])
+
+
+def test_trl_container_fsdp_optional_flags_rendered(tmp_path, config):
+    config.deepspeed = None
+    config.fsdp = FSDPConfig(
+        transformer_layer_cls_to_wrap=["Olmo3DecoderLayer", "Olmo3MLP"], min_num_params=1000
+    )
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    launch = _launch_lines(
+        render_trl_container_slurm_script(config, run_dir, "configs/trl/dpo.yaml").read_text()
+    )
+
+    assert "--fsdp_transformer_layer_cls_to_wrap Olmo3DecoderLayer,Olmo3MLP \\" in launch
+    assert "--fsdp_min_num_params 1000 \\" in launch
+    assert all(line.endswith("\\") for line in launch[:-1])
+
+
+def test_trl_container_fsdp_absent_by_default(tmp_path, config):
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_container_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    assert "--use_fsdp" not in content
+    assert "--fsdp_" not in content
