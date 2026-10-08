@@ -78,6 +78,58 @@ def _dataset_mix_hash(datasets: list) -> str:
     return hashlib.sha256(json.dumps(canonical).encode()).hexdigest()[:8]
 
 
+_FSDP_CHOICES = {
+    "sharding_strategy": (
+        "FULL_SHARD",
+        "SHARD_GRAD_OP",
+        "NO_SHARD",
+        "HYBRID_SHARD",
+        "HYBRID_SHARD_ZERO2",
+    ),
+    "auto_wrap_policy": ("TRANSFORMER_BASED_WRAP", "SIZE_BASED_WRAP", "NO_WRAP"),
+    "backward_prefetch": ("BACKWARD_PRE", "BACKWARD_POST", "NO_PREFETCH"),
+    "state_dict_type": ("FULL_STATE_DICT", "SHARDED_STATE_DICT"),
+}
+
+
+def _validate_fsdp(config: PostTrainingConfig) -> None:
+    """Reject FSDP configs that the launch would ignore, misread, or hang on."""
+    fsdp = config.fsdp
+    if config.deepspeed:
+        raise ValueError("Set either `deepspeed:` or `fsdp:`, not both.")
+    # Only the containerized TRL template renders the --fsdp_* launch flags; the
+    # bare-metal one would silently fall back to plain DDP.
+    if config.container is None or not config.container.image:
+        raise ValueError("fsdp requires container.image (only the container launch supports it).")
+
+    for name, choices in _FSDP_CHOICES.items():
+        value = getattr(fsdp, name)
+        if value not in choices:
+            raise ValueError(f"fsdp.{name} must be one of {', '.join(choices)}; got '{value}'.")
+
+    # Rank-0-only loading leaves the other ranks without weights until FSDP
+    # broadcasts them while wrapping.
+    if fsdp.cpu_ram_efficient_loading and not fsdp.sync_module_states:
+        raise ValueError("fsdp.cpu_ram_efficient_loading requires fsdp.sync_module_states: true.")
+
+    t = config.training
+    if fsdp.activation_checkpointing and t.gradient_checkpointing:
+        raise ValueError(
+            "fsdp.activation_checkpointing and training.gradient_checkpointing are mutually "
+            "exclusive; keep one."
+        )
+    # Early stopping lets each rank end the recompute at a data-dependent point, so
+    # ranks with different sequence lengths issue FSDP all-gathers in different orders.
+    if t.gradient_checkpointing and (
+        t.gradient_checkpointing_kwargs is None or t.gradient_checkpointing_kwargs.early_stop
+    ):
+        raise ValueError(
+            "With fsdp and training.gradient_checkpointing, set "
+            "training.gradient_checkpointing_kwargs.early_stop: false. Early stopping "
+            "makes FSDP collectives rank-dependent when sequence lengths differ."
+        )
+
+
 class TRLBackend(Backend):
     def validate(self, config: PostTrainingConfig) -> None:
         if config.method not in _SUPPORTED_METHODS:
@@ -101,6 +153,9 @@ class TRLBackend(Backend):
                 )
             if not config.container.env_file:
                 raise ValueError("container.env_file must be set when container.image is set.")
+
+        if config.fsdp is not None:
+            _validate_fsdp(config)
 
         total_weight = 0.0
         for entry in config.data.datasets:
@@ -231,6 +286,8 @@ class LlamaFactoryBackend(Backend):
             raise ValueError("llamafactory must be set when backend='llamafactory'.")
         if config.container is None or not config.container.image:
             raise ValueError("container.image must be set when backend='llamafactory'.")
+        if config.fsdp is not None:
+            raise ValueError("fsdp is only supported with backend='trl'.")
 
     def generate_run_name(self, config: PostTrainingConfig, timestamp: str) -> str:
         return f"llamafactory-{config.method}-{timestamp}"
