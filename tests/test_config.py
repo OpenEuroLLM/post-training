@@ -44,7 +44,7 @@ def test_nullable_container_and_training_kwargs_load(tmp_path, monkeypatch):
     assert kwargs["lr_scheduler_kwargs"] is None
     assert kwargs["gradient_checkpointing_kwargs"] is None
     assert kwargs["deepspeed"] is None
-    assert kwargs["ddp_timeout"] == 1800
+    assert kwargs["ddp_timeout"] == 300
 
 
 def test_deepspeed_empty_dict_normalized_to_none(tmp_path, monkeypatch):

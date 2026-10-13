@@ -521,3 +521,24 @@ def test_trl_container_fsdp_absent_by_default(tmp_path, config):
 
     assert "--use_fsdp" not in content
     assert "--fsdp_" not in content
+
+
+def test_trl_container_debug_env_rendered(tmp_path, config):
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_trl_container_slurm_script(config, run_dir, "configs/trl/dpo.yaml").read_text()
+
+    assert f'DEBUG_DIR="{run_dir}/logs/debug/${{SLURM_JOB_ID}}"' in content
+    for var in (
+        "TORCH_NCCL_TRACE_BUFFER_SIZE",
+        "TORCH_NCCL_DUMP_ON_TIMEOUT",
+        "TORCH_FR_DUMP_TEMP_FILE",
+        "TORCH_DISTRIBUTED_DEBUG",
+        "NCCL_DEBUG_FILE",
+        "PYTHONFAULTHANDLER",
+    ):
+        assert f"export {var}=" in content
+    # The debug exports come after env_file, so the env file cannot drop them,
+    # only override them through the ${VAR:-default} fallbacks.
+    assert content.index("source ") < content.index("export TORCH_NCCL_TRACE_BUFFER_SIZE")

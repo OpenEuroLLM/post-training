@@ -124,7 +124,7 @@ class TrainingConfig:
     bf16: bool = True
     seed: int = 42
     # Seconds a collective (or barrier) may wait before the watchdog aborts the job.
-    ddp_timeout: int = 1800
+    ddp_timeout: int = 300  # debug branch default; 1800 for production runs
     use_liger_kernel: bool = True
     liger_kernel_config: LigerKernelConfig | None = None
 

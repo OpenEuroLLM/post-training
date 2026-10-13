@@ -58,6 +58,28 @@ export NCCL_DEBUG=WARN
 # serializes CUDA streams and hurts ZeRO-2 overlap_comm — do not set it.
 export OMP_NUM_THREADS=1
 
+# ── Distributed debugging (debug/liger-fsdp2 branch) ──────────────────────
+# Each default can be overridden from env_file, which is sourced above.
+DEBUG_DIR="{{ run_dir }}/logs/debug/${SLURM_JOB_ID}"
+mkdir -p "$DEBUG_DIR"
+# Flight recorder: on a collective timeout, every rank dumps its last
+# collectives to fr_trace_<rank>, so the rank that never joined is visible.
+export TORCH_NCCL_TRACE_BUFFER_SIZE=${TORCH_NCCL_TRACE_BUFFER_SIZE:-2000}
+export TORCH_NCCL_DUMP_ON_TIMEOUT=${TORCH_NCCL_DUMP_ON_TIMEOUT:-1}
+export TORCH_FR_DUMP_TEMP_FILE=${TORCH_FR_DUMP_TEMP_FILE:-$DEBUG_DIR/fr_trace_}
+export TORCH_NCCL_DEBUG_INFO_TEMP_FILE=${TORCH_NCCL_DEBUG_INFO_TEMP_FILE:-$DEBUG_DIR/fr_trace_}
+# DETAIL checks that all ranks call the same collective with the same shapes,
+# but slows every collective. Do not compare throughput with it on.
+export TORCH_DISTRIBUTED_DEBUG=${TORCH_DISTRIBUTED_DEBUG:-INFO}
+# RCCL setup and transport choice (OFI/CXI vs. sockets), one file per rank.
+export NCCL_DEBUG=${NCCL_DEBUG_LEVEL:-INFO}
+export NCCL_DEBUG_SUBSYS=${NCCL_DEBUG_SUBSYS:-INIT,NET}
+export NCCL_DEBUG_FILE=${NCCL_DEBUG_FILE:-$DEBUG_DIR/rccl.%h.%p.log}
+# Python and C++ stacks on a segfault or a C++ exception.
+export PYTHONFAULTHANDLER=1
+export TORCH_SHOW_CPP_STACKTRACES=1
+echo "Debug output: $DEBUG_DIR"
+
 echo "=========================================="
 echo "Job started at: $(date)"
 echo "Job ID: $SLURM_JOB_ID"
