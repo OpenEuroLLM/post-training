@@ -9,10 +9,12 @@ from __future__ import annotations
 import dataclasses
 import logging
 import os
+from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import torch
+from accelerate import PartialState
 from transformers import AutoTokenizer
 from transformers.integrations import WandbCallback
 
@@ -216,6 +218,7 @@ def build_common_training_kwargs(
         ),
         bf16=t.bf16,
         seed=t.seed,
+        ddp_timeout=t.ddp_timeout,
         # Checkpointing
         save_strategy=config.checkpointing.save_strategy,
         save_steps=config.checkpointing.save_steps,
@@ -228,6 +231,16 @@ def build_common_training_kwargs(
         # DeepSpeed
         deepspeed=ds_config,
     )
+
+
+def distributed_state(config: PostTrainingConfig) -> PartialState:
+    """Return the process-wide ``PartialState``, starting it with ``training.ddp_timeout``.
+
+    The first ``PartialState()`` call creates the process group, and later calls
+    (including the one ``TrainingArguments`` makes) reuse it and ignore their
+    ``timeout``. Without this, the group keeps the 10-minute NCCL default.
+    """
+    return PartialState(timeout=timedelta(seconds=config.training.ddp_timeout))
 
 
 def sanitize_generation_config(trainer: Any) -> None:

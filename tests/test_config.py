@@ -44,6 +44,7 @@ def test_nullable_container_and_training_kwargs_load(tmp_path, monkeypatch):
     assert kwargs["lr_scheduler_kwargs"] is None
     assert kwargs["gradient_checkpointing_kwargs"] is None
     assert kwargs["deepspeed"] is None
+    assert kwargs["ddp_timeout"] == 1800
 
 
 def test_deepspeed_empty_dict_normalized_to_none(tmp_path, monkeypatch):
@@ -203,3 +204,18 @@ def test_resolve_tokenizer(tokenizer_name_or_path, tokenizer_revision, expected)
 
 def test_resolve_tokenizer_without_any_revision():
     assert ModelConfig(name_or_path="org/model").resolve_tokenizer() == ("org/model", None)
+
+
+def test_distributed_state_uses_ddp_timeout(monkeypatch):
+    from datetime import timedelta
+
+    from post_training.methods import common
+
+    seen = {}
+    monkeypatch.setattr(common, "PartialState", lambda **kwargs: seen.update(kwargs))
+    config = PostTrainingConfig()
+    config.training.ddp_timeout = 300
+
+    common.distributed_state(config)
+
+    assert seen == {"timeout": timedelta(seconds=300)}

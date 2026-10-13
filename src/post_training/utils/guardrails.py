@@ -243,6 +243,7 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
             liger_str = f"{liger_str}  ({overrides_str})"
     _row("Liger kernel", liger_str)
     _row("Seed", str(config.training.seed))
+    _row("DDP timeout", f"{config.training.ddp_timeout}s")
 
     if config.method == "sft":
         sft = config.sft

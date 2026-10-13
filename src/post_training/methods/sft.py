@@ -9,7 +9,6 @@ from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from accelerate import PartialState
 from datasets import Dataset, Features, List, Value
 from transformers import PreTrainedTokenizerBase
 from trl import SFTConfig, SFTTrainer
@@ -23,6 +22,7 @@ from post_training.methods.common import (
     build_common_training_kwargs,
     build_model_init_kwargs,
     build_tokenizer,
+    distributed_state,
     prioritize_metric_callbacks,
     sanitize_generation_config,
 )
@@ -340,7 +340,7 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
             "(open-instruct/open_instruct/dataset_transformation.py L1111-L1176)."
         )
 
-    with PartialState().main_process_first():
+    with distributed_state(config).main_process_first():
         dataset = load_and_mix_datasets(
             config.data,
             dataset_filter_fn=partial(
