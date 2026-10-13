@@ -122,15 +122,16 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
       --deepspeed_multinode_launcher {{ deepspeed_multinode_launcher }} \
 {% endif -%}
 {% if fsdp %}      --use_fsdp \
-      --fsdp_version 1 \
-      --fsdp_sharding_strategy {{ fsdp.sharding_strategy }} \
-      --fsdp_auto_wrap_policy {{ fsdp.auto_wrap_policy }} \
+      --fsdp_version {{ fsdp.version }} \
+{% if fsdp.version == 1 %}      --fsdp_sharding_strategy {{ fsdp.sharding_strategy }} \
+      --fsdp_backward_prefetch {{ fsdp.backward_prefetch }} \
+      --fsdp_forward_prefetch {{ fsdp.forward_prefetch | lower }} \
+      --fsdp_use_orig_params {{ fsdp.use_orig_params | lower }} \
+{% else %}      --fsdp_reshard_after_forward {{ 'true' if fsdp.sharding_strategy == 'FULL_SHARD' else 'false' }} \
+{% endif %}      --fsdp_auto_wrap_policy {{ fsdp.auto_wrap_policy }} \
 {% if fsdp.transformer_layer_cls_to_wrap %}      --fsdp_transformer_layer_cls_to_wrap {{ fsdp.transformer_layer_cls_to_wrap | join(",") }} \
 {% endif %}{% if fsdp.min_num_params is not none %}      --fsdp_min_num_params {{ fsdp.min_num_params }} \
-{% endif %}      --fsdp_backward_prefetch {{ fsdp.backward_prefetch }} \
-      --fsdp_forward_prefetch {{ fsdp.forward_prefetch | lower }} \
-      --fsdp_state_dict_type {{ fsdp.state_dict_type }} \
-      --fsdp_use_orig_params {{ fsdp.use_orig_params | lower }} \
+{% endif %}      --fsdp_state_dict_type {{ fsdp.state_dict_type }} \
       --fsdp_offload_params {{ fsdp.offload_params | lower }} \
       --fsdp_cpu_ram_efficient_loading {{ fsdp.cpu_ram_efficient_loading | lower }} \
       --fsdp_sync_module_states {{ fsdp.sync_module_states | lower }} \

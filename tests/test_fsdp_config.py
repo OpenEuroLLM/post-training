@@ -103,6 +103,33 @@ def test_fsdp_unknown_choice_rejected(field, value):
         TRLBackend().validate(cfg)
 
 
+def test_fsdp_unknown_version_rejected():
+    cfg = _fsdp_config()
+    cfg.fsdp.version = 3
+
+    with pytest.raises(ValueError, match="fsdp.version must be 1 or 2"):
+        TRLBackend().validate(cfg)
+
+
+@pytest.mark.parametrize("strategy", ["FULL_SHARD", "SHARD_GRAD_OP"])
+def test_fsdp2_reshard_strategies_pass(strategy):
+    cfg = _fsdp_config()
+    cfg.fsdp.version = 2
+    cfg.fsdp.sharding_strategy = strategy
+
+    TRLBackend().validate(cfg)
+
+
+@pytest.mark.parametrize("strategy", ["NO_SHARD", "HYBRID_SHARD", "HYBRID_SHARD_ZERO2"])
+def test_fsdp2_unmapped_strategy_rejected(strategy):
+    cfg = _fsdp_config()
+    cfg.fsdp.version = 2
+    cfg.fsdp.sharding_strategy = strategy
+
+    with pytest.raises(ValueError, match="fsdp.version 2 supports"):
+        TRLBackend().validate(cfg)
+
+
 def test_fsdp_efficient_loading_requires_sync_module_states():
     cfg = _fsdp_config()
     cfg.fsdp.sync_module_states = False
@@ -154,6 +181,9 @@ def test_guardrails_fsdp_summary():
 
     cfg.fsdp.transformer_layer_cls_to_wrap = ["Olmo3DecoderLayer"]
     assert "TRANSFORMER_BASED_WRAP (Olmo3DecoderLayer)" in _fsdp_summary(cfg)
+
+    cfg.fsdp.version = 2
+    assert _fsdp_summary(cfg).startswith("FSDP2 FULL_SHARD")
 
     cfg.fsdp = None
     assert _fsdp_summary(cfg) == "disabled"

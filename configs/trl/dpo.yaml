@@ -111,6 +111,7 @@ deepspeed:
 # training.gradient_checkpointing_kwargs.early_stop: false (early stopping makes
 # FSDP collectives rank-dependent when sequence lengths differ).
 # fsdp:
+#   version: 1                                 # 2 = fully_shard (per-param DTensor)
 #   sharding_strategy: FULL_SHARD
 #   auto_wrap_policy: TRANSFORMER_BASED_WRAP
 #   transformer_layer_cls_to_wrap: null       # null = the model's _no_split_modules

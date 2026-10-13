@@ -107,6 +107,16 @@ def _validate_fsdp(config: PostTrainingConfig) -> None:
         if value not in choices:
             raise ValueError(f"fsdp.{name} must be one of {', '.join(choices)}; got '{value}'.")
 
+    if fsdp.version not in (1, 2):
+        raise ValueError(f"fsdp.version must be 1 or 2; got {fsdp.version}.")
+    # FSDP2 only has reshard_after_forward; NO_SHARD and HYBRID_* need a device
+    # mesh that this launch does not set up.
+    if fsdp.version == 2 and fsdp.sharding_strategy not in ("FULL_SHARD", "SHARD_GRAD_OP"):
+        raise ValueError(
+            "fsdp.version 2 supports sharding_strategy FULL_SHARD or SHARD_GRAD_OP; "
+            f"got '{fsdp.sharding_strategy}'."
+        )
+
     # Rank-0-only loading leaves the other ranks without weights until FSDP
     # broadcasts them while wrapping.
     if fsdp.cpu_ram_efficient_loading and not fsdp.sync_module_states:

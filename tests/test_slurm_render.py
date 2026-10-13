@@ -485,6 +485,34 @@ def test_trl_container_fsdp_optional_flags_rendered(tmp_path, config):
     assert all(line.endswith("\\") for line in launch[:-1])
 
 
+@pytest.mark.parametrize(
+    ("sharding_strategy", "reshard"), [("FULL_SHARD", "true"), ("SHARD_GRAD_OP", "false")]
+)
+def test_trl_container_fsdp2_flags_rendered(tmp_path, config, sharding_strategy, reshard):
+    config.deepspeed = None
+    config.fsdp = FSDPConfig(version=2, sharding_strategy=sharding_strategy)
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    launch = _launch_lines(
+        render_trl_container_slurm_script(config, run_dir, "configs/trl/dpo.yaml").read_text()
+    )
+
+    assert "--fsdp_version 2 \\" in launch
+    assert f"--fsdp_reshard_after_forward {reshard} \\" in launch
+    # FSDP1-only flags; accelerate rejects forward_prefetch under FSDP2.
+    for flag in (
+        "--fsdp_sharding_strategy",
+        "--fsdp_backward_prefetch",
+        "--fsdp_forward_prefetch",
+        "--fsdp_use_orig_params",
+    ):
+        assert not any(line.startswith(flag) for line in launch)
+    # accelerate launch still checks cpu_ram_efficient_loading against sync_module_states.
+    assert "--fsdp_sync_module_states true \\" in launch
+    assert all(line.endswith("\\") for line in launch[:-1])
+
+
 def test_trl_container_fsdp_absent_by_default(tmp_path, config):
     run_dir = tmp_path / "outputs" / "my-run"
     run_dir.mkdir(parents=True)

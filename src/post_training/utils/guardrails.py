@@ -86,7 +86,7 @@ def _fsdp_summary(config: PostTrainingConfig) -> str:
     if wrap == "TRANSFORMER_BASED_WRAP":
         classes = fsdp.transformer_layer_cls_to_wrap
         wrap += f" ({', '.join(classes) if classes else 'model _no_split_modules'})"
-    return f"FSDP1 {fsdp.sharding_strategy}, {wrap}, {fsdp.state_dict_type}"
+    return f"FSDP{fsdp.version} {fsdp.sharding_strategy}, {wrap}, {fsdp.state_dict_type}"
 
 
 # ---------------------------------------------------------------------------
