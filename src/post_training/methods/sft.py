@@ -104,6 +104,16 @@ MESSAGES_FEATURES = Features(
             {
                 "content": Value("string"),
                 "role": Value("string"),
+                # OpenAI-style calls. `arguments` is a JSON string, which the
+                # chat template inserts verbatim; it avoids declaring each
+                # tool's argument schema. datasets fills it with null for
+                # messages that have no calls.
+                "tool_calls": List(
+                    {
+                        "type": Value("string"),
+                        "function": {"name": Value("string"), "arguments": Value("string")},
+                    }
+                ),
             }
         ),
         # A JSON string, matching what TRL reads: it does

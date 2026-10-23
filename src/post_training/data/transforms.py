@@ -12,9 +12,12 @@ YAML config.
 
 from __future__ import annotations
 
+import ast
 import json
+import keyword
 import re
-from collections.abc import Callable
+import warnings
+from collections.abc import Callable, Iterator
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -555,3 +558,211 @@ def helpsteer3_principle(example: dict[str, Any]) -> dict[str, Any]:
             {"role": "assistant", "content": example["response"]},
         ]
     }
+
+
+# ---------------------------------------------------------------------------
+# Dolci tool use
+# ---------------------------------------------------------------------------
+
+# Dolci tool rows open with this system prompt. It describes the OLMo 3
+# <functions> / <function_calls> format, which the transform replaces.
+_DOLCI_TOOL_PROMPT = (
+    "You are a helpful function-calling AI assistant. You are provided with function signatures "
+    "within <functions></functions> XML tags. You may call one or more functions to assist with "
+    "the user query. Output any function calls within <function_calls></function_calls> XML tags. "
+    "Don't make assumptions about what values to plug into functions."
+)
+_DOLCI_PYTHONIC_HINT = " Format calls like: tool_name(query=...)"
+
+_JSON_NAMES = {"true": True, "false": False, "null": None}
+_CALL_RE = re.compile(r"\s*([^()]+?)\((.*)\)\s*", re.DOTALL)
+# Python keywords used as argument names (``from="EUR"``) are a syntax error;
+# they are renamed before parsing and restored afterwards.
+_KEYWORD_PREFIX = "_kw_"
+_KEYWORD_ARG_RE = re.compile(
+    r"(?<![\w.])("
+    + "|".join(k for k in keyword.kwlist if k not in ("True", "False", "None"))
+    + r")\s*=(?!=)"
+)
+# Nodes allowed in an argument value that is an expression over literals,
+# e.g. ``12*60``, ``[0.03]*15`` or ``[c for c in "noon"]``. A bare name that is
+# not bound by a comprehension is a placeholder and fails with NameError.
+_SAFE_NODES = (
+    ast.Expression, ast.Constant, ast.List, ast.Tuple, ast.Dict, ast.Set, ast.BinOp, ast.UnaryOp,
+    ast.operator, ast.unaryop, ast.ListComp, ast.comprehension, ast.Name, ast.Call, ast.Subscript,
+    ast.Slice, ast.Load, ast.Store, ast.Compare, ast.cmpop,
+)  # fmt: skip
+_SAFE_GLOBALS = {"__builtins__": {}, "range": range, "list": list}
+
+
+class _DolciCallError(ValueError):
+    """A Dolci call line cannot be converted to a JSON tool call."""
+
+
+class _JsonNames(ast.NodeTransformer):
+    """Replace JSON ``true`` / ``false`` / ``null`` names with Python constants."""
+
+    def visit_Name(self, node: ast.Name) -> ast.AST:
+        if node.id in _JSON_NAMES:
+            return ast.Constant(_JSON_NAMES[node.id])
+        return node
+
+
+def _dolci_value(node: ast.expr) -> Any:
+    """Evaluate one argument value: a literal, or an expression over literals only."""
+    node = _JsonNames().visit(node)
+    try:
+        return ast.literal_eval(node)
+    except ValueError:
+        pass
+    if not all(isinstance(n, _SAFE_NODES) and not isinstance(n, ast.Pow) for n in ast.walk(node)):
+        raise _DolciCallError(f"unsupported value: {ast.unparse(node)}")
+    try:
+        return eval(compile(ast.Expression(node), "<dolci>", "eval"), _SAFE_GLOBALS)  # noqa: S307
+    except Exception as exc:
+        raise _DolciCallError(f"cannot evaluate value: {ast.unparse(node)}") from exc
+
+
+def _dolci_call(text: str) -> dict[str, Any]:
+    """Convert one Python-style call, ``name(k=v, ...)``, to an OpenAI-style tool call.
+
+    The name may contain spaces, ``-``, ``.`` or ``/``, so it is split off with a
+    regex. ``arguments`` is a JSON string, serialized like the HF ``tojson``
+    filter and the vLLM ``hermes`` parser do, so a call the model writes and
+    the client sends back renders to the same text as in training.
+    """
+    match = _CALL_RE.fullmatch(text)
+    if not match:
+        raise _DolciCallError(f"not a call: {text!r}")
+    name = match[1].strip()
+    if '"' in name or "\\" in name:
+        raise _DolciCallError(f"name breaks the rendered JSON: {name!r}")
+    arg_text = _KEYWORD_ARG_RE.sub(rf"{_KEYWORD_PREFIX}\1=", match[2])
+    try:
+        # Dolci strings hold regex escapes such as '\.'; they parse fine but warn.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SyntaxWarning)
+            call = ast.parse(f"_f({arg_text})", mode="eval").body
+    except SyntaxError as exc:
+        raise _DolciCallError(f"syntax error: {text!r}") from exc
+    if not isinstance(call, ast.Call) or call.args or any(kw.arg is None for kw in call.keywords):
+        raise _DolciCallError(f"not a keyword-only call: {text!r}")
+
+    args = {}
+    for kw in call.keywords:
+        unprefixed = kw.arg.removeprefix(_KEYWORD_PREFIX)
+        args[unprefixed if keyword.iskeyword(unprefixed) else kw.arg] = _dolci_value(kw.value)
+    try:
+        arguments = json.dumps(args, ensure_ascii=False)
+        round_trip_ok = json.loads(arguments) == args
+    except (TypeError, ValueError):
+        round_trip_ok = False
+    if not round_trip_ok:
+        # Tuples, sets, non-string keys or NaN would come back from the parser changed.
+        raise _DolciCallError(f"arguments do not survive a JSON round trip: {text!r}")
+    return {"type": "function", "function": {"name": name, "arguments": arguments}}
+
+
+def _dolci_call_texts(block: str) -> Iterator[str]:
+    """Split a Dolci ``function_calls`` block into one text per call.
+
+    Skips ``null`` (Dolci's marker for "no call"), blank lines and ``#``
+    comments, splits on a literal ``\\n`` between calls, and joins a call that
+    spans several lines.
+
+    Python's parser splits the block when it can, so ``(``, ``)`` and ``#``
+    inside strings are safe. The literal ``\\n`` is only replaced if the block
+    does not parse as it is, so a ``)\\n`` inside a string is kept. A block that
+    is not Python, e.g. a name with spaces (``Get Rounds(id=1)``), falls back
+    to a line split that counts parentheses.
+    """
+    fixed = re.sub(r"\)\\n(?=\S)", ")\n", block)
+    for text in (block, fixed):
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", SyntaxWarning)
+                statements = ast.parse(text).body
+        except SyntaxError:
+            continue
+        for stmt in statements:
+            if (
+                isinstance(stmt, ast.Expr)
+                and isinstance(stmt.value, ast.Name)
+                and stmt.value.id == "null"
+            ):
+                continue
+            yield ast.get_source_segment(text, stmt)
+        return
+
+    pending = ""
+    for line in fixed.splitlines():
+        if line.strip() in ("", "null") or line.lstrip().startswith("#"):
+            continue
+        pending = f"{pending}\n{line}" if pending else line
+        if pending.count("(") > pending.count(")"):
+            continue
+        yield pending
+        pending = ""
+    if pending:
+        yield pending
+
+
+@register_transform("dolci_tool_use")
+def dolci_tool_use(example: dict[str, Any]) -> dict[str, Any]:
+    """Transform allenai/Dolci-Instruct-SFT tool rows to the standard tool format.
+
+    Dolci stores tools in the OLMo 3 layout: the tool list as a JSON string in
+    ``messages[0]["functions"]``, each call as a Python-style line in an
+    assistant ``function_calls`` field, and each result as role
+    ``environment``. This transform produces what chat templates and the vLLM
+    ``hermes`` parser expect:
+
+    - ``messages[0]["functions"]`` -> the ``tools`` column (JSON string)
+    - assistant ``function_calls`` -> ``tool_calls`` with JSON ``arguments``
+    - role ``environment`` -> role ``tool``
+
+    It also removes the Dolci system prompt text about ``<functions>`` tags
+    (keeping any task instructions after it) and drops assistant turns with
+    no content and no calls. Rows without a tool list pass through unchanged.
+
+    The row is dropped (empty ``messages``) if any call cannot be converted:
+    placeholders such as ``loan_amount=X``, calls nested in calls, positional
+    arguments, or values that change in a JSON round trip.
+    """
+    messages = example["messages"]
+    if not messages or not messages[0].get("functions"):
+        return {
+            "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
+            "tools": None,
+        }
+
+    out: list[dict[str, Any]] = []
+    system = (
+        messages[0]["content"]
+        .removeprefix(_DOLCI_TOOL_PROMPT)
+        .replace(_DOLCI_PYTHONIC_HINT, "")
+        .strip()
+    )
+    if system:
+        out.append({"role": "system", "content": system})
+
+    for message in messages[1:]:
+        role, content = message["role"], message["content"] or ""
+        if role == "environment":
+            out.append({"role": "tool", "content": content})
+        elif role == "assistant":
+            try:
+                tool_calls = [
+                    _dolci_call(t) for t in _dolci_call_texts(message.get("function_calls") or "")
+                ]
+            except _DolciCallError:
+                # Every row must return the same keys, or the datasets writer fails.
+                return {"messages": [], "tools": None}
+            if tool_calls:
+                out.append({"role": "assistant", "content": content, "tool_calls": tool_calls})
+            elif content.strip():
+                out.append({"role": "assistant", "content": content})
+        else:
+            out.append({"role": role, "content": content})
+
+    return {"messages": out, "tools": messages[0]["functions"]}
