@@ -293,6 +293,9 @@ _LLAMAFACTORY_INPUT_PATH_LIST_KEYS = ("adapter_name_or_path",)
 _LLAMAFACTORY_DEFAULT_DATASET_DIR = "data"
 _LLAMAFACTORY_DEFAULT_STAGE = "sft"
 _LLAMAFACTORY_STAGES = ("pt", "sft", "rm", "ppo", "dpo", "kto")
+# LlamaFactory does not resume these stages with full or freeze tuning: a requeued job
+# starts again from step 0.
+_LLAMAFACTORY_NON_RESUMABLE_STAGES = ("rm", "ppo")
 _LLAMAFACTORY_REGISTRY = "dataset_info.json"
 
 
