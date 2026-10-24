@@ -617,7 +617,12 @@ def _dolci_value(node: ast.expr) -> Any:
         return ast.literal_eval(node)
     except (ValueError, TypeError):  # TypeError: an unhashable key, e.g. {[]: 1}
         pass
-    if not all(isinstance(n, _SAFE_NODES) and not isinstance(n, ast.Pow) for n in ast.walk(node)):
+    if not all(
+        isinstance(n, _SAFE_NODES)
+        and not isinstance(n, ast.Pow)
+        and not (isinstance(n, ast.Subscript) and isinstance(n.ctx, ast.Store))
+        for n in ast.walk(node)
+    ):
         raise _DolciCallError(f"unsupported value: {ast.unparse(node)}")
     try:
         return eval(compile(ast.Expression(node), "<dolci>", "eval"), _SAFE_GLOBALS)  # noqa: S307
