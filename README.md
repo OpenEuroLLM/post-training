@@ -386,7 +386,7 @@ Each run generates a unique directory based on `paths.output_base` (or `paths.de
 
 ## LlamaFactory Backend
 
-An alternative backend using [LlamaFactory](https://github.com/hiyouga/LlamaFactory) for training, running inside a Singularity container.
+An alternative backend using [LlamaFactory](https://github.com/hiyouga/LlamaFactory) for training, running inside a Singularity container. The submission targets LlamaFactory **v0.9.5**: the stage choices and the input path keys come from that release, so the container must run it.
 
 ### Setup
 

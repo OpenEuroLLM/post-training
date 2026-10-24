@@ -373,6 +373,33 @@ def test_llamafactory_post_freeze_makes_existing_input_paths_absolute(tmp_path, 
     assert frozen["export_dir"] == "exports"
 
 
+def test_llamafactory_post_freeze_makes_v095_input_paths_absolute(tmp_path, monkeypatch):
+    """The KTransformers and HyperParallel input files that LlamaFactory 0.9.5 added."""
+    repo_dir = tmp_path / "repo"
+    (repo_dir / "kt").mkdir(parents=True)
+    for local in ("kt/weights.kt", "kt/experts.safetensors", "hyper_parallel.json"):
+        (repo_dir / local).write_text("{}")
+    monkeypatch.chdir(repo_dir)
+    cfg = _llamafactory_config(
+        kt_weight_path="kt/weights.kt",
+        kt_expert_checkpoint_path="kt/experts.safetensors",
+        hyper_parallel_args="hyper_parallel.json",
+        profiler_output_dir="profiler",
+        dataset_dir="ONLINE",
+    )
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    LlamaFactoryBackend().post_freeze(cfg, run_dir)
+
+    root = repo_dir.resolve()
+    frozen = _frozen_llamafactory_config(run_dir)
+    assert frozen["kt_weight_path"] == str(root / "kt" / "weights.kt")
+    assert frozen["kt_expert_checkpoint_path"] == str(root / "kt" / "experts.safetensors")
+    assert frozen["hyper_parallel_args"] == str(root / "hyper_parallel.json")
+    assert frozen["profiler_output_dir"] == "profiler"
+
+
 def test_llamafactory_post_freeze_keeps_existing_copies(tmp_path, monkeypatch, caplog):
     """A new submit into the same run directory keeps the copies its checkpoints were made with."""
     repo_dir = tmp_path / "repo"

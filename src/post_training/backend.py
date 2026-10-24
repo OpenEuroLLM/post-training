@@ -261,16 +261,23 @@ class TRLBackend(Backend):
 # LlamaFactory
 # ---------------------------------------------------------------------------
 
+# The LlamaFactory release that the container runs. The key names and stage choices
+# below come from its hparams.
+LLAMAFACTORY_VERSION = "0.9.5"
+
 # llamafactory keys that hold local input paths. The job runs in the run directory, so a
 # relative value that exists is made absolute at submission. Output keys (export_dir,
-# logging_dir, offload_folder, swanlab_logdir) stay relative and land in the run directory.
+# logging_dir, offload_folder, swanlab_logdir, profiler_output_dir) stay relative and land
+# in the run directory.
 _LLAMAFACTORY_INPUT_PATH_KEYS = (
     "model_name_or_path",
     "adapter_folder",
     "cache_dir",
     "new_special_tokens_config",
     "export_quantization_dataset",
-    "kt_optimize_rule",
+    "kt_weight_path",
+    "kt_expert_checkpoint_path",
+    "hyper_parallel_args",
     "media_dir",
     "tokenized_path",
     "ref_model",
