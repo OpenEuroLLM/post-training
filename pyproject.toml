@@ -13,6 +13,7 @@ dependencies = [
     "wandb",
     "huggingface-hub",
     "psutil",
+    "datasets==5.0.0",
 ]
 
 [project.optional-dependencies]
@@ -21,7 +22,6 @@ trl = [
     "trl",
     "deepspeed",
     "transformers",
-    "datasets>4.5.0",
     "accelerate",
     "kernels",
     "flash_attn",

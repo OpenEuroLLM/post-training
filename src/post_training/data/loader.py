@@ -14,7 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from datasets import Dataset, Features, concatenate_datasets, load_dataset
+from datasets import Dataset, Features, List, concatenate_datasets, load_dataset
 
 from post_training.data.transforms import get_transform
 
@@ -97,6 +97,47 @@ def _resample_to_size(ds: Dataset, target_n: int, seed: int) -> Dataset:
     if len(copies) == 1:
         return copies[0]
     return concatenate_datasets(copies)
+
+
+def _align_message_fields(datasets: list[Dataset], num_proc: int) -> list[Dataset]:
+    """Give every dataset the same message fields, so that they concatenate.
+
+    A transformed entry has the message fields of the cast features (e.g.
+    ``tool_calls``); a native entry keeps its own (e.g. only ``role`` and
+    ``content``, or Dolci's ``functions`` and ``function_calls``). Each dataset
+    gets the union of all fields, with null for a field it does not have, so no
+    data is lost. If two datasets give one field different types, nothing
+    changes, and ``concatenate_datasets`` reports the conflict.
+    """
+    structs = [
+        ds.features["messages"].feature
+        for ds in datasets
+        if isinstance(ds.features.get("messages"), List)
+        and isinstance(ds.features["messages"].feature, dict)
+    ]
+    union: dict = {}
+    for struct in structs:
+        for name, feature in struct.items():
+            if union.setdefault(name, feature) != feature:
+                return datasets
+    if all(list(struct) == list(union) for struct in structs):
+        return datasets
+
+    aligned = []
+    for ds in datasets:
+        messages = ds.features.get("messages")
+        if (
+            not isinstance(messages, List)
+            or not isinstance(messages.feature, dict)
+            or list(messages.feature) == list(union)
+        ):
+            aligned.append(ds)
+            continue
+        features = ds.features.copy()
+        features["messages"] = List(dict(union))
+        # The identity map re-encodes the rows: datasets fills missing fields with null.
+        aligned.append(ds.map(lambda row: row, features=features, num_proc=num_proc))
+    return aligned
 
 
 def load_and_mix_datasets(
@@ -239,6 +280,6 @@ def load_and_mix_datasets(
     if len(resampled_datasets) == 1:
         mixed = resampled_datasets[0]
     else:
-        mixed = concatenate_datasets(resampled_datasets)
+        mixed = concatenate_datasets(_align_message_fields(resampled_datasets, num_proc))
 
     return mixed.shuffle(seed=seed)
