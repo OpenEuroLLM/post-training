@@ -230,6 +230,61 @@ def test_tools_column_survives_mixing_and_is_null_where_absent(monkeypatch):
     assert None in tools
 
 
+def test_native_and_transformed_entries_with_different_message_fields_mix(monkeypatch):
+    """A transformed entry gets the cast message fields (here `tool_calls`); native
+    entries keep their own. Each dataset gets the union of the fields, with null
+    where a field is absent, so `concatenate_datasets` does not fail and no field
+    is lost."""
+    from post_training.methods.sft import MESSAGES_FEATURES
+
+    tools = '[{"type": "function", "function": {"name": "wx"}}]'
+    dolci_row = {
+        "messages": [
+            {"role": "system", "content": "", "functions": tools, "function_calls": None},
+            {"role": "user", "content": "Weather?", "functions": None, "function_calls": None},
+            {
+                "role": "assistant",
+                "content": "",
+                "functions": None,
+                "function_calls": 'wx(q="Oslo")',
+            },
+        ]
+    }
+    _patch_load_dataset(
+        monkeypatch,
+        {
+            "plain": _dataset("plain", 1).select_columns(["messages"]),
+            "dolci-native": Dataset.from_list([dolci_row]),
+            "dolci": Dataset.from_list([dolci_row]),
+        },
+    )
+
+    mixed = loader.load_and_mix_datasets(
+        _config(
+            DatasetEntry(name="plain", path="plain"),
+            DatasetEntry(name="dolci-native", path="dolci-native"),
+            DatasetEntry(name="dolci", path="dolci", transform="dolci_tool_use"),
+        ),
+        columns_to_keep=["messages", "tools"],
+        features=MESSAGES_FEATURES,
+    )
+
+    assert set(mixed.features["messages"].feature) == {
+        "role", "content", "tool_calls", "functions", "function_calls"
+    }  # fmt: skip
+    plain = next(r["messages"] for r in mixed if r["messages"][0]["content"] == "plain-0")
+    native = next(r["messages"] for r in mixed if r["messages"][0]["role"] == "system")
+    converted = next(
+        r["messages"] for r in mixed if r["tools"] and r["messages"][0]["role"] == "user"
+    )
+
+    assert plain[0]["tool_calls"] is None and plain[0]["functions"] is None
+    assert native[2]["function_calls"] == 'wx(q="Oslo")'  # kept for the olmo3 template
+    assert native[2]["tool_calls"] is None
+    assert converted[1]["tool_calls"][0]["function"]["name"] == "wx"
+    assert converted[1]["function_calls"] is None
+
+
 def test_native_plain_chat_dataset_skips_schema_cast(monkeypatch):
     _patch_load_dataset(monkeypatch, {"dataset-a": _dataset("a", 2)})
     features = Features(
