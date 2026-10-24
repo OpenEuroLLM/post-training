@@ -1,0 +1,123 @@
+# ============================================================================
+# LlamaFactory SFT of Prelude 9B on Dolci-Instruct-SFT (LUMI)
+# ============================================================================
+# Usage: python scripts/submit.py --config configs/llamafactory/prelude-sft.yaml
+#
+# Needs LlamaFactory 0.9.5 in container.image. Before the first submission, make
+# the model directory in llamafactory.model_name_or_path: the model weights of
+# birgermoell/oellm-9b-256k-theta64m-prelude-anneal300b with the tokenizer of
+# openeurollm/tokenizer-256k (revision qwen3-tokens). LlamaFactory loads the
+# tokenizer from model_name_or_path, and only this tokenizer has the qwen3 tokens.
+# ============================================================================
+
+backend: llamafactory
+method: sft
+run_name: oellm-9b-256k-theta64m-prelude-anneal300b-sft-llamafactory
+offline: false
+
+# -- Container ---------------------------------------------------------------
+container:
+  image: /scratch/project_465002530/containers/REPLACE-WITH-llamafactory-0.9.5-rocm.sif # TODO: LlamaFactory 0.9.5 ROCm image
+  bind_mounts:
+    - /pfs/lustrep3/scratch/project_465002530/users/krishnak/post-training/ # replace with your own path to the post-training repo
+  path: /opt/venv/bin:/opt/rocm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin # check against the image
+  env_file: env/lumi.env # make sure you have this file in the post-training repo, or change to your own env file
+
+# -- SLURM -------------------------------------------------------------------
+slurm:                                      # LUMI Cluster SLURM configuration
+  account: "project_465002530"
+  partition: "standard-g"                   # Test on dev-g first
+  num_nodes: 4
+  gpus_per_node: 8
+  cpus_per_task: 56
+  wall_time: "36:00:00"
+  job_name: "Prelude-SFT"
+  signal_time_seconds: 300                   # SIGUSR1 sent this many seconds before timeout to trigger self-healing
+  max_failures: 1                            # Self-healing retry limit
+  mem: "256G"
+
+# -- Debug mode --------------------------------------------------------------
+debug:
+  enabled: false
+  override_existing: false
+
+# -- Output paths -------------------------------------------------------------
+paths:
+  output_base: "outputs"
+  debug_base: "outputs/debug"
+
+# -- LlamaFactory-native training config ------------------------------------
+llamafactory:
+  # model
+  model_name_or_path: /scratch/project_465002530/users/krishnak/models/oellm-9b-256k-theta64m-prelude-anneal300b-qwen3-tokens # TODO: see the header
+  flash_attn: fa2                            # No flash attention 3 for rocm yet
+  enable_liger_kernel: true
+  disable_gradient_checkpointing: false
+  use_reentrant_gc: false
+
+  # method
+  stage: sft
+  do_train: true
+  finetuning_type: full
+  deepspeed:
+    bf16:
+      enabled: auto
+    zero_optimization:
+      stage: 2
+      overlap_comm: false                    # Enabling overlap_comm has caused issues before
+      contiguous_gradients: true
+      reduce_scatter: true
+    gradient_clipping: 1.0
+    train_micro_batch_size_per_gpu: "auto"
+    gradient_accumulation_steps: "auto"
+    train_batch_size: "auto"
+    optimizer:
+      type: AdamW
+      params:
+        lr: "auto"
+        betas: "auto"
+        eps: "auto"
+        weight_decay: "auto"
+
+  # dataset
+  dataset_dir: data/llamafactory
+  dataset: dolci_instruct_sft
+  template: qwen3
+  enable_thinking: true                      # empty <think></think> block on the trained answer
+  mask_history: true                         # loss on the final assistant message only
+  cutoff_len: 32768
+  packing: true
+  neat_packing: true                         # no attention across packed examples (needs batch size 1)
+  preprocessing_num_workers: 32
+
+  # train
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 1             # 1 x 32 GPUs x 1 = 32 per step
+  num_train_epochs: 2.0
+  learning_rate: 8.0e-5
+  lr_scheduler_type: linear
+  warmup_steps: 0.03                         # a value < 1 is a ratio (transformers >= 5); use warmup_ratio with transformers 4.x
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_epsilon: 1.0e-8
+  weight_decay: 0.0
+  max_grad_norm: 1.0
+  bf16: true
+  seed: 42
+  torch_compile: true
+  torch_compile_backend: inductor
+
+  # checkpoints
+  save_strategy: steps
+  save_steps: 250
+  save_total_limit: 3
+  save_only_model: false
+
+  # logging
+  run_name: oellm-9b-256k-theta64m-prelude-anneal300b-sft-llamafactory
+  report_to:
+    - wandb
+    - tensorboard
+  logging_dir: logs                          # relative to the run directory
+  logging_steps: 10
+  include_num_input_tokens_seen: non_padding
