@@ -326,6 +326,7 @@ def _llamafactory_sections(config: PostTrainingConfig, run_dir: Path, total_gpus
         _LLAMAFACTORY_DEFAULT_STAGE,
         _LLAMAFACTORY_NON_RESUMABLE_STAGES,
         LLAMAFACTORY_VERSION,
+        LlamaFactoryBackend,
         llamafactory_dataset_names,
     )
 
@@ -392,6 +393,13 @@ def _llamafactory_sections(config: PostTrainingConfig, run_dir: Path, total_gpus
 
     _section("Output")
     _row("Run directory", str(run_dir))
+    for frozen, source, differs in LlamaFactoryBackend().kept_frozen_inputs(config, run_dir):
+        name = frozen.relative_to(run_dir.resolve())
+        if differs:
+            text = f"*** {name} differs from {source} — the frozen copy will NOT be replaced ***"
+        else:
+            text = f"*** {name} already exists in the run directory — it will NOT be replaced ***"
+        _row("Frozen input", _yellow(text), warn=True)
     _row("Logging", _lf_value(lf, "report_to"))
     if config.debug.enabled:
         _row("Debug mode", _red("*** ENABLED — output dir may be overwritten ***"), warn=True)

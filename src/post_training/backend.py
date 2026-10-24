@@ -326,14 +326,27 @@ def _absolute_if_exists(value: str) -> str:
     return str(path.resolve())
 
 
-def _freeze_file(dst: Path, render: Callable[[], str]) -> None:
+def _frozen_copy_differs(dst: Path, source: Path, render: Callable[[], str]) -> bool:
+    """True when the frozen *dst* is not what the current *source* would freeze to."""
+    return source.is_file() and dst.read_text() != render()
+
+
+def _freeze_file(dst: Path, source: Path, render: Callable[[], str]) -> None:
     """Write render() to *dst* once; an existing *dst* is kept, so a resumed run keeps its inputs.
 
     The text goes to a temp file first and is swapped into place, so an interrupted
     submission never leaves a partial copy that a later one would keep.
     """
     if dst.exists():
-        logger.warning("%s already exists — keeping the frozen copy.", dst)
+        if _frozen_copy_differs(dst, source, render):
+            logger.warning(
+                "%s differs from %s — keeping the frozen copy. Delete it, or use a new "
+                "run_name, to freeze the current file.",
+                dst,
+                source,
+            )
+        else:
+            logger.warning("%s already exists — keeping the frozen copy.", dst)
         return
     dst.parent.mkdir(parents=True, exist_ok=True)
     tmp = dst.with_name(dst.name + ".tmp")
@@ -349,6 +362,29 @@ def _registry_pointing_at(source_dir: Path) -> str:
             if isinstance(entry.get(key), str) and not Path(entry[key]).is_absolute():
                 entry[key] = str(source_dir / entry[key])
     return json.dumps(entries, indent=2, ensure_ascii=False) + "\n"
+
+
+def _llamafactory_frozen_inputs(
+    lf: dict, frozen_dir: Path
+) -> dict[str, tuple[Path, Path, Callable[[], str]]]:
+    """The files that post_freeze() freezes, as {kind: (frozen copy, source, render)}.
+
+    Relative sources start at the directory where submit.py runs.
+    """
+    inputs: dict[str, tuple[Path, Path, Callable[[], str]]] = {}
+    deepspeed = lf.get("deepspeed")
+    if isinstance(deepspeed, str):
+        source = Path(deepspeed)
+        inputs["deepspeed"] = (frozen_dir / source.name, source, source.read_text)
+    dataset_dir = lf.get("dataset_dir") or _LLAMAFACTORY_DEFAULT_DATASET_DIR
+    if _is_local_registry(dataset_dir):
+        source_dir = Path(dataset_dir).resolve()
+        inputs["registry"] = (
+            frozen_dir / _LLAMAFACTORY_REGISTRY,
+            source_dir / _LLAMAFACTORY_REGISTRY,
+            lambda: _registry_pointing_at(source_dir),
+        )
+    return inputs
 
 
 class LlamaFactoryBackend(Backend):
@@ -439,6 +475,20 @@ class LlamaFactoryBackend(Backend):
     def run_dir_subdirs(self) -> list[str]:
         return ["checkpoints"]
 
+    def kept_frozen_inputs(self, config, run_dir) -> list[tuple[Path, Path, bool]]:
+        """(frozen copy, source, differs) for each frozen input that post_freeze() keeps.
+
+        A new submit into an existing run directory keeps these copies and does not
+        read the current files, so the review screen lists them.
+        """
+        frozen_dir = run_dir.resolve() / "llamafactory"
+        inputs = _llamafactory_frozen_inputs(config.llamafactory, frozen_dir)
+        return [
+            (frozen, source, _frozen_copy_differs(frozen, source, render))
+            for frozen, source, render in inputs.values()
+            if frozen.exists()
+        ]
+
     def render_slurm_script(self, config, run_dir, frozen_config_path, *, tokenize_only=False):
         # LlamaFactory has no --tokenize-only equivalent; submit.py rejects it before this point.
         del tokenize_only
@@ -472,23 +522,21 @@ class LlamaFactoryBackend(Backend):
                 parts = lf_config[key].split(",")
                 lf_config[key] = ",".join(_absolute_if_exists(part.strip()) for part in parts)
 
-        deepspeed = lf_config.get("deepspeed")
-        if isinstance(deepspeed, str):
-            frozen_deepspeed = frozen_dir / Path(deepspeed).name
-            _freeze_file(frozen_deepspeed, lambda: Path(deepspeed).read_text())
+        inputs = _llamafactory_frozen_inputs(lf_config, frozen_dir)
+        if "deepspeed" in inputs:
+            frozen_deepspeed, source, render = inputs["deepspeed"]
+            _freeze_file(frozen_deepspeed, source, render)
             lf_config["deepspeed"] = str(frozen_deepspeed)
 
-        dataset_dir = lf_config.get("dataset_dir") or _LLAMAFACTORY_DEFAULT_DATASET_DIR
-        if _is_local_registry(dataset_dir):
-            source_dir = Path(dataset_dir).resolve()
-            frozen_registry = frozen_dir / _LLAMAFACTORY_REGISTRY
-            if (source_dir / _LLAMAFACTORY_REGISTRY).is_file() or frozen_registry.exists():
-                _freeze_file(frozen_registry, lambda: _registry_pointing_at(source_dir))
+        if "registry" in inputs:
+            frozen_registry, source, render = inputs["registry"]
+            if source.is_file() or frozen_registry.exists():
+                _freeze_file(frozen_registry, source, render)
                 lf_config["dataset_dir"] = str(frozen_dir)
                 # media_dir defaults to dataset_dir; keep relative media paths on the source.
-                lf_config.setdefault("media_dir", str(source_dir))
-            elif source_dir.exists():
-                lf_config["dataset_dir"] = str(source_dir)
+                lf_config.setdefault("media_dir", str(source.parent))
+            elif source.parent.exists():
+                lf_config["dataset_dir"] = str(source.parent)
 
         # LlamaFactory resumes from the last checkpoint-N in output_dir only when
         # overwrite_output_dir is false.

@@ -467,7 +467,52 @@ def test_llamafactory_post_freeze_keeps_existing_copies(tmp_path, monkeypatch, c
 
     assert (frozen_dir / "zero3.json").read_text() == first_deepspeed
     assert (frozen_dir / "dataset_info.json").read_text() == first_registry
-    assert "already exists" in caplog.text
+    assert f"{frozen_dir / 'zero3.json'} differs from configs/deepspeed/zero3.json" in caplog.text
+    assert "dataset_info.json differs from" in caplog.text
+
+
+def test_llamafactory_post_freeze_says_when_a_kept_copy_is_unchanged(tmp_path, monkeypatch, caplog):
+    repo_dir = tmp_path / "repo"
+    _make_llamafactory_repo(repo_dir)
+    monkeypatch.chdir(repo_dir)
+    cfg = _llamafactory_config(deepspeed="configs/deepspeed/zero3.json", dataset_dir="ONLINE")
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+    LlamaFactoryBackend().post_freeze(cfg, run_dir)
+
+    with caplog.at_level(logging.WARNING):
+        LlamaFactoryBackend().post_freeze(cfg, run_dir)
+
+    assert "zero3.json already exists — keeping the frozen copy." in caplog.text
+    assert "differs" not in caplog.text
+
+
+def test_llamafactory_kept_frozen_inputs_marks_changed_sources(tmp_path, monkeypatch):
+    repo_dir = tmp_path / "repo"
+    _make_llamafactory_repo(repo_dir)
+    monkeypatch.chdir(repo_dir)
+    cfg = _llamafactory_config(
+        deepspeed="configs/deepspeed/zero3.json",
+        dataset="local_file",
+        dataset_dir="data/llamafactory",
+    )
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+    assert LlamaFactoryBackend().kept_frozen_inputs(cfg, run_dir) == []
+
+    LlamaFactoryBackend().post_freeze(cfg, run_dir)
+    (repo_dir / "data" / "llamafactory" / "dataset_info.json").write_text("{}")
+
+    frozen_dir = run_dir.resolve() / "llamafactory"
+    root = repo_dir.resolve()
+    assert LlamaFactoryBackend().kept_frozen_inputs(cfg, run_dir) == [
+        (frozen_dir / "zero3.json", Path("configs/deepspeed/zero3.json"), False),
+        (
+            frozen_dir / "dataset_info.json",
+            root / "data" / "llamafactory" / "dataset_info.json",
+            True,
+        ),
+    ]
 
 
 def test_llamafactory_post_freeze_recovers_from_interrupted_copy(tmp_path, monkeypatch):
