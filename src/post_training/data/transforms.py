@@ -590,10 +590,13 @@ _LOST_ESCAPE_RE = re.compile(r"\)([\r\t\x0c\x08\x0b\x07])(?=[\w.]+\()")
 # not bound by a comprehension is a placeholder and fails with NameError.
 _SAFE_NODES = (
     ast.Expression, ast.Constant, ast.List, ast.Tuple, ast.Dict, ast.Set, ast.BinOp, ast.UnaryOp,
-    ast.operator, ast.unaryop, ast.ListComp, ast.comprehension, ast.Name, ast.Call, ast.Subscript,
-    ast.Slice, ast.Load, ast.Store, ast.Compare, ast.cmpop,
+    ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.USub, ast.UAdd, ast.ListComp,
+    ast.comprehension, ast.Name, ast.Call, ast.Subscript, ast.Slice, ast.Load, ast.Store,
+    ast.Compare, ast.cmpop,
 )  # fmt: skip
-_SAFE_GLOBALS = {"__builtins__": {}, "range": range, "list": list}
+# Most items a value may build with repetition or range(), e.g. [0.5] * 12 or
+# list(range(60)); a dataset value must not allocate unbounded memory.
+_MAX_ITEMS = 10_000
 
 
 class _DolciCallError(ValueError):
@@ -610,6 +613,57 @@ class _JsonNames(ast.NodeTransformer):
         return node
 
 
+def _is_number_expr(node: ast.expr) -> bool:
+    """True if ``node`` is arithmetic over number constants only, e.g. ``12 * 60``."""
+    return all(
+        isinstance(n, ast.BinOp | ast.UnaryOp | ast.operator | ast.unaryop)
+        or (isinstance(n, ast.Constant) and isinstance(n.value, int | float))
+        for n in ast.walk(node)
+    )
+
+
+def _small_int(node: ast.expr) -> int | None:
+    """The int value of ``node`` if it is in ``[-_MAX_ITEMS, _MAX_ITEMS]``, else None.
+
+    ``node`` may be arithmetic over numbers, e.g. ``30 * 12``. Without ``**``
+    and ``<<`` its value grows only with the length of the expression.
+    """
+    if not _is_number_expr(node):
+        return None
+    code = compile(ast.Expression(node), "<dolci>", "eval")
+    try:
+        value = eval(code, {"__builtins__": {}})  # noqa: S307
+    except ArithmeticError:
+        return None
+    return value if type(value) is int and abs(value) <= _MAX_ITEMS else None
+
+
+def _within_size_limit(node: ast.expr) -> bool:
+    """True if every repetition and range() in ``node`` has a small constant size.
+
+    The product of all repetition counts and range() lengths must be at most
+    ``_MAX_ITEMS``, so nested and chained repetition is bounded too. A
+    comprehension may have one ``for`` only.
+    """
+    items = 1
+    for n in ast.walk(node):
+        if isinstance(n, ast.BinOp) and isinstance(n.op, ast.Mult):
+            if _is_number_expr(n.left) and _is_number_expr(n.right):
+                continue  # arithmetic, e.g. 12 * 60
+            count = _small_int(n.right) if not _is_number_expr(n.left) else _small_int(n.left)
+            if count is None:
+                return False
+            items *= max(count, 1)
+        elif isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "range":
+            bounds = [_small_int(a) for a in n.args]
+            if n.keywords or not 1 <= len(bounds) <= 3 or None in bounds or bounds[2:] == [0]:
+                return False
+            items *= max(len(range(*bounds)), 1)
+        elif isinstance(n, ast.ListComp) and len(n.generators) > 1:
+            return False
+    return items <= _MAX_ITEMS
+
+
 def _dolci_value(node: ast.expr) -> Any:
     """Evaluate one argument value: a literal, or an expression over literals only."""
     node = _JsonNames().visit(node)
@@ -619,13 +673,14 @@ def _dolci_value(node: ast.expr) -> Any:
         pass
     if not all(
         isinstance(n, _SAFE_NODES)
-        and not isinstance(n, ast.Pow)
         and not (isinstance(n, ast.Subscript) and isinstance(n.ctx, ast.Store))
         for n in ast.walk(node)
-    ):
+    ) or not _within_size_limit(node):
         raise _DolciCallError(f"unsupported value: {ast.unparse(node)}")
+    # New globals for each value, so that no value can change how a later row evaluates.
+    safe_globals = {"__builtins__": {}, "range": range, "list": list}
     try:
-        return eval(compile(ast.Expression(node), "<dolci>", "eval"), _SAFE_GLOBALS)  # noqa: S307
+        return eval(compile(ast.Expression(node), "<dolci>", "eval"), safe_globals)  # noqa: S307
     except Exception as exc:
         raise _DolciCallError(f"cannot evaluate value: {ast.unparse(node)}") from exc
 
@@ -715,6 +770,24 @@ def _dolci_call(text: str) -> dict[str, Any]:
     return {"type": "function", "function": {"name": name, "arguments": arguments}}
 
 
+def _restore_lost_escapes(block: str) -> str:
+    """Apply the ``_LOST_ESCAPE_RE`` repair, but not inside string literals.
+
+    The string positions come from the tokenizer, with the control characters
+    read as spaces (the same length, so the offsets stay correct). If the block
+    does not tokenize, the repair applies everywhere.
+    """
+    tokens = _tokens(block.translate({ord(c): " " for c in _ESCAPE_LETTERS}))
+    strings = [(start, end) for tok, start, end in tokens or [] if tok.type == tokenize.STRING]
+
+    def repair(match: re.Match[str]) -> str:
+        if any(start <= match.start() < end for start, end in strings):
+            return match[0]
+        return f")\n{_ESCAPE_LETTERS[match[1]]}"
+
+    return _LOST_ESCAPE_RE.sub(repair, block)
+
+
 def _dolci_call_texts(block: str) -> Iterator[str]:
     """Split a Dolci ``function_calls`` block into one text per call.
 
@@ -734,7 +807,7 @@ def _dolci_call_texts(block: str) -> Iterator[str]:
     parentheses. A wrong join there gives a syntax error, so the row is
     dropped, not changed.
     """
-    block = _LOST_ESCAPE_RE.sub(lambda m: f")\n{_ESCAPE_LETTERS[m[1]]}", block)
+    block = _restore_lost_escapes(block)
     fixed = re.sub(r"\)\\n(?=\S)", ")\n", block.replace("\r\n", "\n").replace("\r", "\n"))
     for text in (block, fixed):
         tokens = _tokens(text)

@@ -145,6 +145,9 @@ def test_dolci_tool_use_converts_to_standard_format():
         ("wx.get(flags=[true, false]*2)", [{"flags": [True, False, True, False]}]),
         ("wx.get(q='a')\r\nwx.get(q='b')", [{"q": "a"}, {"q": "b"}]),
         ("Get Player's Media(id=1)\nGet Player's Media(id=2)", [{"id": 1}, {"id": 2}]),
+        ('wx.get(q=")\tget(")', [{"q": ")\tget("}]),
+        ("wx.get(q=list(range(3)), r=[[0] * 2] * 2)", [{"q": [0, 1, 2], "r": [[0, 0], [0, 0]]}]),
+        ("wx.get(q=[1] * (2 * 2))", [{"q": [1, 1, 1, 1]}]),
     ],
 )
 def test_dolci_tool_use_repairs_call_lines(function_calls, expected):
@@ -161,6 +164,11 @@ def test_dolci_tool_use_repairs_call_lines(function_calls, expected):
         "wx.get(q=(1, 2))",
         "wx.get(q={1: 'a'})",
         "wx.get(q={[]: 1})",
+        "wx.get(q=[0]*1000000000)",
+        "wx.get(q=list(range(1000000000)))",
+        "wx.get(q=[[0] * 10000] * 10000)",
+        "wx.get(q=1 << 100)",
+        "wx.get(q=[x for x in 'ab' for y in 'cd'])",
         "wx.get(q=2**10)",
         'say"hi(q=1)',
         "wx.get",
@@ -168,6 +176,23 @@ def test_dolci_tool_use_repairs_call_lines(function_calls, expected):
 )
 def test_dolci_tool_use_drops_row_with_unconvertible_call(function_calls):
     assert dolci_tool_use(_dolci_row(function_calls)) == {"messages": [], "tools": None}
+
+
+def test_dolci_tool_use_value_cannot_change_how_later_rows_evaluate():
+    assert not dolci_tool_use(_dolci_row("wx.get(q=[0 for __builtins__['X'] in ['Oslo']])"))[
+        "messages"
+    ]
+    assert not dolci_tool_use(_dolci_row("wx.get(q=X)"))["messages"]
+
+
+def test_olmo3_instruct_sft_rejects_json_string_arguments_with_a_clear_error():
+    chat_template_utils = pytest.importorskip("transformers.utils.chat_template_utils")
+    compiled = chat_template_utils._compile_jinja_template(get_chat_template("olmo3-instruct-sft"))
+    out = dolci_tool_use(_dolci_row('wx.get(q="Oslo")'))
+    with pytest.raises(Exception, match="use transform: null"):
+        chat_template_utils._render_with_assistant_indices(
+            compiled, out["messages"], json.loads(out["tools"]), None, False
+        )
 
 
 def test_dolci_tool_use_restores_names_that_lost_an_escaped_letter():
