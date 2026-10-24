@@ -182,6 +182,47 @@ def test_llamafactory_validate_allows_overwrite_output_dir_false():
     LlamaFactoryBackend().validate(_llamafactory_config(overwrite_output_dir=False))
 
 
+@pytest.mark.parametrize("stage", ["pt", "sft", "rm", "ppo", "dpo", "kto"])
+def test_llamafactory_validate_accepts_matching_stage_and_method(stage):
+    cfg = _llamafactory_config(stage=stage)
+    cfg.method = stage
+
+    LlamaFactoryBackend().validate(cfg)
+
+
+def test_llamafactory_validate_defaults_the_stage_to_sft():
+    cfg = _llamafactory_config()
+    del cfg.llamafactory["stage"]
+
+    LlamaFactoryBackend().validate(cfg)
+
+
+@pytest.mark.parametrize("stage", ["orpo", "SFT", None])
+def test_llamafactory_validate_rejects_unknown_stage(stage):
+    cfg = _llamafactory_config(stage=stage)
+
+    with pytest.raises(ValueError, match="llamafactory.stage .* Choose from: pt, sft"):
+        LlamaFactoryBackend().validate(cfg)
+
+
+def test_llamafactory_validate_rejects_method_that_differs_from_stage():
+    cfg = _llamafactory_config(stage="dpo")
+    cfg.method = "sft"
+
+    with pytest.raises(ValueError, match="method 'sft' does not match llamafactory.stage 'dpo'"):
+        LlamaFactoryBackend().validate(cfg)
+
+
+def test_llamafactory_validate_rejects_default_stage_with_other_method():
+    """Without llamafactory.stage, LlamaFactory trains sft, so method must be sft."""
+    cfg = _llamafactory_config()
+    del cfg.llamafactory["stage"]
+    cfg.method = "dpo"
+
+    with pytest.raises(ValueError, match="does not match llamafactory.stage 'sft'"):
+        LlamaFactoryBackend().validate(cfg)
+
+
 def test_llamafactory_example_config_is_valid(monkeypatch):
     """The shipped example config passes validation from the repository root."""
     monkeypatch.chdir(_REPO_ROOT)

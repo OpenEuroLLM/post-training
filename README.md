@@ -412,6 +412,7 @@ python scripts/submit.py --config configs/llamafactory/long-context.yaml
 ### Configuration
 
 - Set every training setting in the `llamafactory` block, with LlamaFactory's own keys. The TRL sections (`model`, `training`, `checkpointing`, `data`, `sft`, `dpo`, `deepspeed`, `accelerate`, `logging`) stop the submission with an error, also when they are null or come from a CLI override.
+- `llamafactory.stage` (default `sft`) must be one of `pt`, `sft`, `rm`, `ppo`, `dpo`, `kto`, and the top-level `method` must have the same value. For example, a DPO run sets `method: dpo` and `stage: dpo`.
 
 ### Run directory
 

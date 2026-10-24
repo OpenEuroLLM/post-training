@@ -292,6 +292,7 @@ _LLAMAFACTORY_INPUT_PATH_LIST_KEYS = ("adapter_name_or_path",)
 
 _LLAMAFACTORY_DEFAULT_DATASET_DIR = "data"
 _LLAMAFACTORY_DEFAULT_STAGE = "sft"
+_LLAMAFACTORY_STAGES = ("pt", "sft", "rm", "ppo", "dpo", "kto")
 _LLAMAFACTORY_REGISTRY = "dataset_info.json"
 
 
@@ -356,8 +357,20 @@ class LlamaFactoryBackend(Backend):
         if not config.llamafactory.get("model_name_or_path"):
             raise ValueError("llamafactory.model_name_or_path must be set.")
 
-        # post_freeze() owns these two settings, so a requeued or resubmitted job resumes.
         lf = config.llamafactory
+        stage = lf.get("stage", _LLAMAFACTORY_DEFAULT_STAGE)
+        if stage not in _LLAMAFACTORY_STAGES:
+            raise ValueError(
+                f"llamafactory.stage '{stage}' is not a LlamaFactory {LLAMAFACTORY_VERSION} "
+                f"stage. Choose from: {', '.join(_LLAMAFACTORY_STAGES)}."
+            )
+        if config.method != stage:
+            raise ValueError(
+                f"method '{config.method}' does not match llamafactory.stage '{stage}'. "
+                f"Set method: {stage}."
+            )
+
+        # post_freeze() owns these two settings, so a requeued or resubmitted job resumes.
         if "output_dir" in lf:
             raise ValueError(
                 "llamafactory.output_dir must not be set: the submission writes checkpoints to "
