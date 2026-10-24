@@ -13,9 +13,11 @@ YAML config.
 from __future__ import annotations
 
 import ast
+import io
 import json
 import keyword
 import re
+import tokenize
 import warnings
 from collections.abc import Callable, Iterator
 from typing import Any
@@ -579,11 +581,10 @@ _CALL_RE = re.compile(r"\s*([^()]+?)\((.*)\)\s*", re.DOTALL)
 # Python keywords used as argument names (``from="EUR"``) are a syntax error;
 # they are renamed before parsing and restored afterwards.
 _KEYWORD_PREFIX = "_kw_"
-_KEYWORD_ARG_RE = re.compile(
-    r"(?<![\w.])("
-    + "|".join(k for k in keyword.kwlist if k not in ("True", "False", "None"))
-    + r")\s*=(?!=)"
-)
+# Some blocks lost a "\" before a call name: "\reverse(...)" was decoded as a
+# carriage return + "everse(...)". The line break and the letter are restored.
+_ESCAPE_LETTERS = {"\r": "r", "\t": "t", "\x0c": "f", "\x08": "b", "\x0b": "v", "\x07": "a"}
+_LOST_ESCAPE_RE = re.compile(r"\)([\r\t\x0c\x08\x0b\x07])(?=[\w.]+\()")
 # Nodes allowed in an argument value that is an expression over literals,
 # e.g. ``12*60``, ``[0.03]*15`` or ``[c for c in "noon"]``. A bare name that is
 # not bound by a comprehension is a placeholder and fails with NameError.
@@ -604,7 +605,8 @@ class _JsonNames(ast.NodeTransformer):
 
     def visit_Name(self, node: ast.Name) -> ast.AST:
         if node.id in _JSON_NAMES:
-            return ast.Constant(_JSON_NAMES[node.id])
+            # compile() needs a source location on every node.
+            return ast.copy_location(ast.Constant(_JSON_NAMES[node.id]), node)
         return node
 
 
@@ -613,7 +615,7 @@ def _dolci_value(node: ast.expr) -> Any:
     node = _JsonNames().visit(node)
     try:
         return ast.literal_eval(node)
-    except ValueError:
+    except (ValueError, TypeError):  # TypeError: an unhashable key, e.g. {[]: 1}
         pass
     if not all(isinstance(n, _SAFE_NODES) and not isinstance(n, ast.Pow) for n in ast.walk(node)):
         raise _DolciCallError(f"unsupported value: {ast.unparse(node)}")
@@ -621,6 +623,51 @@ def _dolci_value(node: ast.expr) -> Any:
         return eval(compile(ast.Expression(node), "<dolci>", "eval"), _SAFE_GLOBALS)  # noqa: S307
     except Exception as exc:
         raise _DolciCallError(f"cannot evaluate value: {ast.unparse(node)}") from exc
+
+
+def _tokens(text: str) -> list[tuple[tokenize.TokenInfo, int, int]] | None:
+    """Python tokens of ``text`` with their start and end offsets, or None if it does not tokenize.
+
+    The tokenizer knows strings and comments, so code built on it never
+    mistakes a ``(``, ``#`` or ``from=`` inside a quoted value for syntax. Names
+    with spaces (``Rates API``) still tokenize, unlike with ``ast.parse``.
+    """
+    if "\r" in text:
+        return None  # the tokenizer counts "\r" as a line break; the offsets below do not
+    # The last entry is for the NEWLINE / ENDMARKER tokens after the last line.
+    line_starts = [0] + [i + 1 for i, c in enumerate(text) if c == "\n"] + [len(text)]
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SyntaxWarning)
+            tokens = list(tokenize.generate_tokens(io.StringIO(text).readline))
+    except (tokenize.TokenError, SyntaxError):
+        return None
+    if any(tok.type == tokenize.ERRORTOKEN for tok in tokens):
+        return None
+    return [
+        (
+            tok,
+            line_starts[tok.start[0] - 1] + tok.start[1],
+            line_starts[tok.end[0] - 1] + tok.end[1],
+        )
+        for tok in tokens
+    ]
+
+
+def _rename_keyword_args(arg_text: str) -> str:
+    """Prefix Python keywords used as argument names (``from="EUR"``), which are a syntax error."""
+    tokens = _tokens(arg_text)
+    if tokens is None:
+        return arg_text  # the parse fails next and reports the error
+    for (tok, start, _), (nxt, _, _) in reversed(list(zip(tokens, tokens[1:]))):
+        if (
+            tok.type == tokenize.NAME
+            and keyword.iskeyword(tok.string)
+            and tok.string not in ("True", "False", "None")
+            and nxt.string == "="
+        ):
+            arg_text = f"{arg_text[:start]}{_KEYWORD_PREFIX}{arg_text[start:]}"
+    return arg_text
 
 
 def _dolci_call(text: str) -> dict[str, Any]:
@@ -637,7 +684,7 @@ def _dolci_call(text: str) -> dict[str, Any]:
     name = match[1].strip()
     if '"' in name or "\\" in name:
         raise _DolciCallError(f"name breaks the rendered JSON: {name!r}")
-    arg_text = _KEYWORD_ARG_RE.sub(rf"{_KEYWORD_PREFIX}\1=", match[2])
+    arg_text = _rename_keyword_args(match[2])
     try:
         # Dolci strings hold regex escapes such as '\.'; they parse fine but warn.
         with warnings.catch_warnings():
@@ -670,28 +717,32 @@ def _dolci_call_texts(block: str) -> Iterator[str]:
     comments, splits on a literal ``\\n`` between calls, and joins a call that
     spans several lines.
 
-    Python's parser splits the block when it can, so ``(``, ``)`` and ``#``
-    inside strings are safe. The literal ``\\n`` is only replaced if the block
-    does not parse as it is, so a ``)\\n`` inside a string is kept. A block that
-    is not Python, e.g. a name with spaces (``Get Rounds(id=1)``), falls back
-    to a line split that counts parentheses.
+    The split follows Python's tokenizer: a call ends at a NEWLINE token (or a
+    ``;``), which the tokenizer only emits outside brackets and strings. Thus
+    ``(``, ``)`` and ``#`` inside strings are safe, and names with spaces
+    (``Get Rounds(id=1)``) work. The literal ``\\n`` and ``\\r`` line breaks are
+    only replaced if the block does not tokenize as it is, so a ``)\\n`` inside
+    a string is kept.
+
+    A block that does not tokenize at all, e.g. a name with a quote
+    (``Get Player's Media(id=1)``), falls back to a line split that counts
+    parentheses. A wrong join there gives a syntax error, so the row is
+    dropped, not changed.
     """
-    fixed = re.sub(r"\)\\n(?=\S)", ")\n", block)
+    block = _LOST_ESCAPE_RE.sub(lambda m: f")\n{_ESCAPE_LETTERS[m[1]]}", block)
+    fixed = re.sub(r"\)\\n(?=\S)", ")\n", block.replace("\r\n", "\n").replace("\r", "\n"))
     for text in (block, fixed):
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", SyntaxWarning)
-                statements = ast.parse(text).body
-        except SyntaxError:
+        tokens = _tokens(text)
+        if tokens is None:
             continue
-        for stmt in statements:
-            if (
-                isinstance(stmt, ast.Expr)
-                and isinstance(stmt.value, ast.Name)
-                and stmt.value.id == "null"
-            ):
-                continue
-            yield ast.get_source_segment(text, stmt)
+        call: list[tuple[int, int]] = []
+        for tok, start, end in tokens:
+            if tok.type in (tokenize.NEWLINE, tokenize.ENDMARKER) or tok.string == ";":
+                if call and text[call[0][0] : call[-1][1]] != "null":
+                    yield text[call[0][0] : call[-1][1]]
+                call = []
+            elif tok.type not in (tokenize.COMMENT, tokenize.NL, tokenize.INDENT, tokenize.DEDENT):
+                call.append((start, end))
         return
 
     pending = ""
@@ -736,6 +787,7 @@ def dolci_tool_use(example: dict[str, Any]) -> dict[str, Any]:
             "tools": None,
         }
 
+    tool_names = {t.get("function", {}).get("name") for t in json.loads(messages[0]["functions"])}
     out: list[dict[str, Any]] = []
     system = (
         messages[0]["content"]
@@ -758,6 +810,12 @@ def dolci_tool_use(example: dict[str, Any]) -> dict[str, Any]:
             except _DolciCallError:
                 # Every row must return the same keys, or the datasets writer fails.
                 return {"messages": [], "tools": None}
+            for call in tool_calls:
+                # A "\" before a name that starts with "n" became a plain line
+                # break (see _LOST_ESCAPE_RE), so only the tool list can show it.
+                name = call["function"]["name"]
+                if name not in tool_names and f"n{name}" in tool_names:
+                    call["function"]["name"] = f"n{name}"
             if tool_calls:
                 out.append({"role": "assistant", "content": content, "tool_calls": tool_calls})
             elif content.strip():

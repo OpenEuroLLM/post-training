@@ -134,6 +134,17 @@ def test_dolci_tool_use_converts_to_standard_format():
         ("wx.get(q='#a')\n# skip\nwx.get(q='b')", [{"q": "#a"}, {"q": "b"}]),
         ('wx.get(q="a)\\nb")', [{"q": "a)\nb"}]),
         ("wx.get(q='a')\nnull", [{"q": "a"}]),
+        (
+            'Rates API(from="EUR", q="(")\nRates API(from="USD", q=")")',
+            [{"from": "EUR", "q": "("}, {"from": "USD", "q": ")"}],
+        ),
+        (
+            'wx.get(html="<div class=\'a\'>", q="from=x")',
+            [{"html": "<div class='a'>", "q": "from=x"}],
+        ),
+        ("wx.get(flags=[true, false]*2)", [{"flags": [True, False, True, False]}]),
+        ("wx.get(q='a')\r\nwx.get(q='b')", [{"q": "a"}, {"q": "b"}]),
+        ("Get Player's Media(id=1)\nGet Player's Media(id=2)", [{"id": 1}, {"id": 2}]),
     ],
 )
 def test_dolci_tool_use_repairs_call_lines(function_calls, expected):
@@ -149,6 +160,7 @@ def test_dolci_tool_use_repairs_call_lines(function_calls, expected):
         "min([2, 4, 6])",
         "wx.get(q=(1, 2))",
         "wx.get(q={1: 'a'})",
+        "wx.get(q={[]: 1})",
         "wx.get(q=2**10)",
         'say"hi(q=1)',
         "wx.get",
@@ -156,6 +168,19 @@ def test_dolci_tool_use_repairs_call_lines(function_calls, expected):
 )
 def test_dolci_tool_use_drops_row_with_unconvertible_call(function_calls):
     assert dolci_tool_use(_dolci_row(function_calls)) == {"messages": [], "tools": None}
+
+
+def test_dolci_tool_use_restores_names_that_lost_an_escaped_letter():
+    # Dolci decoded "\reverse" as "\r" + "everse"; "\next" became a plain line break.
+    row = _dolci_row("wx.get(q='a')\reverse(s='x')\x0clatten(x=1)\next(n=2)")
+    row["messages"][0]["functions"] = json.dumps(
+        [
+            {"type": "function", "function": {"name": n}}
+            for n in ("wx.get", "reverse", "flatten", "next")
+        ]
+    )
+    calls = dolci_tool_use(row)["messages"][1]["tool_calls"]
+    assert [c["function"]["name"] for c in calls] == ["wx.get", "reverse", "flatten", "next"]
 
 
 def test_dolci_tool_use_null_call_keeps_refusal_and_drops_empty_turn():
