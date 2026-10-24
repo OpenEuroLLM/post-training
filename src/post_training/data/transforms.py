@@ -674,6 +674,11 @@ def _dolci_value(node: ast.expr) -> Any:
     if not all(
         isinstance(n, _SAFE_NODES)
         and not (isinstance(n, ast.Subscript) and isinstance(n.ctx, ast.Store))
+        and not (
+            isinstance(n, ast.BinOp)
+            and isinstance(n.op, ast.Mod)
+            and not (_is_number_expr(n.left) and _is_number_expr(n.right))
+        )
         for n in ast.walk(node)
     ) or not _within_size_limit(node):
         raise _DolciCallError(f"unsupported value: {ast.unparse(node)}")
