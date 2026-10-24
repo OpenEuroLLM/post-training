@@ -1,5 +1,5 @@
 # ============================================================================
-# LlamaFactory SFT of Prelude 9B on Dolci-Instruct-SFT (LUMI)
+# LlamaFactory SFT of Prelude 9B on OpenEuroLLM-Excellent-SFT (LUMI)
 # ============================================================================
 # Usage: python scripts/submit.py --config configs/llamafactory/prelude-sft.yaml
 #
@@ -12,7 +12,7 @@
 
 backend: llamafactory
 method: sft
-run_name: oellm-9b-256k-theta64m-prelude-anneal300b-sft-llamafactory
+run_name: oellm-9b-256k-theta64m-prelude-anneal300b-excellent-sft-llamafactory
 offline: false
 
 # -- Container ---------------------------------------------------------------
@@ -81,7 +81,7 @@ llamafactory:
 
   # dataset
   dataset_dir: data/llamafactory
-  dataset: dolci_instruct_sft
+  dataset: openeurollm_excellent_sft
   template: qwen3
   enable_thinking: true                      # empty <think></think> block on the trained answer
   mask_history: true                         # loss on the final assistant message only
@@ -114,7 +114,7 @@ llamafactory:
   save_only_model: false
 
   # logging
-  run_name: oellm-9b-256k-theta64m-prelude-anneal300b-sft-llamafactory
+  run_name: oellm-9b-256k-theta64m-prelude-anneal300b-excellent-sft-llamafactory
   report_to:
     - wandb
     - tensorboard
