@@ -414,6 +414,7 @@ python scripts/submit.py --config configs/llamafactory/long-context.yaml
 - Set every training setting in the `llamafactory` block, with LlamaFactory's own keys. The TRL sections (`model`, `training`, `checkpointing`, `data`, `sft`, `dpo`, `deepspeed`, `accelerate`, `logging`) stop the submission with an error, also when they are null or come from a CLI override.
 - `llamafactory.stage` (default `sft`) must be one of `pt`, `sft`, `rm`, `ppo`, `dpo`, `kto`, and the top-level `method` must have the same value. For example, a DPO run sets `method: dpo` and `stage: dpo`.
 - The submission review shows the values of the `llamafactory` block. Keys that the block does not set show the LlamaFactory or transformers default, marked `(default)`.
+- The job always launches `llamafactory-cli train` through `torchrun` (`FORCE_TORCHRUN=1`), also with one GPU per node.
 - LlamaFactory v0.9.5 does not resume the `rm` and `ppo` stages with `finetuning_type: full` or `freeze`. A requeued job of this type starts again from step 0, and the review shows a warning.
 
 ### Run directory

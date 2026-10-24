@@ -485,6 +485,17 @@ def test_llamafactory_cuda_device_max_connections_not_set(tmp_path, config):
     assert "export CUDA_DEVICE_MAX_CONNECTIONS" not in content
 
 
+def test_llamafactory_forces_torchrun(tmp_path, config):
+    """One GPU per node still launches torchrun, so the nodes train as one job."""
+    config.slurm.gpus_per_node = 1
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert "export FORCE_TORCHRUN=1" in content
+
+
 # ---------------------------------------------------------------------------
 # offline flag — LlamaFactory template
 # ---------------------------------------------------------------------------
