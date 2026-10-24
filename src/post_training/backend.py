@@ -138,6 +138,11 @@ def _validate_fsdp(config: PostTrainingConfig) -> None:
             "training.gradient_checkpointing_kwargs.early_stop: false. Early stopping "
             "makes FSDP collectives rank-dependent when sequence lengths differ."
         )
+    if config.method == "dpo" and t.use_liger_kernel:
+        raise ValueError(
+            "Liger Kernel does not work with fsdp and method 'dpo'; set "
+            "training.use_liger_kernel: false."
+        )
 
 
 class TRLBackend(Backend):

@@ -51,6 +51,7 @@ def test_fsdp_block_loads_from_yaml(tmp_path):
                     "per_device_train_batch_size": 1,
                     "gradient_checkpointing": True,
                     "gradient_checkpointing_kwargs": {"early_stop": False},
+                    "use_liger_kernel": False,
                 },
                 "deepspeed": None,
                 "fsdp": {"transformer_layer_cls_to_wrap": ["Olmo3DecoderLayer"]},
@@ -161,6 +162,30 @@ def test_fsdp_gradient_checkpointing_requires_early_stop_off(kwargs):
 
     with pytest.raises(ValueError, match="early_stop: false"):
         TRLBackend().validate(cfg)
+
+
+def test_fsdp_dpo_with_liger_rejected():
+    cfg = _fsdp_config()
+    cfg.method = "dpo"
+    cfg.training.use_liger_kernel = True
+
+    with pytest.raises(ValueError, match="Liger Kernel does not work with fsdp"):
+        TRLBackend().validate(cfg)
+
+
+def test_fsdp_dpo_without_liger_passes():
+    cfg = _fsdp_config()
+    cfg.method = "dpo"
+    cfg.training.use_liger_kernel = False
+
+    TRLBackend().validate(cfg)
+
+
+def test_fsdp_sft_with_liger_passes():
+    cfg = _fsdp_config()
+    cfg.training.use_liger_kernel = True
+
+    TRLBackend().validate(cfg)
 
 
 def test_fsdp_rejected_for_llamafactory():
