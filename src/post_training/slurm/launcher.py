@@ -170,7 +170,7 @@ def render_llamafactory_slurm_script(
 ) -> Path:
     """Render the LlamaFactory SLURM batch script into *run_dir/slurm/job.sh*.
 
-    With *tokenize_only*, the job runs run_dir/llamafactory/tokenize.py, which
+    With *tokenize_only*, the job runs run_dir/llamafactory/llamafactory_tokenize.py, which
     post_freeze() froze, and not ``llamafactory-cli train``.
     """
     if config.container is None or not config.container.image:
@@ -209,7 +209,7 @@ def render_llamafactory_slurm_script(
         # LlamaFactory
         llamafactory_config=str(run_dir.resolve() / "llamafactory_config.yaml"),
         tokenize_only=tokenize_only,
-        tokenize_script=str(run_dir.resolve() / "llamafactory" / "tokenize.py"),
+        tokenize_script=str(run_dir.resolve() / "llamafactory" / "llamafactory_tokenize.py"),
     )
 
     slurm_dir = run_dir / "slurm"

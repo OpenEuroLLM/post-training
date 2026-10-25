@@ -507,7 +507,11 @@ def test_llamafactory_kept_frozen_inputs_marks_changed_sources(tmp_path, monkeyp
     frozen_dir = run_dir.resolve() / "llamafactory"
     root = repo_dir.resolve()
     assert LlamaFactoryBackend().kept_frozen_inputs(cfg, run_dir) == [
-        (frozen_dir / "tokenize.py", backend_module._LLAMAFACTORY_TOKENIZE_SCRIPT, False),
+        (
+            frozen_dir / "llamafactory_tokenize.py",
+            backend_module._LLAMAFACTORY_TOKENIZE_SCRIPT,
+            False,
+        ),
         (frozen_dir / "zero3.json", Path("configs/deepspeed/zero3.json"), False),
         (
             frozen_dir / "dataset_info.json",
@@ -518,7 +522,7 @@ def test_llamafactory_kept_frozen_inputs_marks_changed_sources(tmp_path, monkeyp
 
 
 def test_llamafactory_post_freeze_always_freezes_the_tokenize_script(tmp_path, monkeypatch):
-    """Every submission freezes tokenize.py; a later one keeps that copy."""
+    """Every submission freezes the tokenize script; a later one keeps that copy."""
 
     monkeypatch.chdir(tmp_path)
     source = tmp_path / "llamafactory_tokenize.py"
@@ -527,7 +531,7 @@ def test_llamafactory_post_freeze_always_freezes_the_tokenize_script(tmp_path, m
     cfg = _llamafactory_config(dataset_dir="ONLINE")
     run_dir = tmp_path / "outputs" / "my-run"
     run_dir.mkdir(parents=True)
-    frozen = run_dir.resolve() / "llamafactory" / "tokenize.py"
+    frozen = run_dir.resolve() / "llamafactory" / "llamafactory_tokenize.py"
 
     LlamaFactoryBackend().post_freeze(cfg, run_dir)
     source.write_text("# version 2\n")

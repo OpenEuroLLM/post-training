@@ -342,9 +342,12 @@ def test_llamafactory_backend_tokenize_only_runs_the_tokenize_script(tmp_path, c
     )
     content = script.read_text()
 
-    tokenize_script = run_dir.resolve() / "llamafactory" / "tokenize.py"
+    tokenize_script = run_dir.resolve() / "llamafactory" / "llamafactory_tokenize.py"
     lf_config = run_dir.resolve() / "llamafactory_config.yaml"
-    assert f"torchrun --standalone --nproc_per_node 1 {tokenize_script} {lf_config}" in content
+    assert (
+        f"PYTHONSAFEPATH=1 torchrun --standalone --nproc_per_node 1 {tokenize_script} {lf_config}"
+        in content
+    )
     assert "llamafactory-cli train" not in content
 
 
@@ -359,7 +362,7 @@ def test_llamafactory_backend_trains_by_default(tmp_path, config):
     content = script.read_text()
 
     assert "llamafactory-cli train" in content
-    assert "tokenize.py" not in content
+    assert "llamafactory_tokenize.py" not in content
 
 
 # ---------------------------------------------------------------------------

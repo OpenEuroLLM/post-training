@@ -379,7 +379,7 @@ def _llamafactory_frozen_inputs(
     # Frozen for every submission, so a later --tokenize-only submit into the run
     # directory runs the same script; only a --tokenize-only job uses it.
     source = _LLAMAFACTORY_TOKENIZE_SCRIPT
-    inputs["tokenize"] = (frozen_dir / "tokenize.py", source, source.read_text)
+    inputs["tokenize"] = (frozen_dir / source.name, source, source.read_text)
     deepspeed = lf.get("deepspeed")
     if isinstance(deepspeed, str):
         source = Path(deepspeed)
