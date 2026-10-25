@@ -101,3 +101,76 @@ def test_llamafactory_resubmit_from_frozen_config(submitted, monkeypatch):
     _submit.main()
 
     assert len(submitted_scripts) == 2
+
+
+def _tokenize_only_submit(tmp_path, monkeypatch, llamafactory_block):
+    """Run submit.py --tokenize-only; return the run directory and the submit calls."""
+    env_file = tmp_path / "cluster.env"
+    env_file.write_text("".join(f"export {var}=/cluster/hf\n" for var in REQUIRED_HF_CACHE_VARS))
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "backend": "llamafactory",
+                "run_name": "lf-tok",
+                "container": {
+                    "image": "/shared/containers/llamafactory.sif",
+                    "bind_mounts": ["/scratch:/scratch"],
+                    "env_file": str(env_file),
+                },
+                "paths": {"output_base": str(tmp_path / "outputs")},
+                "slurm": {"num_nodes": 4, "gpus_per_node": 8},
+                "llamafactory": {
+                    "model_name_or_path": "org/lf-model",
+                    "stage": "sft",
+                    "do_train": True,
+                    **llamafactory_block,
+                },
+            }
+        )
+    )
+    calls = []
+
+    def fake_generate_and_submit(config, run_dir, config_path, *, tokenize_only=False):
+        calls.append((config.slurm.num_nodes, config.slurm.gpus_per_node, tokenize_only))
+        return "12345"
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        prefetch_module,
+        "prefetch_assets",
+        lambda config: prefetch_module.PrefetchedPaths(model=_SNAPSHOT, tokenizer=_SNAPSHOT),
+    )
+    monkeypatch.setattr(_submit, "generate_and_submit", fake_generate_and_submit)
+    monkeypatch.setattr(
+        sys, "argv", ["submit.py", "--config", str(config_path), "--confirm", "--tokenize-only"]
+    )
+
+    _submit.main()
+
+    return tmp_path / "outputs" / "lf-tok", calls
+
+
+def test_llamafactory_tokenize_only_makes_tokenized_path_absolute(tmp_path, monkeypatch):
+    """A relative tokenized_path starts at the submit directory, on 1 node with 1 GPU."""
+    run_dir, calls = _tokenize_only_submit(
+        tmp_path, monkeypatch, {"tokenized_path": "data/tokenized/sft"}
+    )
+
+    lf_config = yaml.safe_load((run_dir / "llamafactory_config.yaml").read_text())
+    assert lf_config["tokenized_path"] == str(tmp_path.resolve() / "data" / "tokenized" / "sft")
+    assert calls == [(1, 1, True)]
+
+
+def test_llamafactory_tokenize_only_needs_tokenized_path(tmp_path, monkeypatch):
+    with pytest.raises(ValueError, match="needs llamafactory.tokenized_path"):
+        _tokenize_only_submit(tmp_path, monkeypatch, {})
+
+
+def test_llamafactory_tokenize_only_refuses_existing_data(tmp_path, monkeypatch):
+    tokenized = tmp_path / "data" / "tokenized"
+    tokenized.mkdir(parents=True)
+    (tokenized / "dataset_dict.json").write_text("{}")
+
+    with pytest.raises(ValueError, match="already holds data"):
+        _tokenize_only_submit(tmp_path, monkeypatch, {"tokenized_path": "data/tokenized"})

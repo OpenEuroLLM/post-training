@@ -138,7 +138,12 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
 
     cd \"{{ run_dir }}\"
 
+{% if tokenize_only %}
+    # --tokenize-only: save the tokenized datasets to tokenized_path and exit before the model load.
+    torchrun --standalone --nproc_per_node 1 {{ tokenize_script }} {{ llamafactory_config }}
+{% else %}
     llamafactory-cli train {{ llamafactory_config }}
+{% endif %}
   " &
 
 # Capture the srun exit code without letting set -e exit before the failure handler.

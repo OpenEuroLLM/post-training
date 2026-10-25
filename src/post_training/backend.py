@@ -490,11 +490,9 @@ class LlamaFactoryBackend(Backend):
         ]
 
     def render_slurm_script(self, config, run_dir, frozen_config_path, *, tokenize_only=False):
-        # LlamaFactory has no --tokenize-only equivalent; submit.py rejects it before this point.
-        del tokenize_only
         from post_training.slurm.launcher import render_llamafactory_slurm_script
 
-        return render_llamafactory_slurm_script(config, run_dir)
+        return render_llamafactory_slurm_script(config, run_dir, tokenize_only=tokenize_only)
 
     def post_freeze(self, config, run_dir, prefetched=None):
         """Freeze the job's inputs into run_dir and write llamafactory_config.yaml.

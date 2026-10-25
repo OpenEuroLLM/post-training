@@ -92,6 +92,28 @@ def _check_required_hf_vars(config: PostTrainingConfig) -> None:
         )
 
 
+def _prepare_llamafactory_tokenize_only(config: PostTrainingConfig) -> None:
+    """Check llamafactory.tokenized_path for a --tokenize-only job and make it absolute.
+
+    The job saves the tokenized data there. A relative path starts at the directory
+    where submit.py runs, so a later training submit with the same value finds the data.
+    """
+    lf = config.llamafactory
+    tokenized_path = lf.get("tokenized_path")
+    if not isinstance(tokenized_path, str) or not tokenized_path:
+        raise ValueError(
+            "--tokenize-only with backend: llamafactory needs llamafactory.tokenized_path: "
+            "the job saves the tokenized data there."
+        )
+    path = Path(tokenized_path).resolve()
+    if path.is_dir() and any(path.iterdir()):
+        raise ValueError(
+            f"llamafactory.tokenized_path '{path}' already holds data, and LlamaFactory would "
+            "load it. Delete it, or set a new tokenized_path."
+        )
+    lf["tokenized_path"] = str(path)
+
+
 def _parse_args() -> tuple[str, list[str], bool]:
     parser = argparse.ArgumentParser(description="Submit a SLURM training job.")
     parser.add_argument(
@@ -108,7 +130,10 @@ def _parse_args() -> tuple[str, list[str], bool]:
     parser.add_argument(
         "--tokenize-only",
         action="store_true",
-        help="Pass --tokenize-only to train.py — exits after trainer initialization.",
+        help=(
+            "Tokenize the datasets on 1 GPU and exit before training. TRL: passes "
+            "--tokenize-only to train.py. LlamaFactory: saves to llamafactory.tokenized_path."
+        ),
     )
     known, unknown = parser.parse_known_args()
     return known.config, unknown, known.confirm, known.tokenize_only
@@ -123,10 +148,7 @@ def main() -> None:
 
     if tokenize_only:
         if config.backend == "llamafactory":
-            raise ValueError(
-                "--tokenize-only is only supported with backend=trl "
-                "(LlamaFactory uses llamafactory-cli, which has no equivalent flag)."
-            )
+            _prepare_llamafactory_tokenize_only(config)
         config.slurm.num_nodes = 1
         config.slurm.gpus_per_node = 1
 

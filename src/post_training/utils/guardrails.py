@@ -173,7 +173,7 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     _row("Offline mode", str(config.offline))
 
     if config.backend == "llamafactory":
-        _llamafactory_sections(config, run_dir, total_gpus)
+        _llamafactory_sections(config, run_dir, total_gpus, tokenize_only)
     else:
         _trl_sections(config, run_dir, total_gpus, tokenize_only)
     _confirm(total_gpus)
@@ -319,7 +319,9 @@ def _trl_sections(
         )
 
 
-def _llamafactory_sections(config: PostTrainingConfig, run_dir: Path, total_gpus: int) -> None:
+def _llamafactory_sections(
+    config: PostTrainingConfig, run_dir: Path, total_gpus: int, tokenize_only: bool
+) -> None:
     """Review the llamafactory block only; the TRL sections do not apply to these runs."""
     from post_training.backend import (
         _LLAMAFACTORY_DEFAULT_DATASET_DIR,
@@ -405,6 +407,14 @@ def _llamafactory_sections(config: PostTrainingConfig, run_dir: Path, total_gpus
         _row("Debug mode", _red("*** ENABLED — output dir may be overwritten ***"), warn=True)
     else:
         _row("Debug mode", "disabled")
+    if tokenize_only:
+        _row(
+            "Tokenize only",
+            _yellow(
+                f"*** ENABLED — saves to {lf.get('tokenized_path')} and exits, no training ***"
+            ),
+            warn=True,
+        )
 
 
 # LlamaFactory 0.9.5 and transformers defaults for the keys that the review shows.
