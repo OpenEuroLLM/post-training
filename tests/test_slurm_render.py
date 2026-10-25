@@ -333,7 +333,7 @@ def test_trl_backend_forwards_tokenize_only_container(tmp_path, config):
 
 
 def test_llamafactory_backend_tokenize_only_runs_the_tokenize_script(tmp_path, config):
-    """--tokenize-only runs the copied tokenize script under torchrun, not llamafactory-cli."""
+    """--tokenize-only runs the frozen tokenize script under torchrun, not llamafactory-cli."""
     run_dir = tmp_path / "outputs" / "my-run"
     run_dir.mkdir(parents=True)
 
@@ -346,11 +346,10 @@ def test_llamafactory_backend_tokenize_only_runs_the_tokenize_script(tmp_path, c
     lf_config = run_dir.resolve() / "llamafactory_config.yaml"
     assert f"torchrun --standalone --nproc_per_node 1 {tokenize_script} {lf_config}" in content
     assert "llamafactory-cli train" not in content
-    assert "get_dataset(" in tokenize_script.read_text()
 
 
 def test_llamafactory_backend_trains_by_default(tmp_path, config):
-    """Without --tokenize-only, the job trains and no tokenize script is copied."""
+    """Without --tokenize-only, the job trains and does not run the tokenize script."""
     run_dir = tmp_path / "outputs" / "my-run"
     run_dir.mkdir(parents=True)
 
@@ -361,7 +360,6 @@ def test_llamafactory_backend_trains_by_default(tmp_path, config):
 
     assert "llamafactory-cli train" in content
     assert "tokenize.py" not in content
-    assert not (run_dir / "llamafactory" / "tokenize.py").exists()
 
 
 # ---------------------------------------------------------------------------

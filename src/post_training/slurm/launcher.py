@@ -8,7 +8,6 @@ and written into the run directory before ``sbatch`` is called.
 from __future__ import annotations
 
 import logging
-import shutil
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -24,7 +23,6 @@ _TEMPLATE_DIR = Path(__file__).resolve().parent
 _TEMPLATE_NAME = "job.sh.jinja"
 _LLAMAFACTORY_TEMPLATE_NAME = "job_llamafactory.sh.jinja"
 _TRL_CONTAINER_TEMPLATE_NAME = "job_trl_container.sh.jinja"
-_LLAMAFACTORY_TOKENIZE_SCRIPT = _TEMPLATE_DIR / "llamafactory_tokenize.py"
 
 # HF cache variables that the container job scripts forward into the container.
 # scripts/submit.py checks them at submission, and the job script checks them again at start.
@@ -172,16 +170,11 @@ def render_llamafactory_slurm_script(
 ) -> Path:
     """Render the LlamaFactory SLURM batch script into *run_dir/slurm/job.sh*.
 
-    With *tokenize_only*, the job runs llamafactory_tokenize.py, copied into
-    run_dir/llamafactory/tokenize.py, and not ``llamafactory-cli train``.
+    With *tokenize_only*, the job runs run_dir/llamafactory/tokenize.py, which
+    post_freeze() froze, and not ``llamafactory-cli train``.
     """
     if config.container is None or not config.container.image:
         raise ValueError("container.image must be set to render a LlamaFactory script.")
-
-    tokenize_script = run_dir.resolve() / "llamafactory" / "tokenize.py"
-    if tokenize_only:
-        tokenize_script.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(_LLAMAFACTORY_TOKENIZE_SCRIPT, tokenize_script)
 
     env = Environment(
         loader=FileSystemLoader(str(_TEMPLATE_DIR)),
@@ -216,7 +209,7 @@ def render_llamafactory_slurm_script(
         # LlamaFactory
         llamafactory_config=str(run_dir.resolve() / "llamafactory_config.yaml"),
         tokenize_only=tokenize_only,
-        tokenize_script=str(tokenize_script),
+        tokenize_script=str(run_dir.resolve() / "llamafactory" / "tokenize.py"),
     )
 
     slurm_dir = run_dir / "slurm"

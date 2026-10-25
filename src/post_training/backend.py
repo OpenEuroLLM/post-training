@@ -297,6 +297,10 @@ _LLAMAFACTORY_STAGES = ("pt", "sft", "rm", "ppo", "dpo", "kto")
 # starts again from step 0.
 _LLAMAFACTORY_NON_RESUMABLE_STAGES = ("rm", "ppo")
 _LLAMAFACTORY_REGISTRY = "dataset_info.json"
+# A --tokenize-only job runs this script in the container, not llamafactory-cli train.
+_LLAMAFACTORY_TOKENIZE_SCRIPT = (
+    Path(__file__).resolve().parent / "slurm" / "llamafactory_tokenize.py"
+)
 
 
 def llamafactory_dataset_names(
@@ -372,6 +376,10 @@ def _llamafactory_frozen_inputs(
     Relative sources start at the directory where submit.py runs.
     """
     inputs: dict[str, tuple[Path, Path, Callable[[], str]]] = {}
+    # Frozen for every submission, so a later --tokenize-only submit into the run
+    # directory runs the same script; only a --tokenize-only job uses it.
+    source = _LLAMAFACTORY_TOKENIZE_SCRIPT
+    inputs["tokenize"] = (frozen_dir / "tokenize.py", source, source.read_text)
     deepspeed = lf.get("deepspeed")
     if isinstance(deepspeed, str):
         source = Path(deepspeed)
@@ -497,8 +505,8 @@ class LlamaFactoryBackend(Backend):
     def post_freeze(self, config, run_dir, prefetched=None):
         """Freeze the job's inputs into run_dir and write llamafactory_config.yaml.
 
-        The DeepSpeed JSON and dataset_info.json are copied into run_dir/llamafactory/,
-        so a queued or resumed job does not read later edits. Only
+        The DeepSpeed JSON, dataset_info.json and the tokenize script are copied into
+        run_dir/llamafactory/, so a queued or resumed job does not read later edits. Only
         llamafactory_config.yaml carries the rewritten values; config.yaml keeps the
         user's block, so a new submit from it passes validation again.
         """
@@ -521,6 +529,8 @@ class LlamaFactoryBackend(Backend):
                 lf_config[key] = ",".join(_absolute_if_exists(part.strip()) for part in parts)
 
         inputs = _llamafactory_frozen_inputs(lf_config, frozen_dir)
+        if "tokenize" in inputs:
+            _freeze_file(*inputs["tokenize"])
         if "deepspeed" in inputs:
             frozen_deepspeed, source, render = inputs["deepspeed"]
             _freeze_file(frozen_deepspeed, source, render)
