@@ -13,6 +13,7 @@ from trl import DPOConfig, DPOTrainer
 from post_training.data.loader import load_and_mix_datasets
 from post_training.methods.common import (
     align_generation_eos,
+    bind_inference_checkpoint_callback,
     build_callbacks,
     build_common_training_kwargs,
     build_model_init_kwargs,
@@ -77,4 +78,5 @@ def build_dpo_trainer(config: PostTrainingConfig, run_dir: Path) -> DPOTrainer:
     sanitize_generation_config(trainer)
     align_generation_eos(trainer)
     prioritize_metric_callbacks(trainer)
+    bind_inference_checkpoint_callback(trainer)
     return trainer

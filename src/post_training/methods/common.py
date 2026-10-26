@@ -300,6 +300,18 @@ def build_callbacks(config: PostTrainingConfig, run_dir: Path) -> list:
     return callbacks
 
 
+def bind_inference_checkpoint_callback(trainer: Any) -> None:
+    """Give ``InferenceCheckpointCallback`` the trainer, so it can gather FSDP shards.
+
+    Callbacks receive the model that ``Trainer.__init__`` saw, not the wrapper
+    that ``accelerator.prepare`` builds later, so only the trainer can reach
+    the sharded weights.
+    """
+    for callback in trainer.callback_handler.callbacks:
+        if isinstance(callback, InferenceCheckpointCallback):
+            callback.bind_trainer(trainer)
+
+
 def prioritize_metric_callbacks(trainer: Any) -> None:
     """Move ``ThroughputCallback``/``MFUCallback`` to run just before ``WandbCallback``.
 
