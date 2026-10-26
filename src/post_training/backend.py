@@ -281,14 +281,16 @@ _LLAMAFACTORY_INPUT_PATH_KEYS = (
     "media_dir",
     "tokenized_path",
     "ref_model",
-    "ref_model_adapters",
     "reward_model",
-    "reward_model_adapters",
     "resume_from_checkpoint",
     "fsdp_config",
 )
 # Keys that hold a comma-separated list of input paths.
-_LLAMAFACTORY_INPUT_PATH_LIST_KEYS = ("adapter_name_or_path",)
+_LLAMAFACTORY_INPUT_PATH_LIST_KEYS = (
+    "adapter_name_or_path",
+    "ref_model_adapters",
+    "reward_model_adapters",
+)
 
 _LLAMAFACTORY_DEFAULT_DATASET_DIR = "data"
 _LLAMAFACTORY_DEFAULT_STAGE = "sft"
