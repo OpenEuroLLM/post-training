@@ -271,6 +271,8 @@ container:
   env_file: env/cluster.env  # required when image is set; sourced before launch
 ```
 
+The env file must export `HF_HOME`, `HF_HUB_CACHE`, and `HUGGINGFACE_HUB_CACHE`. `scripts/submit.py` refuses to submit if any of them is unset, and the job checks again before launching the container.
+
 Both the LlamaFactory and containerized TRL backends use this mechanism. Building containers for different HPCs is a work in progress, so if your cluster specific container is not available yet, please use the `uv` environment instead (or raise a pull request with a recipe for your cluster-specific container!). For TRL, use the `uv` environment by setting `container: null` or `container.image: null`; LlamaFactory requires a container image.
 
 ## 🧩 Feature Guide
@@ -424,7 +426,7 @@ You must specify exactly one determining factor for training duration in the `tr
 - **Offline**: `offline: true`
   Disables Hugging Face Hub / Weights & Biases network calls (essential for air-gapped nodes).
 - **Prefetch assets**: `prefetch_assets: true` (default)
-  When submitting via `scripts/submit.py`, pre-fetches models and datasets on the login node before the job is submitted to warm the shared Hugging Face caches (useful for faster startup and for `offline: true` air-gapped runs). Runs whenever `offline` or `prefetch_assets` is true — set `prefetch_assets: false` to skip this step (e.g., assets are already warm in the shared cache). A tokenizer from a different repo or revision (`model.tokenizer_name_or_path` / `model.tokenizer_revision`) is fetched too, without its model weights.
+  When submitting via `scripts/submit.py`, pre-fetches models and datasets on the login node before the job is submitted to warm the shared Hugging Face caches (useful for faster startup and for `offline: true` air-gapped runs). Runs whenever `offline` or `prefetch_assets` is true — set `prefetch_assets: false` to skip this step (e.g., assets are already warm in the shared cache). A tokenizer from a different repo or revision (`model.tokenizer_name_or_path` / `model.tokenizer_revision`) is fetched too, without its model weights. For `backend: llamafactory`, it downloads `llamafactory.model_name_or_path` and `ref_model` (with `model_revision` and `cache_dir`), and loads the datasets named in `dataset` / `eval_dataset` as LlamaFactory does: `hf_hub_url` registry entries, `dataset_dir: ONLINE`, and `REMOTE:` registries. Sources it cannot download (`ms_hub_url`, `om_hub_url`, `cloud_file_name`, `script_url`, `streaming: true`) are rejected at submission when `offline: true`, and skipped otherwise. The local snapshot directories of the models are written into `llamafactory_config.yaml`; `config.yaml` keeps the Hub IDs.
 - **Debug**: `debug.enabled: true`
   Forces `report_to: none`, uses a separate output directory, and allows overwriting existing runs.
 - **Tokenize only**: `--tokenize-only` (CLI flag on `train.py` / `submit.py`)
@@ -479,7 +481,7 @@ Each run generates a unique directory based on `paths.output_base` (or `paths.de
 
 ## LlamaFactory Backend
 
-An alternative backend using [LlamaFactory](https://github.com/hiyouga/LlamaFactory) for training, running inside a Singularity container.
+An alternative backend using [LlamaFactory](https://github.com/hiyouga/LlamaFactory) for training, running inside a Singularity container. The submission targets LlamaFactory **v0.9.5**: the stage choices and the input path keys come from that release, so the container must run it.
 
 ### Setup
 
@@ -501,6 +503,22 @@ python scripts/submit.py --config configs/llamafactory/long-context.yaml
 - Config: `configs/llamafactory/long-context.yaml`
 - DeepSpeed: `configs/deepspeed/z3_partial_offload.json`
 - Dataset registry: `data/llamafactory/dataset_info.json`
+
+### Configuration
+
+- Set every training setting in the `llamafactory` block, with LlamaFactory's own keys. The TRL sections (`model`, `training`, `checkpointing`, `data`, `sft`, `dpo`, `deepspeed`, `accelerate`, `logging`) stop the submission with an error, also when they are null or come from a CLI override.
+- `llamafactory.stage` (default `sft`) must be one of `pt`, `sft`, `rm`, `ppo`, `dpo`, `kto`, and the top-level `method` must have the same value. For example, a DPO run sets `method: dpo` and `stage: dpo`.
+- The submission review shows the values of the `llamafactory` block. Keys that the block does not set show the LlamaFactory or transformers default, marked `(default)`.
+- The job always launches `llamafactory-cli train` through `torchrun` (`FORCE_TORCHRUN=1`), also with one GPU per node.
+- LlamaFactory v0.9.5 does not resume the `rm` and `ppo` stages with `finetuning_type: full` or `freeze`. A requeued job of this type starts again from step 0, and the review shows a warning.
+
+### Run directory
+
+- The frozen `<run_dir>/config.yaml` holds only the `llamafactory` block and the submission keys, so you can submit again from it.
+- The run name is `llamafactory-<stage>-<model>-<datasets>-<timestamp>`, built from `llamafactory.stage` (default `sft`), `model_name_or_path`, and the names in `dataset` joined with `+`. Set `run_name` for a long dataset mix, because a directory name cannot exceed 255 bytes.
+- `scripts/submit.py` copies the DeepSpeed JSON and `dataset_info.json` into `<run_dir>/llamafactory/`, and the job runs in `<run_dir>`. Later edits in the repository do not change a queued or resumed run. A new submit with the same `run_name` keeps the existing copies. The review screen and the log warn about each kept copy and say when it differs from the current file; to use the current file, delete the copy or set a new `run_name`.
+- Relative paths in the `llamafactory` block start at the directory where you run `submit.py`. Existing input paths (models, adapters, `media_dir`, ...) are made absolute; output paths such as `export_dir` stay relative to `<run_dir>`.
+- LlamaFactory writes checkpoints and the final model to `<run_dir>/checkpoints/`, and a requeued or resubmitted job resumes from the last checkpoint. Do not set `output_dir` or `overwrite_output_dir`; validation rejects them.
 
 ## 📘 Configuration Reference: `configs/trl/sft.yaml`
 

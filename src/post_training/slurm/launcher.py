@@ -24,6 +24,10 @@ _TEMPLATE_NAME = "job.sh.jinja"
 _LLAMAFACTORY_TEMPLATE_NAME = "job_llamafactory.sh.jinja"
 _TRL_CONTAINER_TEMPLATE_NAME = "job_trl_container.sh.jinja"
 
+# HF cache variables that the container job scripts forward into the container.
+# scripts/submit.py checks them at submission, and the job script checks them again at start.
+REQUIRED_HF_CACHE_VARS = ("HF_HOME", "HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE")
+
 
 def render_trl_slurm_script(
     config: PostTrainingConfig,
@@ -144,6 +148,7 @@ def render_trl_container_slurm_script(
         container_image=config.container.image,
         bind_mounts=config.container.bind_mounts,
         env_file=config.container.env_file,
+        required_hf_vars=REQUIRED_HF_CACHE_VARS,
         container_path=config.container.path,
     )
 
@@ -160,8 +165,14 @@ def render_trl_container_slurm_script(
 def render_llamafactory_slurm_script(
     config: PostTrainingConfig,
     run_dir: Path,
+    *,
+    tokenize_only: bool = False,
 ) -> Path:
-    """Render the LlamaFactory SLURM batch script into *run_dir/slurm/job.sh*."""
+    """Render the LlamaFactory SLURM batch script into *run_dir/slurm/job.sh*.
+
+    With *tokenize_only*, the job runs run_dir/llamafactory/llamafactory_tokenize.py, which
+    post_freeze() froze, and not ``llamafactory-cli train``.
+    """
     if config.container is None or not config.container.image:
         raise ValueError("container.image must be set to render a LlamaFactory script.")
 
@@ -185,15 +196,20 @@ def render_llamafactory_slurm_script(
         wall_time=config.slurm.wall_time,
         signal_time_seconds=config.slurm.signal_time_seconds,
         max_failures=config.slurm.max_failures,
+        modules=config.slurm.modules,
+        module_purge=config.slurm.module_purge,
+        offline=config.offline,
         run_dir=str(run_dir.resolve()),
         # Container
         container_image=config.container.image,
         bind_mounts=config.container.bind_mounts,
         env_file=config.container.env_file,
+        required_hf_vars=REQUIRED_HF_CACHE_VARS,
         container_path=config.container.path,
         # LlamaFactory
-        llamafactory_config=str(run_dir / "llamafactory_config.yaml"),
-        repo_dir=str(Path.cwd()),
+        llamafactory_config=str(run_dir.resolve() / "llamafactory_config.yaml"),
+        tokenize_only=tokenize_only,
+        tokenize_script=str(run_dir.resolve() / "llamafactory" / "llamafactory_tokenize.py"),
     )
 
     slurm_dir = run_dir / "slurm"

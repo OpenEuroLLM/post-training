@@ -172,6 +172,16 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
         _row("Container", "none  (bare-metal)")
     _row("Offline mode", str(config.offline))
 
+    if config.backend == "llamafactory":
+        _llamafactory_sections(config, run_dir, total_gpus, tokenize_only)
+    else:
+        _trl_sections(config, run_dir, total_gpus, tokenize_only)
+    _confirm(total_gpus)
+
+
+def _trl_sections(
+    config: PostTrainingConfig, run_dir: Path, total_gpus: int, tokenize_only: bool
+) -> None:
     # ------------------------------------------------------------------
     # Model & data
     # ------------------------------------------------------------------
@@ -308,6 +318,132 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
             warn=True,
         )
 
+
+def _llamafactory_sections(
+    config: PostTrainingConfig, run_dir: Path, total_gpus: int, tokenize_only: bool
+) -> None:
+    """Review the llamafactory block only; the TRL sections do not apply to these runs."""
+    from post_training.backend import (
+        _LLAMAFACTORY_DEFAULT_DATASET_DIR,
+        _LLAMAFACTORY_DEFAULT_STAGE,
+        _LLAMAFACTORY_NON_RESUMABLE_STAGES,
+        LLAMAFACTORY_VERSION,
+        LlamaFactoryBackend,
+        llamafactory_dataset_names,
+    )
+
+    lf = config.llamafactory or {}
+    stage = lf.get("stage", _LLAMAFACTORY_DEFAULT_STAGE)
+    finetuning_type = lf.get("finetuning_type", _LF_DEFAULTS["finetuning_type"])
+
+    _section("Model & Data")
+    _row("Model", str(lf.get("model_name_or_path")))
+    if lf.get("ref_model"):
+        _row("Ref model", str(lf["ref_model"]))
+    _row("Template", _lf_value(lf, "template"), warn=lf.get("template") is None)
+    _row("Dataset dir", str(lf.get("dataset_dir") or _LLAMAFACTORY_DEFAULT_DATASET_DIR))
+    _row("Datasets", ", ".join(llamafactory_dataset_names(lf, keys=("dataset",))) or "none")
+    eval_names = llamafactory_dataset_names(lf, keys=("eval_dataset",))
+    if eval_names:
+        _row("Eval datasets", ", ".join(eval_names))
+    _row("Cutoff length", _lf_value(lf, "cutoff_len"))
+
+    _section(f"Training  ({str(stage).upper()})")
+    _row("Backend", f"llamafactory {LLAMAFACTORY_VERSION}")
+    _row("Finetuning type", _lf_value(lf, "finetuning_type"))
+    if stage in ("dpo", "kto"):
+        _row("Preference loss", _lf_value(lf, "pref_loss"))
+        _row("Beta", _lf_value(lf, "pref_beta"))
+    max_steps = lf.get("max_steps", -1)
+    if isinstance(max_steps, int) and max_steps > 0:
+        _row("Duration", f"{max_steps:,} steps")
+    else:
+        _row("Epochs", _lf_value(lf, "num_train_epochs"))
+    _row("Learning rate", _lf_value(lf, "learning_rate"))
+    _row("LR scheduler", _lf_value(lf, "lr_scheduler_type"))
+    per_device = lf.get("per_device_train_batch_size", _LF_DEFAULTS["per_device_train_batch_size"])
+    grad_acc = lf.get("gradient_accumulation_steps", _LF_DEFAULTS["gradient_accumulation_steps"])
+    _row(
+        "Batch sizes",
+        f"{per_device} per device  ×  {total_gpus} GPUs  ×  {grad_acc} grad-acc"
+        f"  =  {per_device * total_gpus * grad_acc} effective",
+    )
+    deepspeed = lf.get("deepspeed")
+    _row(
+        "DeepSpeed", "inline dict" if isinstance(deepspeed, dict) else str(deepspeed or "disabled")
+    )
+
+    _section("Checkpointing")
+    save_strategy = lf.get("save_strategy", _LF_DEFAULTS["save_strategy"])
+    if save_strategy == "steps":
+        _row("Save steps", _lf_value(lf, "save_steps"))
+    else:
+        _row("Save strategy", str(save_strategy), warn=save_strategy == "no")
+    if stage in _LLAMAFACTORY_NON_RESUMABLE_STAGES and finetuning_type in ("full", "freeze"):
+        _row(
+            "Resume",
+            _yellow(
+                f"*** LlamaFactory cannot resume stage {stage} with {finetuning_type} tuning — "
+                "a requeued job starts again from step 0 ***"
+            ),
+            warn=True,
+        )
+    elif save_strategy == "no":
+        _row("Resume", _yellow("*** no checkpoints — a requeued job starts again ***"), warn=True)
+    else:
+        _row("Resume", f"from the last checkpoint in {run_dir / 'checkpoints'}")
+
+    _section("Output")
+    _row("Run directory", str(run_dir))
+    for frozen, source, differs in LlamaFactoryBackend().kept_frozen_inputs(config, run_dir):
+        name = frozen.relative_to(run_dir.resolve())
+        if differs:
+            text = f"*** {name} differs from {source} — the frozen copy will NOT be replaced ***"
+        else:
+            text = f"*** {name} already exists in the run directory — it will NOT be replaced ***"
+        _row("Frozen input", _yellow(text), warn=True)
+    _row("Logging", _lf_value(lf, "report_to"))
+    if config.debug.enabled:
+        _row("Debug mode", _red("*** ENABLED — output dir may be overwritten ***"), warn=True)
+    else:
+        _row("Debug mode", "disabled")
+    if tokenize_only:
+        _row(
+            "Tokenize only",
+            _yellow(
+                f"*** ENABLED — saves to {lf.get('tokenized_path')} and exits, no training ***"
+            ),
+            warn=True,
+        )
+
+
+# LlamaFactory 0.9.5 and transformers defaults for the keys that the review shows.
+_LF_DEFAULTS = {
+    "template": "parsed from the tokenizer chat template",
+    "cutoff_len": 2048,
+    "finetuning_type": "lora",
+    "pref_loss": "sigmoid",
+    "pref_beta": 0.1,
+    "num_train_epochs": 3.0,
+    "learning_rate": 5e-5,
+    "lr_scheduler_type": "linear",
+    "per_device_train_batch_size": 8,
+    "gradient_accumulation_steps": 1,
+    "save_strategy": "steps",
+    "save_steps": 500,
+    # The default changes between transformers releases.
+    "report_to": "transformers default",
+}
+
+
+def _lf_value(lf: dict, key: str) -> str:
+    """The value of *key*, or the default marked as such when the block does not set it."""
+    if key in lf:
+        return str(lf[key])
+    return f"{_LF_DEFAULTS[key]}  (default)"
+
+
+def _confirm(total_gpus: int) -> None:
     # ------------------------------------------------------------------
     # Final confirmation
     # ------------------------------------------------------------------

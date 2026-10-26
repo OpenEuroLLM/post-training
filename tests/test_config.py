@@ -203,3 +203,123 @@ def test_resolve_tokenizer(tokenizer_name_or_path, tokenizer_revision, expected)
 
 def test_resolve_tokenizer_without_any_revision():
     assert ModelConfig(name_or_path="org/model").resolve_tokenizer() == ("org/model", None)
+
+
+# ---------------------------------------------------------------------------
+# backend: llamafactory takes all training settings from the llamafactory block
+# ---------------------------------------------------------------------------
+
+_TRL_SECTION_NAMES = (
+    "model",
+    "training",
+    "checkpointing",
+    "data",
+    "sft",
+    "dpo",
+    "deepspeed",
+    "accelerate",
+    "logging",
+)
+
+
+def _write_llamafactory_yaml(tmp_path, **extra):
+    config = {
+        "backend": "llamafactory",
+        "container": {
+            "image": "/shared/containers/llamafactory.sif",
+            "bind_mounts": ["/scratch:/scratch"],
+            "env_file": "/shared/env/cluster.env",
+        },
+        "llamafactory": {"model_name_or_path": "org/model", "stage": "sft", "do_train": True},
+        **extra,
+    }
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump(config))
+    return path
+
+
+def test_llamafactory_config_rejects_trl_sections(tmp_path):
+    path = _write_llamafactory_yaml(
+        tmp_path, training={"learning_rate": 1e-5, "seed": 1}, sft={"max_seq_length": 4096}
+    )
+
+    with pytest.raises(ValueError, match="training.learning_rate") as excinfo:
+        PostTrainingConfig.load(path)
+    assert "training.seed" in str(excinfo.value)
+    assert "sft.max_seq_length" in str(excinfo.value)
+
+
+def test_llamafactory_config_rejects_trl_cli_override(tmp_path):
+    path = _write_llamafactory_yaml(tmp_path)
+
+    with pytest.raises(ValueError, match="sft.packing"):
+        PostTrainingConfig.load(path, ["sft.packing=false"])
+
+
+def test_llamafactory_config_rejects_null_trl_section(tmp_path):
+    """A key written with a null value counts as set."""
+    path = _write_llamafactory_yaml(tmp_path, deepspeed=None)
+
+    with pytest.raises(ValueError, match="deepspeed"):
+        PostTrainingConfig.load(path)
+
+
+def test_llamafactory_backend_from_cli_override_is_checked(tmp_path):
+    path = _write_llamafactory_yaml(tmp_path, backend="trl", training={"max_steps": 1})
+
+    with pytest.raises(ValueError, match="training.max_steps"):
+        PostTrainingConfig.load(path, ["backend=llamafactory"])
+
+
+def test_llamafactory_config_allows_top_level_method(tmp_path):
+    path = _write_llamafactory_yaml(tmp_path, method="sft")
+
+    assert PostTrainingConfig.load(path).method == "sft"
+
+
+def test_trl_config_with_all_sections_loads(tmp_path, monkeypatch):
+    path = tmp_path / "config.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "backend": "trl",
+                "container": None,
+                "model": {"name_or_path": "org/model"},
+                "training": {"max_steps": 1},
+                "checkpointing": {"save_steps": 10},
+                "data": {"datasets": [{"name": "dummy", "path": "dummy/path"}]},
+                "sft": {"max_seq_length": 128},
+                "dpo": {"beta": 0.1},
+                "deepspeed": None,
+                "accelerate": {"dynamo_backend": "no"},
+                "logging": {"logging_steps": 5},
+            }
+        )
+    )
+
+    PostTrainingConfig.load(path)
+
+
+def test_llamafactory_save_omits_trl_sections(tmp_path):
+    """The frozen config holds only the llamafactory block and the submission keys, and loads again."""
+    config = PostTrainingConfig.load(_write_llamafactory_yaml(tmp_path))
+    frozen_path = tmp_path / "frozen.yaml"
+
+    config.save(frozen_path)
+
+    frozen = yaml.safe_load(frozen_path.read_text())
+    assert not set(frozen) & set(_TRL_SECTION_NAMES)
+    assert {"backend", "llamafactory", "container", "slurm", "paths"} <= set(frozen)
+    PostTrainingConfig.load(frozen_path)
+
+
+def test_trl_save_keeps_all_sections(tmp_path):
+    config = PostTrainingConfig()
+    config.container = None
+    config.training.max_steps = 1
+    frozen_path = tmp_path / "frozen.yaml"
+
+    config.save(frozen_path)
+
+    frozen = yaml.safe_load(frozen_path.read_text())
+    assert set(_TRL_SECTION_NAMES) <= set(frozen)

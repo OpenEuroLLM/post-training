@@ -1,5 +1,7 @@
 """Automated tests for SLURM template rendering."""
 
+from pathlib import Path
+
 import pytest
 
 from post_training.backend import LlamaFactoryBackend, TRLBackend
@@ -140,7 +142,7 @@ def test_trl_container_qos_mem_absent_when_none(tmp_path, config):
 
 
 # ---------------------------------------------------------------------------
-# environment modules — TRL container template
+# environment modules — TRL container and LlamaFactory templates
 # ---------------------------------------------------------------------------
 
 
@@ -184,6 +186,51 @@ def test_trl_container_host_setup_absent_when_unspecified(tmp_path, config):
     run_dir.mkdir(parents=True)
 
     content = render_trl_container_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text()
+
+    assert "module purge" not in content
+    assert "module load" not in content
+
+
+def test_llamafactory_modules_rendered(tmp_path, config):
+    """Configured host modules are loaded before the cluster environment file."""
+    config.slurm.modules = ["singularity/4.1.0", "cuda/12.4"]
+    config.slurm.module_purge = True
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    commands = [
+        "module purge",
+        "module load singularity/4.1.0",
+        "module load cuda/12.4",
+        'source "/shared/env/cluster.env"',
+    ]
+    assert all(command in content for command in commands)
+    assert [content.index(command) for command in commands] == sorted(
+        content.index(command) for command in commands
+    )
+
+
+def test_llamafactory_module_purge_omitted_when_disabled(tmp_path, config):
+    """Modules can be loaded without first purging the inherited module set."""
+    config.slurm.modules = ["singularity/4.1.0"]
+    config.slurm.module_purge = False
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert "module load singularity/4.1.0" in content
+    assert "module purge" not in content
+
+
+def test_llamafactory_host_setup_absent_when_unspecified(tmp_path, config):
+    """No module setup is rendered when the module list is empty."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
 
     assert "module purge" not in content
     assert "module load" not in content
@@ -285,20 +332,37 @@ def test_trl_backend_forwards_tokenize_only_container(tmp_path, config):
     assert "--tokenize-only" in _train_invocation(script.read_text())
 
 
-def test_llamafactory_backend_ignores_tokenize_only(tmp_path, config):
-    """LlamaFactoryBackend accepts the kwarg silently and never emits --tokenize-only.
-
-    submit.py raises before reaching this point, but the backend itself
-    must not crash if a caller passes the kwarg.
-    """
+def test_llamafactory_backend_tokenize_only_runs_the_tokenize_script(tmp_path, config):
+    """--tokenize-only runs the frozen tokenize script under torchrun, not llamafactory-cli."""
     run_dir = tmp_path / "outputs" / "my-run"
     run_dir.mkdir(parents=True)
 
     script = LlamaFactoryBackend().render_slurm_script(
         config, run_dir, "configs/llamafactory/long-context.yaml", tokenize_only=True
     )
+    content = script.read_text()
 
-    assert "--tokenize-only" not in script.read_text()
+    tokenize_script = run_dir.resolve() / "llamafactory" / "llamafactory_tokenize.py"
+    lf_config = run_dir.resolve() / "llamafactory_config.yaml"
+    assert (
+        f"PYTHONSAFEPATH=1 torchrun --standalone --nproc_per_node 1 {tokenize_script} {lf_config}"
+        in content
+    )
+    assert "llamafactory-cli train" not in content
+
+
+def test_llamafactory_backend_trains_by_default(tmp_path, config):
+    """Without --tokenize-only, the job trains and does not run the tokenize script."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    script = LlamaFactoryBackend().render_slurm_script(
+        config, run_dir, "configs/llamafactory/long-context.yaml"
+    )
+    content = script.read_text()
+
+    assert "llamafactory-cli train" in content
+    assert "llamafactory_tokenize.py" not in content
 
 
 # ---------------------------------------------------------------------------
@@ -421,3 +485,95 @@ def test_llamafactory_container_custom_path(tmp_path, config):
     content = render_llamafactory_slurm_script(config, run_dir).read_text()
 
     assert 'export PATH=\\"/opt/conda/bin:/usr/local/bin:/usr/bin:/bin\\"' in content
+
+
+# ---------------------------------------------------------------------------
+# CUDA_DEVICE_MAX_CONNECTIONS — LlamaFactory template
+# ---------------------------------------------------------------------------
+
+
+def test_llamafactory_cuda_device_max_connections_not_set(tmp_path, config):
+    """The LlamaFactory job does not serialize CUDA streams via CUDA_DEVICE_MAX_CONNECTIONS."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert "export CUDA_DEVICE_MAX_CONNECTIONS" not in content
+
+
+def test_llamafactory_forces_torchrun(tmp_path, config):
+    """One GPU per node still launches torchrun, so the nodes train as one job."""
+    config.slurm.gpus_per_node = 1
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert "export FORCE_TORCHRUN=1" in content
+
+
+# ---------------------------------------------------------------------------
+# offline flag — LlamaFactory template
+# ---------------------------------------------------------------------------
+
+
+def test_llamafactory_offline_enabled(tmp_path, config):
+    """offline: true switches HF and WandB to offline mode inside the container."""
+    config.offline = True
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert "export HF_HUB_OFFLINE=1" in content
+    assert "export HF_DATASETS_OFFLINE=1" in content
+    assert "export TRANSFORMERS_OFFLINE=1" in content
+    assert "export WANDB_MODE=offline" in content
+    assert "OFFLINE=0" not in content
+
+
+def test_llamafactory_offline_disabled(tmp_path, config):
+    """offline: false clears the HF offline flags, overriding any value from the env file."""
+    config.offline = False
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert "export HF_HUB_OFFLINE=0" in content
+    assert "export HF_DATASETS_OFFLINE=0" in content
+    assert "export TRANSFORMERS_OFFLINE=0" in content
+    assert "OFFLINE=1" not in content
+    assert "WANDB_MODE" not in content
+
+
+# ---------------------------------------------------------------------------
+# working directory and PYTHONPATH — LlamaFactory template
+# ---------------------------------------------------------------------------
+
+
+def test_llamafactory_runs_in_run_directory(tmp_path, config, monkeypatch):
+    """The job runs in the run directory, not in the directory that submit.py ran from."""
+    submit_dir = tmp_path / "repo"
+    submit_dir.mkdir()
+    monkeypatch.chdir(submit_dir)
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert f'cd \\"{run_dir.resolve()}\\"' in content
+    assert f"cd {Path.cwd()}" not in content
+    assert f"llamafactory-cli train {run_dir.resolve() / 'llamafactory_config.yaml'}" in content
+
+
+def test_llamafactory_unsets_pythonpath(tmp_path, config):
+    """LlamaFactory does not import post_training, so no PYTHONPATH reaches the container."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = render_llamafactory_slurm_script(config, run_dir).read_text()
+
+    assert "unset PYTHONPATH" in content
+    assert "PYTHONPATH=" not in content

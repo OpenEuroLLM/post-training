@@ -12,5 +12,38 @@
       "assistant_tag": "assistant",
       "system_tag": "system"
     }
+  },
+  "dolci_instruct_sft": {
+    "hf_hub_url": "allenai/Dolci-Instruct-SFT",
+    "split": "train",
+    "formatting": "sharegpt",
+    "columns": {
+      "messages": "messages"
+    },
+    "tags": {
+      "role_tag": "role",
+      "content_tag": "content",
+      "user_tag": "user",
+      "assistant_tag": "assistant",
+      "observation_tag": "environment",
+      "system_tag": "system"
+    }
+  },
+  "openeurollm_excellent_sft": {
+    "hf_hub_url": "openeurollm/OpenEuroLLM-Excellent-SFT",
+    "split": "train",
+    "formatting": "sharegpt",
+    "columns": {
+      "messages": "messages",
+      "tools": "tools"
+    },
+    "tags": {
+      "role_tag": "role",
+      "content_tag": "content",
+      "user_tag": "user",
+      "assistant_tag": "assistant",
+      "observation_tag": "tool",
+      "system_tag": "system"
+    }
   }
 }

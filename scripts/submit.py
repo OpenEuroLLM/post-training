@@ -23,7 +23,7 @@ if str(_PROJECT_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 
 from post_training.config import PostTrainingConfig
-from post_training.slurm.launcher import generate_and_submit
+from post_training.slurm.launcher import REQUIRED_HF_CACHE_VARS, generate_and_submit
 from post_training.utils.guardrails import run_guardrails
 from post_training.utils.logging import setup_logging
 from post_training.utils.paths import setup_run_directory
@@ -75,6 +75,45 @@ def _apply_hf_env_from_file(env_file: str) -> None:
         logger.info("Applied HF cache vars from %s: %s", env_file, ", ".join(applied))
 
 
+def _check_required_hf_vars(config: PostTrainingConfig) -> None:
+    """Refuse a container job that would stop at start for a missing HF cache variable.
+
+    Call after _apply_hf_env_from_file(): os.environ then holds the submitting
+    shell's values, which sbatch passes to the job, plus the env file's exports.
+    The job script checks again at start, for differences on the compute node.
+    """
+    if config.container is None or not config.container.image:
+        return
+    missing = [var for var in REQUIRED_HF_CACHE_VARS if not os.environ.get(var)]
+    if missing:
+        raise ValueError(
+            f"{', '.join(missing)} not set. Export them in container.env_file "
+            f"({config.container.env_file}) as 'export NAME=value' lines."
+        )
+
+
+def _prepare_llamafactory_tokenize_only(config: PostTrainingConfig) -> None:
+    """Check llamafactory.tokenized_path for a --tokenize-only job and make it absolute.
+
+    The job saves the tokenized data there. A relative path starts at the directory
+    where submit.py runs, so a later training submit with the same value finds the data.
+    """
+    lf = config.llamafactory
+    tokenized_path = lf.get("tokenized_path")
+    if not isinstance(tokenized_path, str) or not tokenized_path:
+        raise ValueError(
+            "--tokenize-only with backend: llamafactory needs llamafactory.tokenized_path: "
+            "the job saves the tokenized data there."
+        )
+    path = Path(tokenized_path).resolve()
+    if path.is_dir() and any(path.iterdir()):
+        raise ValueError(
+            f"llamafactory.tokenized_path '{path}' already holds data, and LlamaFactory would "
+            "load it. Delete it, or set a new tokenized_path."
+        )
+    lf["tokenized_path"] = str(path)
+
+
 def _parse_args() -> tuple[str, list[str], bool]:
     parser = argparse.ArgumentParser(description="Submit a SLURM training job.")
     parser.add_argument(
@@ -91,7 +130,10 @@ def _parse_args() -> tuple[str, list[str], bool]:
     parser.add_argument(
         "--tokenize-only",
         action="store_true",
-        help="Pass --tokenize-only to train.py — exits after trainer initialization.",
+        help=(
+            "Tokenize the datasets on 1 GPU and exit before training. TRL: passes "
+            "--tokenize-only to train.py. LlamaFactory: saves to llamafactory.tokenized_path."
+        ),
     )
     known, unknown = parser.parse_known_args()
     return known.config, unknown, known.confirm, known.tokenize_only
@@ -106,15 +148,14 @@ def main() -> None:
 
     if tokenize_only:
         if config.backend == "llamafactory":
-            raise ValueError(
-                "--tokenize-only is only supported with backend=trl "
-                "(LlamaFactory uses llamafactory-cli, which has no equivalent flag)."
-            )
+            _prepare_llamafactory_tokenize_only(config)
         config.slurm.num_nodes = 1
         config.slurm.gpus_per_node = 1
 
     if config.container is not None and config.container.env_file:
         _apply_hf_env_from_file(config.container.env_file)
+
+    _check_required_hf_vars(config)
 
     prefetched = None
     if config.offline or config.prefetch_assets:
@@ -144,7 +185,9 @@ def main() -> None:
     # the original repo id) are done. train.py then loads a local directory
     # path, so from_pretrained skips HF Hub's cache-resolution/filelock path
     # entirely — avoiding contention when every rank loads it at once.
-    if prefetched is not None:
+    # LlamaFactory gets its snapshot paths in post_freeze() instead, so
+    # config.yaml keeps the user's llamafactory block and TRL defaults.
+    if prefetched is not None and config.backend == "trl":
         config.model.name_or_path = prefetched.model
         config.model.tokenizer_name_or_path = prefetched.tokenizer
         if prefetched.ref_model is not None:
@@ -157,7 +200,7 @@ def main() -> None:
     # Copy any backend-specific artifacts for reproducibility.
     from post_training.backend import get_backend
 
-    get_backend(config.backend).post_freeze(config, run_dir)
+    get_backend(config.backend).post_freeze(config, run_dir, prefetched)
 
     job_id = generate_and_submit(
         config, run_dir, str(frozen.resolve()), tokenize_only=tokenize_only
