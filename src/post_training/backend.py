@@ -71,11 +71,26 @@ def _shorten_dataset_name(name: str) -> str:
 
 
 def _dataset_mix_hash(datasets: list) -> str:
+    # Every field that can change the realised rows belongs in the identity.
+    # Omitting (for example) the Hub revision can make two materially different
+    # runs resolve to the same output directory and resume each other's state.
     canonical = sorted(
-        [{"name": d.name, "path": d.path, "weight": d.weight} for d in datasets],
+        [
+            {
+                "name": d.name,
+                "path": d.path,
+                "revision": d.revision,
+                "data_dir": d.data_dir,
+                "subset": d.subset,
+                "split": d.split,
+                "weight": d.weight,
+                "transform": d.transform,
+            }
+            for d in datasets
+        ],
         key=lambda x: x["name"],
     )
-    return hashlib.sha256(json.dumps(canonical).encode()).hexdigest()[:8]
+    return hashlib.sha256(json.dumps(canonical, sort_keys=True).encode()).hexdigest()[:8]
 
 
 class TRLBackend(Backend):
@@ -168,7 +183,7 @@ class TRLBackend(Backend):
         model_short = _shorten_model_name(config.model.name_or_path)
         datasets = config.data.datasets
         if len(datasets) == 1:
-            ds_part = _shorten_dataset_name(datasets[0].name)
+            ds_part = f"{_shorten_dataset_name(datasets[0].name)}_{_dataset_mix_hash(datasets)}"
         else:
             ds_part = f"mix_{_dataset_mix_hash(datasets)}"
         return f"{config.method}-{model_short}-{ds_part}-{timestamp}"

@@ -71,6 +71,42 @@ def test_weight_resampling_uses_each_dataset_size(monkeypatch):
     assert Counter(mixed["source"]) == {"a": 2, "b": 4}
 
 
+def test_hub_dataset_revision_is_forwarded(monkeypatch):
+    calls = []
+
+    def fake_load_dataset(path: str, **kwargs) -> Dataset:
+        calls.append((path, kwargs))
+        return _dataset("a", 1)
+
+    monkeypatch.setattr(loader, "load_dataset", fake_load_dataset)
+
+    loader.load_and_mix_datasets(
+        _config(DatasetEntry(name="a", path="org/dataset", revision="abc123"))
+    )
+
+    assert calls == [("org/dataset", {"split": "train", "revision": "abc123"})]
+
+
+def test_local_dataset_file_does_not_receive_hub_revision(monkeypatch, tmp_path):
+    path = tmp_path / "train.parquet"
+    path.touch()
+    calls = []
+
+    def fake_load_dataset(builder: str, **kwargs) -> Dataset:
+        calls.append((builder, kwargs))
+        return _dataset("a", 1)
+
+    monkeypatch.setattr(loader, "load_dataset", fake_load_dataset)
+
+    loader.load_and_mix_datasets(
+        _config(DatasetEntry(name="a", path=str(path), revision="ignored-for-local"))
+    )
+
+    assert calls == [
+        ("parquet", {"data_files": str(path), "split": "train"}),
+    ]
+
+
 def test_weight_resampling_is_reproducible(monkeypatch):
     _patch_load_dataset(
         monkeypatch,

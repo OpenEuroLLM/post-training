@@ -61,6 +61,8 @@ trap handle_signal USR1
 
 # ── Launch via accelerate (explicit flags from config) ─────────────────────
 export LAUNCHER="accelerate launch \
+{% if accelerate_config_file %}    --config_file {{ accelerate_config_file }} \
+{% endif -%}
     --num_machines $NUM_NODES \
     --num_processes $WORLD_SIZE \
     --machine_rank \$SLURM_PROCID \
@@ -96,4 +98,3 @@ if [ $EXIT_CODE -ne 0 ]; then
         exit 1
     fi
 fi
-

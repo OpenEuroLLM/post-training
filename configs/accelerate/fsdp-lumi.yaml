@@ -1,0 +1,14 @@
+# Multi-node full-shard profile for LUMI MI250X GCDs. The generated SLURM
+# launcher overrides process counts, machine rank, and rendezvous coordinates.
+compute_environment: LOCAL_MACHINE
+distributed_type: FSDP
+mixed_precision: bf16
+num_processes: 8
+fsdp_config:
+  fsdp_sharding_strategy: FULL_SHARD
+  fsdp_auto_wrap_policy: TRANSFORMER_BASED_WRAP
+  fsdp_state_dict_type: FULL_STATE_DICT
+  fsdp_use_orig_params: true
+  fsdp_offload_params: false
+  fsdp_cpu_ram_efficient_loading: true
+  fsdp_sync_module_states: true

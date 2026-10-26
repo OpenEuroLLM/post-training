@@ -178,6 +178,8 @@ class DatasetEntry:
 
     name: str = MISSING
     path: str = MISSING
+    # Hub branch, tag, or commit. Ignored for existing local paths.
+    revision: str | None = None
     data_dir: str | None = None
     subset: str | None = None
     split: str = "train"
@@ -199,6 +201,10 @@ class DataConfig:
 class AccelerateConfig:
     """Flags forwarded to ``accelerate launch`` for explicit multi-node control."""
 
+    # Optional Accelerate YAML for launchers that are not expressible by the
+    # simple flags below (for example FSDP on LUMI). The SLURM renderer freezes
+    # a copy beside job.sh before submission.
+    config_file: str | None = None
     mixed_precision: str = "bf16"
     # Only takes effect when the top-level `deepspeed:` config is also set;
     # `deepspeed: null` disables DeepSpeed at launch regardless of this flag.

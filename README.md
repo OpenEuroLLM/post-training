@@ -10,6 +10,7 @@ This repo supports two training backends:
 
 - [Quick Start](#quick-start)
 - [Run SFT using a pre-built container](#-run-sft-using-a-pre-built-container)
+- [Reasoning SFT on LUMI](docs/reasoning-sft.md)
 - [Project Structure](#-project-structure)
 - [Design Philosophy](#-design-philosophy)
 - [Feature Guide](#-feature-guide)
@@ -115,6 +116,12 @@ This guide fine-tunes a given checkpoint with SFT on a SLURM cluster, with train
 Tokenizing first keeps the multi-node allocation from sitting idle during CPU-bound preprocessing, and it surfaces data and chat-template problems in a small job.
 
 The example config is [`configs/trl/prelude-sft.yaml`](configs/trl/prelude-sft.yaml). It fine-tunes a 9B checkpoint on LUMI, with the tokenizer from a separate repo. For your own run, copy it and replace the checkpoint, data, container paths, and SLURM account.
+
+For reasoning continuation, use the production-oriented
+[`configs/trl/reasoning-sft-lumi.yaml`](configs/trl/reasoning-sft-lumi.yaml) and
+the accompanying [reasoning SFT guide](docs/reasoning-sft.md). It adds a frozen
+FSDP launch profile, a pinned parent revision, 16K assistant-only training, and
+an explicit contract for a token-balanced materialized reasoning mixture.
 
 ### Before you start
 
@@ -305,6 +312,7 @@ data:
   datasets:
     - name: "my_dataset"
       path: "org/dataset"
+      revision: "<commit-sha>"  # pin Hub inputs for reproducible runs
       split: "train"
       weight: 1.0  # 1 = full dataset, <1 undersamples, >1 oversamples
 ```
@@ -399,7 +407,7 @@ You must specify exactly one determining factor for training duration in the `tr
 
 - **DeepSpeed**: configured inline under the top-level `deepspeed:` key (see the reference config below); set `deepspeed: null` to disable DeepSpeed entirely.
   To switch from ZeRO stage 2 to stage 3, bump `zero_optimization.stage` to `3` and add the `stage3_*` tuning keys — see `configs/deepspeed/zero3.yaml` for a full example.
-- **Accelerate flags**: the `accelerate` section in the YAML mirrors the CLI flags required for multi-node setups (`mixed_precision`, `dynamo_backend`, `rdzv_backend`, etc.).
+- **Accelerate flags**: the `accelerate` section in the YAML mirrors the CLI flags required for multi-node setups (`mixed_precision`, `dynamo_backend`, `rdzv_backend`, etc.). Set `accelerate.config_file` for a full profile such as FSDP. The renderer copies that file into the run's `slurm/` directory before submission, so a queued job cannot drift with the working checkout.
   These are used by the SLURM launcher to generate the correct job script.
 - **Self-healing**: the SLURM launcher (`src/post_training/slurm/`) supports auto-requeueing.
   - `slurm.signal_time_seconds` ensures the job saves a checkpoint and requeues itself before the wall time expires

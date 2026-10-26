@@ -89,6 +89,7 @@ data:
   datasets:
     - name: "nemotron_pt_v2"
       path: "nvidia/Nemotron-Post-Training-Dataset-v2"
+      revision: null                         # pin production runs to a Hub commit
       split: "stem"
       weight: 1.0                            # 1 = full dataset, <1 undersamples, >1 oversamples
       transform: null                        # null = already conversational
@@ -155,5 +156,4 @@ debug:
 paths:
   output_base: "outputs"
   debug_base: "outputs/debug"
-
 

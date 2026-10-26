@@ -376,6 +376,38 @@ def test_trl_deepspeed_flags_absent_when_accelerate_override_disables(tmp_path, 
     assert "--deepspeed_multinode_launcher" not in content
 
 
+@pytest.mark.parametrize(
+    "renderer",
+    [render_trl_slurm_script, render_trl_container_slurm_script],
+)
+def test_trl_accelerate_config_is_frozen_and_forwarded(tmp_path, config, renderer):
+    profile = tmp_path / "fsdp.yaml"
+    profile.write_text("distributed_type: FSDP\n")
+    config.accelerate.config_file = str(profile)
+    config.deepspeed = None
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    content = renderer(config, run_dir, "configs/trl/sft.yaml").read_text()
+    frozen = run_dir / "slurm" / "accelerate.yaml"
+
+    assert frozen.read_text() == "distributed_type: FSDP\n"
+    assert f"--config_file {frozen.resolve()}" in content
+    assert "--use_deepspeed" not in content
+
+    profile.write_text("distributed_type: MULTI_GPU\n")
+    assert frozen.read_text() == "distributed_type: FSDP\n"
+
+
+def test_missing_accelerate_config_fails_before_submission(tmp_path, config):
+    config.accelerate.config_file = str(tmp_path / "missing.yaml")
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    with pytest.raises(FileNotFoundError, match="accelerate.config_file"):
+        render_trl_slurm_script(config, run_dir, "configs/trl/sft.yaml")
+
+
 # ---------------------------------------------------------------------------
 # container.path — configurable PATH inside the container
 # ---------------------------------------------------------------------------

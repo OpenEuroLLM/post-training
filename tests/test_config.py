@@ -1,5 +1,7 @@
 """Tests for nullable config fields."""
 
+from pathlib import Path
+
 import pytest
 import yaml
 
@@ -203,3 +205,16 @@ def test_resolve_tokenizer(tokenizer_name_or_path, tokenizer_revision, expected)
 
 def test_resolve_tokenizer_without_any_revision():
     assert ModelConfig(name_or_path="org/model").resolve_tokenizer() == ("org/model", None)
+
+
+def test_reasoning_lumi_profile_resolves_exact_production_budget():
+    config_path = Path(__file__).parents[1] / "configs" / "trl" / "reasoning-sft-lumi.yaml"
+
+    config = PostTrainingConfig.load(config_path)
+
+    assert config.resolve_max_steps() == 500
+    assert config.model.revision == "85bf18fb4f0bee6ac6270f06b1d1c6b3be200f31"
+    assert config.data.chat_template == "qwen3"
+    assert config.sft.truncated_span_action == "drop"
+    assert config.accelerate.config_file == "configs/accelerate/fsdp-lumi.yaml"
+    assert config.deepspeed is None

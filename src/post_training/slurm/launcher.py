@@ -8,6 +8,7 @@ and written into the run directory before ``sbatch`` is called.
 from __future__ import annotations
 
 import logging
+import shutil
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -23,6 +24,28 @@ _TEMPLATE_DIR = Path(__file__).resolve().parent
 _TEMPLATE_NAME = "job.sh.jinja"
 _LLAMAFACTORY_TEMPLATE_NAME = "job_llamafactory.sh.jinja"
 _TRL_CONTAINER_TEMPLATE_NAME = "job_trl_container.sh.jinja"
+
+
+def _freeze_accelerate_config(config: PostTrainingConfig, run_dir: Path) -> str | None:
+    """Freeze the optional Accelerate launch profile next to ``job.sh``.
+
+    A queued job must not read a mutable file from the working checkout. The
+    copied path is also inside ``run_dir``, which the container launcher already
+    exposes to the training process.
+    """
+    source_value = config.accelerate.config_file
+    if source_value is None:
+        return None
+
+    source = Path(source_value).expanduser().resolve()
+    if not source.is_file():
+        raise FileNotFoundError(f"accelerate.config_file '{source_value}' not found.")
+
+    destination = run_dir / "slurm" / "accelerate.yaml"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if source != destination.resolve():
+        shutil.copy2(source, destination)
+    return str(destination.resolve())
 
 
 def render_trl_slurm_script(
@@ -54,6 +77,7 @@ def render_trl_slurm_script(
         keep_trailing_newline=True,
     )
     template = env.get_template(_TEMPLATE_NAME)
+    accelerate_config_file = _freeze_accelerate_config(config, run_dir)
 
     rendered = template.render(
         # SLURM parameters
@@ -75,6 +99,7 @@ def render_trl_slurm_script(
         config_path=config_path,
         tokenize_only=tokenize_only,
         # Accelerate flags
+        accelerate_config_file=accelerate_config_file,
         mixed_precision=config.accelerate.mixed_precision,
         dynamo_backend=config.accelerate.dynamo_backend,
         use_deepspeed=config.accelerate.use_deepspeed and bool(config.deepspeed),
@@ -113,6 +138,7 @@ def render_trl_container_slurm_script(
         keep_trailing_newline=True,
     )
     template = env.get_template(_TRL_CONTAINER_TEMPLATE_NAME)
+    accelerate_config_file = _freeze_accelerate_config(config, run_dir)
 
     rendered = template.render(
         # SLURM parameters
@@ -134,6 +160,7 @@ def render_trl_container_slurm_script(
         config_path=config_path,
         tokenize_only=tokenize_only,
         # Accelerate flags
+        accelerate_config_file=accelerate_config_file,
         mixed_precision=config.accelerate.mixed_precision,
         dynamo_backend=config.accelerate.dynamo_backend,
         use_deepspeed=config.accelerate.use_deepspeed and bool(config.deepspeed),

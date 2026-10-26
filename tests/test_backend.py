@@ -2,8 +2,35 @@
 
 import logging
 
-from post_training.backend import TRLBackend
-from post_training.config import ContainerConfig, PostTrainingConfig
+from post_training.backend import TRLBackend, _dataset_mix_hash
+from post_training.config import ContainerConfig, DatasetEntry, PostTrainingConfig
+
+
+def test_dataset_mix_hash_covers_reproducibility_fields():
+    baseline = DatasetEntry(name="reasoning", path="org/data")
+    changes = [
+        DatasetEntry(name="reasoning", path="org/data", revision="abc123"),
+        DatasetEntry(name="reasoning", path="org/data", subset="math"),
+        DatasetEntry(name="reasoning", path="org/data", split="validation"),
+        DatasetEntry(name="reasoning", path="org/data", transform="custom"),
+    ]
+
+    baseline_hash = _dataset_mix_hash([baseline])
+
+    assert all(_dataset_mix_hash([changed]) != baseline_hash for changed in changes)
+
+
+def test_single_dataset_run_name_changes_with_revision():
+    config = PostTrainingConfig()
+    config.model.name_or_path = "org/model"
+    config.data.datasets = [DatasetEntry(name="reasoning", path="org/data")]
+    first = TRLBackend().generate_run_name(config, "20260917-120000")
+
+    config.data.datasets[0].revision = "abc123"
+    second = TRLBackend().generate_run_name(config, "20260917-120000")
+
+    assert first != second
+    assert first.startswith("sft-model-reasoning_")
 
 
 def _make_fake_repo(repo_dir, marker: str = "live") -> None:
