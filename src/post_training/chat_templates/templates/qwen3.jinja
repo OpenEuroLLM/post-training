@@ -1,7 +1,44 @@
+{%- set instruction = thinking_instruction | default(none) %}
+{%- set thinking = enable_thinking | default(none) %}
+{%- if instruction is not none and instruction not in ['think', 'no_think'] %}
+    {{- raise_exception('thinking_instruction must be think, no_think, or none.') }}
+{%- endif %}
+{%- if thinking is not none and thinking is not true and thinking is not false %}
+    {{- raise_exception('enable_thinking must be true, false, or none.') }}
+{%- endif %}
+{%- if instruction == 'think' and thinking is false %}
+    {{- raise_exception('think instruction conflicts with enable_thinking=False.') }}
+{%- endif %}
+{%- set target = namespace(message=none, reasoning='') %}
+{%- for message in messages %}
+    {%- if message.role == 'user' and message.content is string and not (message.content.startswith('<tool_response>') and message.content.endswith('</tool_response>')) %}
+        {%- set target.message = none %}
+    {%- elif message.role == 'assistant' %}
+        {%- set target.message = message %}
+    {%- endif %}
+{%- endfor %}
+{%- if not add_generation_prompt and target.message is not none %}
+    {%- if target.message.reasoning_content is string %}
+        {%- set target.reasoning = target.message.reasoning_content %}
+    {%- elif target.message.content is string and '<think>' in target.message.content and '</think>' in target.message.content %}
+        {%- set target.reasoning = target.message.content.split('</think>')[0].split('<think>')[-1] %}
+    {%- endif %}
+    {%- if target.reasoning | trim %}
+        {%- if instruction == 'no_think' %}
+            {{- raise_exception('no_think target contains reasoning.') }}
+        {%- endif %}
+    {%- elif instruction != 'no_think' %}
+        {{- raise_exception('A target without reasoning requires thinking_instruction=no_think.') }}
+    {%- endif %}
+{%- endif %}
+{%- set system_content = messages[0].content if messages[0].role == 'system' else '' %}
+{%- if instruction is not none %}
+    {%- set system_content = system_content + ('\n\n' if system_content else '') + '/' + instruction %}
+{%- endif %}
 {%- if tools %}
     {{- '<|im_start|>system\n' }}
-    {%- if messages[0].role == 'system' %}
-        {{- messages[0].content + '\n\n' }}
+    {%- if system_content %}
+        {{- system_content + '\n\n' }}
     {%- endif %}
     {{- "# Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>" }}
     {%- for tool in tools %}
@@ -10,8 +47,8 @@
     {%- endfor %}
     {{- "\n</tools>\n\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\n<tool_call>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</tool_call><|im_end|>\n" }}
 {%- else %}
-    {%- if messages[0].role == 'system' %}
-        {{- '<|im_start|>system\n' + messages[0].content + '<|im_end|>\n' }}
+    {%- if system_content %}
+        {{- '<|im_start|>system\n' + system_content + '<|im_end|>\n' }}
     {%- endif %}
 {%- endif %}
 {%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}

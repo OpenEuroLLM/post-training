@@ -146,6 +146,8 @@ class SFTMethodConfig:
     # Dropping is never silent: it changes the realised mixture, because
     # data.datasets[].weight applies to the rows that survive filtering.
     truncated_span_action: str = "warn"
+    # Opt-in fraction of reasoning rows given /think; others omit it, direct answers get /no_think.
+    thinking_instruction_probability: float | None = None
 
 
 @dataclass

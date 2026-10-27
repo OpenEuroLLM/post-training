@@ -55,6 +55,8 @@ _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 # markers therefore wrap the assistant body only when
 # ``loop.index0 > ns.last_query_index``.  Multi-step tool exchanges keep every
 # assistant turn after the last user query, since those retain their traces.
+# Qwen3 validates the final SFT target against thinking_instruction.
+# Direct-answer targets require no_think; reasoning permits think or None.
 CHAT_TEMPLATES: dict[str, str] = {
     "chatml": "chatml.jinja",
     "olmo3": "olmo3.jinja",
@@ -64,6 +66,8 @@ CHAT_TEMPLATES: dict[str, str] = {
     "tulu3": "tulu3.jinja",
     "qwen3": "qwen3.jinja",
 }
+
+THINKING_INSTRUCTION_TEMPLATES = frozenset({"qwen3"})
 
 
 def register_chat_template(name: str, filename: str) -> None:

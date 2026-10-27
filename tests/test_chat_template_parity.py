@@ -1,4 +1,4 @@
-"""Render-parity tests: registered templates vs. their pristine upstream.
+"""Render parity for valid targets and intentional conditioning validation.
 
 Splicing `{% generation %}` markers into a vendored chat template is only
 safe if it changes *nothing* about what the template renders — the markers
@@ -157,6 +157,13 @@ def test_qwen3_renders_identically_to_upstream(
     """
     messages = _CONVERSATIONS[shape]
     tools = _TOOLS if with_tools else None
+
+    if not add_generation_prompt and shape in {"no-think", "tool-call"}:
+        from jinja2.exceptions import TemplateError
+
+        with pytest.raises(TemplateError, match="requires thinking_instruction=no_think"):
+            _render(get_chat_template("qwen3"), messages, tools, add_generation_prompt)
+        return
 
     ours = _render(get_chat_template("qwen3"), messages, tools, add_generation_prompt)
     upstream = _render(_UPSTREAM.read_text(), messages, tools, add_generation_prompt)
