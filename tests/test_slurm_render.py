@@ -421,3 +421,35 @@ def test_llamafactory_container_custom_path(tmp_path, config):
     content = render_llamafactory_slurm_script(config, run_dir).read_text()
 
     assert 'export PATH=\\"/opt/conda/bin:/usr/local/bin:/usr/bin:/bin\\"' in content
+
+
+# ---------------------------------------------------------------------------
+# exclude field — all three templates
+# ---------------------------------------------------------------------------
+
+
+def _render_all(config, run_dir):
+    return [
+        render_trl_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text(),
+        render_trl_container_slurm_script(config, run_dir, "configs/trl/sft.yaml").read_text(),
+        render_llamafactory_slurm_script(config, run_dir).read_text(),
+    ]
+
+
+def test_exclude_rendered(tmp_path, config):
+    """exclude appears as an #SBATCH directive when set."""
+    config.slurm.exclude = "node[01,03]"
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    for content in _render_all(config, run_dir):
+        assert "#SBATCH --exclude=node[01,03]" in content
+
+
+def test_exclude_absent_when_none(tmp_path, config):
+    """The exclude directive is suppressed when not set."""
+    run_dir = tmp_path / "outputs" / "my-run"
+    run_dir.mkdir(parents=True)
+
+    for content in _render_all(config, run_dir):
+        assert "--exclude" not in content
