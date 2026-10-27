@@ -236,6 +236,7 @@ class SlurmConfig:
     partition: str = "gpu"
     account: str | None = None
     qos: str | None = None
+    exclude: str | None = None
     num_nodes: int = 1
     gpus_per_node: int = 4
     cpus_per_task: int = 32
