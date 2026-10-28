@@ -1,0 +1,132 @@
+method: sft
+run_name: curated-v4-openeurollm-prelude-sft
+offline: true
+backend: trl
+llamafactory: null
+container:
+  image: /gpfs/projects/ehpc715/frei058666/containers/post-training.sif
+  bind_mounts:
+  - /gpfs/scratch/ehpc715/frei058666
+  env_file: env/mn5.env
+  path: /usr/local/bin:/usr/bin:/bin:/opt/venv/bin
+prefetch_assets: true
+model:
+  name_or_path: birgermoell/oellm-9b-128k-theta32m-prelude-anneal300b
+  attn_implementation: flash_attention_3
+  dtype: bfloat16
+  revision: c5b5a9fffdb8d09fe5071c5fa99028bdd76eb235
+  tokenizer_name_or_path: openeurollm/tokenizer-256k
+  tokenizer_revision: 94bae05cf351c4feb435d6a73c2aa8edfd88ae04
+training:
+  max_steps: null
+  num_train_epochs: 2.0
+  num_training_samples: null
+  num_training_tokens: null
+  learning_rate: 8.0e-05
+  effective_batch_size: 32
+  per_device_train_batch_size: 1
+  warmup_steps: 0.03
+  lr_scheduler_type: linear
+  lr_scheduler_kwargs: null
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  weight_decay: 0.0
+  adam_epsilon: 1.0e-08
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
+    determinism_check: default
+    debug: false
+    early_stop: true
+  bf16: true
+  seed: 42
+  use_liger_kernel: true
+  liger_kernel_config: null
+checkpointing:
+  save_strategy: steps
+  save_steps: 200
+  save_total_limit: 2
+  inference_checkpoint_steps: 100
+  inference_checkpoint_path: inference_checkpoints
+data:
+  chat_template: qwen3
+  num_proc: null
+  seed: 42
+  datasets:
+  - name: propella_sft_pool
+    path: openeurollm/OpenEuroLLM-Excellent-SFT
+    # Dataset snapshot: c4ee55804f256c5f8cc4a6ef3fdecbe4a4ea95e0.
+    # The historical dataset loader does not support a revision config field.
+    data_dir: null
+    subset: null
+    split: train
+    weight: 1.0
+    transform: null
+sft:
+  max_seq_length: 32768
+  packing: true
+  dataset_num_proc: null
+  truncated_span_action: warn
+dpo:
+  beta: 5.0
+  loss_type: sigmoid
+  ref_model_name_or_path: null
+  max_seq_length: 2048
+  dataset_num_proc: null
+deepspeed:
+  bf16:
+    enabled: true
+  zero_optimization:
+    stage: 2
+    overlap_comm: false
+    contiguous_gradients: true
+    reduce_scatter: true
+  gradient_clipping: 1.0
+  train_micro_batch_size_per_gpu: auto
+  gradient_accumulation_steps: auto
+  train_batch_size: auto
+  optimizer:
+    type: AdamW
+    params:
+      lr: auto
+      betas: auto
+      eps: auto
+      weight_decay: auto
+accelerate:
+  mixed_precision: bf16
+  use_deepspeed: true
+  deepspeed_multinode_launcher: standard
+  same_network: true
+  rdzv_backend: static
+  dynamo_backend: inductor
+logging:
+  report_to:
+  - wandb
+  - tensorboard
+  wandb_project: instruction-selection
+  logging_steps: 1
+  include_num_input_tokens_seen: non_padding
+slurm:
+  partition: acc_ehpc
+  account: ehpc715
+  qos: acc_ehpc
+  num_nodes: 8
+  gpus_per_node: 4
+  cpus_per_task: 76
+  cpus_per_gpu: null
+  mem: null
+  wall_time: '72:00:00'
+  job_name: curated-v4-prelude-sft
+  signal_time_seconds: 300
+  max_failures: 3
+  modules:
+  - cuda/12.6
+  - gcc/11.4.0
+  - singularity
+  module_purge: false
+debug:
+  enabled: false
+  override_existing: false
+paths:
+  output_base: /gpfs/scratch/ehpc715/frei058666/post-training/outputs_sft
+  debug_base: outputs_sft/debug
