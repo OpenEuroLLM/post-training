@@ -94,6 +94,33 @@ srun --export=ALL --wait=60 --kill-on-bad-exit=1 \
     export PYTHONPATH=\"{{ run_dir }}/src\"
     export PYTHONNOUSERSITE=1
 
+    # Keep working defaults; retry only when bundled compatibility libraries interfere.
+    if python \"{{ run_dir }}/scripts/check_cuda.py\"; then
+      echo \"CUDA initialized with the container's default libraries.\"
+    else
+      echo \"CUDA preflight failed; retrying without bundled compatibility libraries.\" >&2
+      original_ld_library_path=\"\${LD_LIBRARY_PATH:-}\"
+      clean_ld_library_path=\"\"
+      IFS=: read -ra ld_library_paths <<< \"\$original_ld_library_path\"
+      for ld_library_path in \"\${ld_library_paths[@]}\"; do
+        case \"\$ld_library_path\" in
+          /usr/local/cuda/compat|/usr/local/cuda/compat/*)
+            ;;
+          *)
+            clean_ld_library_path=\"\${clean_ld_library_path:+\$clean_ld_library_path:}\$ld_library_path\"
+            ;;
+        esac
+      done
+
+      if LD_LIBRARY_PATH=\"\$clean_ld_library_path\" python \"{{ run_dir }}/scripts/check_cuda.py\"; then
+        export LD_LIBRARY_PATH=\"\$clean_ld_library_path\"
+        echo \"CUDA initialized without bundled compatibility libraries.\"
+      else
+        echo \"CUDA initialization failed with and without bundled compatibility libraries.\" >&2
+        exit 1
+      fi
+    fi
+
     export NODE_RANK=\"\$SLURM_NODEID\"
     export NNODES=\"\$SLURM_NNODES\"
     export NPROC_PER_NODE=${GPUS_PER_NODE}
