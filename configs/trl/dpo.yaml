@@ -118,7 +118,8 @@ deepspeed:
 #   backward_prefetch: BACKWARD_PRE
 #   state_dict_type: SHARDED_STATE_DICT        # format of the resumable checkpoints/
 #   use_orig_params: true
-#   cpu_ram_efficient_loading: true            # rank 0 loads, FSDP broadcasts
+#   cpu_ram_efficient_loading: true            # rank 0 loads, FSDP broadcasts; must be
+#                                              # false with version 2 (reference model)
 #   sync_module_states: true
 
 # -- Accelerate launch flags -------------------------------------------------

@@ -181,6 +181,33 @@ def test_fsdp_dpo_without_liger_passes():
     TRLBackend().validate(cfg)
 
 
+def test_fsdp2_dpo_efficient_loading_rejected():
+    cfg = _fsdp_config()
+    cfg.method = "dpo"
+    cfg.training.use_liger_kernel = False
+    cfg.fsdp.version = 2
+
+    with pytest.raises(ValueError, match="requires fsdp.cpu_ram_efficient_loading: false"):
+        TRLBackend().validate(cfg)
+
+
+def test_fsdp2_dpo_without_efficient_loading_passes():
+    cfg = _fsdp_config()
+    cfg.method = "dpo"
+    cfg.training.use_liger_kernel = False
+    cfg.fsdp.version = 2
+    cfg.fsdp.cpu_ram_efficient_loading = False
+
+    TRLBackend().validate(cfg)
+
+
+def test_fsdp2_sft_efficient_loading_passes():
+    cfg = _fsdp_config()
+    cfg.fsdp.version = 2
+
+    TRLBackend().validate(cfg)
+
+
 def test_fsdp_sft_with_liger_passes():
     cfg = _fsdp_config()
     cfg.training.use_liger_kernel = True

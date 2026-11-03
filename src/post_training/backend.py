@@ -121,6 +121,15 @@ def _validate_fsdp(config: PostTrainingConfig) -> None:
     # broadcasts them while wrapping.
     if fsdp.cpu_ram_efficient_loading and not fsdp.sync_module_states:
         raise ValueError("fsdp.cpu_ram_efficient_loading requires fsdp.sync_module_states: true.")
+    # TRL shards the DPO reference model with fully_shard() itself, outside
+    # accelerator.prepare(), so nothing broadcasts rank 0's weights to it and the
+    # other ranks keep uninitialized reference weights.
+    if config.method == "dpo" and fsdp.version == 2 and fsdp.cpu_ram_efficient_loading:
+        raise ValueError(
+            "fsdp.version 2 with method 'dpo' requires fsdp.cpu_ram_efficient_loading: false. "
+            "TRL does not broadcast the reference model's weights from rank 0, so the "
+            "other ranks would train against an uninitialized reference model."
+        )
 
     t = config.training
     if fsdp.activation_checkpointing and t.gradient_checkpointing:
