@@ -18,6 +18,7 @@ from transformers.integrations import WandbCallback
 
 from post_training.callbacks.inference_checkpoint import InferenceCheckpointCallback
 from post_training.callbacks.mfu import MFUCallback
+from post_training.callbacks.resume_check import ResumeCheckCallback
 from post_training.callbacks.throughput import ThroughputCallback
 from post_training.chat_templates.registry import get_chat_template, infer_end_token_from_render
 
@@ -320,18 +321,23 @@ def build_callbacks(config: PostTrainingConfig, run_dir: Path) -> list:
             )
         )
 
+    if config.debug.resume_check:
+        callbacks.append(ResumeCheckCallback())
+
     return callbacks
 
 
 def bind_inference_checkpoint_callback(trainer: Any) -> None:
-    """Give ``InferenceCheckpointCallback`` the trainer, so it can gather FSDP shards.
+    """Give ``InferenceCheckpointCallback`` and ``ResumeCheckCallback`` the trainer.
+
+    The first gathers FSDP shards through it; the second reads the optimizer state.
 
     Callbacks receive the model that ``Trainer.__init__`` saw, not the wrapper
     that ``accelerator.prepare`` builds later, so only the trainer can reach
     the sharded weights.
     """
     for callback in trainer.callback_handler.callbacks:
-        if isinstance(callback, InferenceCheckpointCallback):
+        if isinstance(callback, InferenceCheckpointCallback | ResumeCheckCallback):
             callback.bind_trainer(trainer)
 
 

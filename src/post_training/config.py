@@ -291,6 +291,9 @@ class DebugConfig:
 
     enabled: bool = False
     override_existing: bool = False
+    # Fingerprint weights + optimizer state at each save and verify them after a
+    # resume (see post_training/callbacks/resume_check.py).
+    resume_check: bool = False
 
 
 @dataclass
