@@ -117,6 +117,15 @@ def _validate_fsdp(config: PostTrainingConfig) -> None:
             f"got '{fsdp.sharding_strategy}'."
         )
 
+    # Accelerate builds the FSDP1 sharded optimizer load target from the fresh,
+    # still-empty optimizer, so DCP reads no Adam state and a resume silently
+    # restarts Adam's history while keeping the global step.
+    if fsdp.version == 1 and fsdp.state_dict_type == "SHARDED_STATE_DICT":
+        raise ValueError(
+            "fsdp.version 1 with state_dict_type SHARDED_STATE_DICT loses the optimizer state "
+            "on resume. Use fsdp.version: 2, or fsdp.state_dict_type: FULL_STATE_DICT."
+        )
+
     # Rank-0-only loading leaves the other ranks without weights until FSDP
     # broadcasts them while wrapping.
     if fsdp.cpu_ram_efficient_loading and not fsdp.sync_module_states:

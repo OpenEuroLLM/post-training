@@ -219,7 +219,9 @@ class FSDPConfig:
     """
 
     # 1 = FullyShardedDataParallel (flat params), 2 = fully_shard (per-param DTensor).
-    version: int = 1
+    # Version 1 requires state_dict_type FULL_STATE_DICT (its sharded resume drops the
+    # optimizer state).
+    version: int = 2
     # FSDP2 maps FULL_SHARD / SHARD_GRAD_OP to reshard_after_forward true / false.
     sharding_strategy: str = "FULL_SHARD"
     auto_wrap_policy: str = "TRANSFORMER_BASED_WRAP"
@@ -234,6 +236,8 @@ class FSDPConfig:
     state_dict_type: str = "SHARDED_STATE_DICT"
     use_orig_params: bool = True
     offload_params: bool = False
+    # Must be false for method 'dpo' with version 2 (TRL never broadcasts the
+    # reference model's weights).
     cpu_ram_efficient_loading: bool = True
     sync_module_states: bool = True
     # Mutually exclusive with training.gradient_checkpointing.

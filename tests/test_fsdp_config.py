@@ -54,7 +54,10 @@ def test_fsdp_block_loads_from_yaml(tmp_path):
                     "use_liger_kernel": False,
                 },
                 "deepspeed": None,
-                "fsdp": {"transformer_layer_cls_to_wrap": ["Olmo3DecoderLayer"]},
+                "fsdp": {
+                    "transformer_layer_cls_to_wrap": ["Olmo3DecoderLayer"],
+                    "cpu_ram_efficient_loading": False,
+                },
                 "data": {"datasets": [{"name": "dummy", "path": "dummy/path", "weight": 1.0}]},
             }
         )
@@ -64,6 +67,7 @@ def test_fsdp_block_loads_from_yaml(tmp_path):
 
     assert config.fsdp.transformer_layer_cls_to_wrap == ["Olmo3DecoderLayer"]
     assert config.fsdp.auto_wrap_policy == "TRANSFORMER_BASED_WRAP"
+    assert config.fsdp.version == 2
     assert config.fsdp.state_dict_type == "SHARDED_STATE_DICT"
 
 
@@ -139,6 +143,58 @@ def test_fsdp_efficient_loading_requires_sync_module_states():
         TRLBackend().validate(cfg)
 
 
+def test_fsdp1_sharded_state_dict_rejected():
+    cfg = _fsdp_config()
+    cfg.fsdp.version = 1
+    cfg.fsdp.state_dict_type = "SHARDED_STATE_DICT"
+
+    with pytest.raises(ValueError, match="loses the optimizer state on resume"):
+        TRLBackend().validate(cfg)
+
+
+@pytest.mark.parametrize(
+    ("version", "state_dict_type"),
+    [(1, "FULL_STATE_DICT"), (2, "SHARDED_STATE_DICT"), (2, "FULL_STATE_DICT")],
+)
+def test_fsdp_resumable_state_dict_combinations_pass(version, state_dict_type):
+    cfg = _fsdp_config()
+    cfg.fsdp.version = version
+    cfg.fsdp.state_dict_type = state_dict_type
+
+    TRLBackend().validate(cfg)
+
+
+@pytest.mark.parametrize(
+    ("installed", "state_dict_type", "raises"),
+    [
+        ("1.12.0", "SHARDED_STATE_DICT", True),
+        ("1.13.0", "SHARDED_STATE_DICT", False),
+        ("1.14.0", "SHARDED_STATE_DICT", False),
+        ("1.12.0", "FULL_STATE_DICT", False),
+    ],
+)
+def test_fsdp_runtime_accelerate_version_check(monkeypatch, installed, state_dict_type, raises):
+    import accelerate
+
+    from post_training.methods.common import check_fsdp_runtime
+
+    monkeypatch.setattr(accelerate, "__version__", installed)
+    cfg = _fsdp_config()
+    cfg.fsdp.state_dict_type = state_dict_type
+
+    if raises:
+        with pytest.raises(RuntimeError, match="needs accelerate >= 1.13.0"):
+            check_fsdp_runtime(cfg)
+    else:
+        check_fsdp_runtime(cfg)
+
+
+def test_fsdp_runtime_check_skips_without_fsdp():
+    from post_training.methods.common import check_fsdp_runtime
+
+    check_fsdp_runtime(PostTrainingConfig())
+
+
 def test_fsdp_activation_checkpointing_conflicts_with_gradient_checkpointing():
     cfg = _fsdp_config()
     cfg.fsdp.activation_checkpointing = True
@@ -167,6 +223,7 @@ def test_fsdp_gradient_checkpointing_requires_early_stop_off(kwargs):
 def test_fsdp_dpo_with_liger_rejected():
     cfg = _fsdp_config()
     cfg.method = "dpo"
+    cfg.fsdp.cpu_ram_efficient_loading = False
     cfg.training.use_liger_kernel = True
 
     with pytest.raises(ValueError, match="Liger Kernel does not work with fsdp"):
@@ -176,6 +233,7 @@ def test_fsdp_dpo_with_liger_rejected():
 def test_fsdp_dpo_without_liger_passes():
     cfg = _fsdp_config()
     cfg.method = "dpo"
+    cfg.fsdp.cpu_ram_efficient_loading = False
     cfg.training.use_liger_kernel = False
 
     TRLBackend().validate(cfg)
@@ -228,14 +286,14 @@ def test_guardrails_fsdp_summary():
     cfg = _fsdp_config()
 
     assert _fsdp_summary(cfg) == (
-        "FSDP1 FULL_SHARD, TRANSFORMER_BASED_WRAP (model _no_split_modules), SHARDED_STATE_DICT"
+        "FSDP2 FULL_SHARD, TRANSFORMER_BASED_WRAP (model _no_split_modules), SHARDED_STATE_DICT"
     )
 
     cfg.fsdp.transformer_layer_cls_to_wrap = ["Olmo3DecoderLayer"]
     assert "TRANSFORMER_BASED_WRAP (Olmo3DecoderLayer)" in _fsdp_summary(cfg)
 
-    cfg.fsdp.version = 2
-    assert _fsdp_summary(cfg).startswith("FSDP2 FULL_SHARD")
+    cfg.fsdp.version = 1
+    assert _fsdp_summary(cfg).startswith("FSDP1 FULL_SHARD")
 
     cfg.fsdp = None
     assert _fsdp_summary(cfg) == "disabled"

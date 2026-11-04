@@ -438,7 +438,7 @@ def _launch_lines(content: str) -> list[str]:
 
 def test_trl_container_fsdp_flags_rendered(tmp_path, config):
     config.deepspeed = None
-    config.fsdp = FSDPConfig()
+    config.fsdp = FSDPConfig(version=1, state_dict_type="FULL_STATE_DICT")
     run_dir = tmp_path / "outputs" / "my-run"
     run_dir.mkdir(parents=True)
 
@@ -452,7 +452,7 @@ def test_trl_container_fsdp_flags_rendered(tmp_path, config):
         "--fsdp_auto_wrap_policy TRANSFORMER_BASED_WRAP \\",
         "--fsdp_backward_prefetch BACKWARD_PRE \\",
         "--fsdp_forward_prefetch false \\",
-        "--fsdp_state_dict_type SHARDED_STATE_DICT \\",
+        "--fsdp_state_dict_type FULL_STATE_DICT \\",
         "--fsdp_use_orig_params true \\",
         "--fsdp_offload_params false \\",
         "--fsdp_cpu_ram_efficient_loading true \\",
