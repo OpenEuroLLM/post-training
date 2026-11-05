@@ -263,7 +263,12 @@ def test_dolci_tool_use_survives_features_cast_and_renders_qwen3_tool_call(monke
     chat_template_utils = pytest.importorskip("transformers.utils.chat_template_utils")
     compiled = chat_template_utils._compile_jinja_template(get_chat_template("qwen3"))
     rendered, indices = chat_template_utils._render_with_assistant_indices(
-        compiled, tool_row["messages"], json.loads(tool_row["tools"]), None, False
+        compiled,
+        tool_row["messages"],
+        json.loads(tool_row["tools"]),
+        None,
+        False,
+        thinking_instruction="no_think",
     )
     spans = [rendered[start:end] for start, end in indices]
 

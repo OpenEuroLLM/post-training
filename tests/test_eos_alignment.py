@@ -83,6 +83,7 @@ def test_chatml_style_templates_terminate_on_im_end(name):
         None,
         None,
         False,
+        **({"thinking_instruction": "no_think"} if name == "qwen3" else {}),
     )
     assert infer_end_token_from_render(rendered, ADDED) == "<|im_end|>"
 
