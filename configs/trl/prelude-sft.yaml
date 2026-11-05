@@ -1,0 +1,121 @@
+
+method: sft
+backend: trl
+run_name: oellm-9b-256k-theta64m-prelude-anneal300b-sft # auto-generated from model + datasets if null
+offline: false
+
+# Container (remove or set image: null for bare-metal)
+container:
+  image: /scratch/project_465002530/containers/post-training-rocm7.2.4-py3.12-torch2.9.1-trl1.7.0-olmo-patched.sif
+  bind_mounts:
+    - /pfs/lustrep3/scratch/project_465002530/users/krishnak/post-training/ # replace with your own path to the post-training repo
+  path: /opt/venv/bin:/opt/rocm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  env_file: env/lumi.env # make sure you have this file in the post-training repo, or change to your own env file
+
+# -- Model -------------------------------------------------------------------
+model:
+  name_or_path: birgermoell/oellm-9b-256k-theta64m-prelude-anneal300b
+  attn_implementation: flash_attention_2 # No flash attention 3 for rocm yet, so use flash attention 2 for now
+  dtype: bfloat16
+  tokenizer_name_or_path: openeurollm/tokenizer-256k
+  tokenizer_revision: qwen3-tokens # This tokenizer has dedicated tokens for qwen3 chat template, which is used in the data section below. If you use a different tokenizer, make sure to change the chat_template in the data section accordingly.
+
+# -- Training hyper-parameters -----------------------------------------------
+training:
+  num_train_epochs: 2
+  learning_rate: 8.0e-5
+  effective_batch_size: 32                   # per_device * grad_accum * world_size
+  per_device_train_batch_size: 1
+  warmup_ratio: 0.03
+  adam_beta2: 0.95
+  lr_scheduler_type: "linear"
+  gradient_checkpointing: true
+  bf16: true
+  seed: 42
+  use_liger_kernel: true
+
+# -- SFT method parameters ---------------------------------------------------
+sft:
+  max_seq_length: 32768
+  packing: true
+  dataset_num_proc: 32
+
+# -- Checkpointing -----------------------------------------------------------
+checkpointing:
+  save_steps: 250                            # How frequently to save the full checkpoints (with optimizer states)
+  save_total_limit: 3                        # Full checkpoints to keep
+  inference_checkpoint_steps: 250            # Minimal inference model interval (set to null to disable)
+  inference_checkpoint_path: "inference_checkpoints"   # Relative to run dir
+
+# -- Data mix ----------------------------------------------------------------
+data:
+  chat_template: qwen3                       # Name from chat template registry
+  num_proc: 32                               # null = auto-detect, capped at 32
+  datasets:
+    - name: "dolci-instruct-sft"
+      path: "allenai/Dolci-Instruct-SFT"     # HuggingFace dataset path
+      split: "train"
+      weight: 1.0
+      transform: null                        # null = already conversational
+
+# -- DeepSpeed ---------------------------------------------------------------
+deepspeed:
+  bf16:
+    enabled: auto
+  zero_optimization:
+    stage: 2
+    overlap_comm: false                      # Enabling overlap_comm has caused issues before, so we disable it for now. If you want to enable it, set this to true and test carefully.
+    contiguous_gradients: true
+    reduce_scatter: true
+  gradient_clipping: 1.0
+  train_micro_batch_size_per_gpu: "auto"
+  gradient_accumulation_steps: "auto"
+  train_batch_size: "auto"
+  optimizer:
+    type: AdamW
+    params:
+      lr: "auto"
+      betas: "auto"
+      eps: "auto"
+      weight_decay: "auto"
+
+# -- Accelerate launch flags (explicit multi-node control) -------------------
+accelerate:
+  mixed_precision: "bf16"
+  use_deepspeed: true
+  deepspeed_multinode_launcher: "standard"   # "standard" | "pdsh" | etc.
+  same_network: true                         # All nodes on same network
+  rdzv_backend: "static"                     # "static" | "c10d" | "etcd"
+  dynamo_backend: "inductor"                 # "inductor" | "no" | etc.
+
+# -- Logging & tracking ------------------------------------------------------
+logging:
+  report_to:
+    - "wandb"
+    - "tensorboard"
+  wandb_project: "sft-training"
+  logging_steps: 10
+  include_num_input_tokens_seen: "non_padding"
+
+# -- SLURM -------------------------------------------------------------------
+slurm:                                      # LUMI Cluster SLURM configuration
+  account: "project_465002530"
+  partition: "standard-g"                   # Test on dev-g first
+  num_nodes: 4
+  gpus_per_node: 8
+  cpus_per_task: 56
+  wall_time: "36:00:00"
+  job_name: "Prelude-SFT"
+  signal_time_seconds: 300                   # SIGUSR1 sent this many seconds before timeout to trigger self-healing
+  max_failures: 1                            # Self-healing retry limit
+  mem: "256G"
+
+# -- Debug mode --------------------------------------------------------------
+debug:
+  enabled: false
+  override_existing: false
+
+# -- Output paths -------------------------------------------------------------
+paths:
+  output_base: "outputs"
+  debug_base: "outputs/debug"

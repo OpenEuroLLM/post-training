@@ -12,6 +12,9 @@
 {% if qos -%}
 #SBATCH --qos={{ qos }}
 {% endif -%}
+{% if exclude -%}
+#SBATCH --exclude={{ exclude }}
+{% endif -%}
 #SBATCH --nodes={{ num_nodes }}
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:{{ gpus_per_node }}
