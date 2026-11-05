@@ -210,6 +210,41 @@ class AccelerateConfig:
 
 
 @dataclass
+class FSDPConfig:
+    """FSDP settings, forwarded to ``accelerate launch`` as ``--fsdp_*`` flags.
+
+    They go on the launch line, not into ``TrainingArguments``: TRL loads the
+    policy model before the ``Accelerator`` exists, and rank-0-only loading
+    (``cpu_ram_efficient_loading``) reads the launch environment at that point.
+    """
+
+    # 1 = FullyShardedDataParallel (flat params), 2 = fully_shard (per-param DTensor).
+    # Version 1 requires state_dict_type FULL_STATE_DICT (its sharded resume drops the
+    # optimizer state).
+    version: int = 2
+    # FSDP2 maps FULL_SHARD / SHARD_GRAD_OP to reshard_after_forward true / false.
+    sharding_strategy: str = "FULL_SHARD"
+    auto_wrap_policy: str = "TRANSFORMER_BASED_WRAP"
+    # null wraps the classes in the model's `_no_split_modules` (e.g. the decoder layer).
+    transformer_layer_cls_to_wrap: list[str] | None = None
+    # Only read by SIZE_BASED_WRAP; null keeps accelerate's default.
+    min_num_params: int | None = None
+    # FSDP1 only: backward_prefetch, forward_prefetch and use_orig_params.
+    backward_prefetch: str = "BACKWARD_PRE"
+    forward_prefetch: bool = False
+    # Format of the resumable checkpoints/ saves. Inference checkpoints are always full.
+    state_dict_type: str = "SHARDED_STATE_DICT"
+    use_orig_params: bool = True
+    offload_params: bool = False
+    # Must be false for method 'dpo' with version 2 (TRL never broadcasts the
+    # reference model's weights).
+    cpu_ram_efficient_loading: bool = True
+    sync_module_states: bool = True
+    # Mutually exclusive with training.gradient_checkpointing.
+    activation_checkpointing: bool = False
+
+
+@dataclass
 class LoggingConfig:
     """Logging and experiment tracking."""
 
@@ -256,6 +291,9 @@ class DebugConfig:
 
     enabled: bool = False
     override_existing: bool = False
+    # Fingerprint weights + optimizer state at each save and verify them after a
+    # resume (see post_training/callbacks/resume_check.py).
+    resume_check: bool = False
 
 
 @dataclass
@@ -295,6 +333,8 @@ class PostTrainingConfig:
     # Infrastructure.
     # Inline DeepSpeed config dict. Set to null to disable DeepSpeed entirely.
     deepspeed: dict[str, Any] | None = None
+    # FSDP settings (TRL with a container only). Mutually exclusive with `deepspeed:`.
+    fsdp: FSDPConfig | None = None
     accelerate: AccelerateConfig = field(default_factory=AccelerateConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     slurm: SlurmConfig = field(default_factory=SlurmConfig)

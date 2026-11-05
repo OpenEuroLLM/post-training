@@ -78,6 +78,91 @@ def _dataset_mix_hash(datasets: list) -> str:
     return hashlib.sha256(json.dumps(canonical).encode()).hexdigest()[:8]
 
 
+_FSDP_CHOICES = {
+    "sharding_strategy": (
+        "FULL_SHARD",
+        "SHARD_GRAD_OP",
+        "NO_SHARD",
+        "HYBRID_SHARD",
+        "HYBRID_SHARD_ZERO2",
+    ),
+    "auto_wrap_policy": ("TRANSFORMER_BASED_WRAP", "SIZE_BASED_WRAP", "NO_WRAP"),
+    "backward_prefetch": ("BACKWARD_PRE", "BACKWARD_POST", "NO_PREFETCH"),
+    "state_dict_type": ("FULL_STATE_DICT", "SHARDED_STATE_DICT"),
+}
+
+
+def _validate_fsdp(config: PostTrainingConfig) -> None:
+    """Reject FSDP configs that the launch would ignore, misread, or hang on."""
+    fsdp = config.fsdp
+    if config.deepspeed:
+        raise ValueError("Set either `deepspeed:` or `fsdp:`, not both.")
+    # Only the containerized TRL template renders the --fsdp_* launch flags; the
+    # bare-metal one would silently fall back to plain DDP.
+    if config.container is None or not config.container.image:
+        raise ValueError("fsdp requires container.image (only the container launch supports it).")
+
+    for name, choices in _FSDP_CHOICES.items():
+        value = getattr(fsdp, name)
+        if value not in choices:
+            raise ValueError(f"fsdp.{name} must be one of {', '.join(choices)}; got '{value}'.")
+
+    if fsdp.version not in (1, 2):
+        raise ValueError(f"fsdp.version must be 1 or 2; got {fsdp.version}.")
+    # FSDP2 only has reshard_after_forward; NO_SHARD and HYBRID_* need a device
+    # mesh that this launch does not set up.
+    if fsdp.version == 2 and fsdp.sharding_strategy not in ("FULL_SHARD", "SHARD_GRAD_OP"):
+        raise ValueError(
+            "fsdp.version 2 supports sharding_strategy FULL_SHARD or SHARD_GRAD_OP; "
+            f"got '{fsdp.sharding_strategy}'."
+        )
+
+    # Accelerate builds the FSDP1 sharded optimizer load target from the fresh,
+    # still-empty optimizer, so DCP reads no Adam state and a resume silently
+    # restarts Adam's history while keeping the global step.
+    if fsdp.version == 1 and fsdp.state_dict_type == "SHARDED_STATE_DICT":
+        raise ValueError(
+            "fsdp.version 1 with state_dict_type SHARDED_STATE_DICT loses the optimizer state "
+            "on resume. Use fsdp.version: 2, or fsdp.state_dict_type: FULL_STATE_DICT."
+        )
+
+    # Rank-0-only loading leaves the other ranks without weights until FSDP
+    # broadcasts them while wrapping.
+    if fsdp.cpu_ram_efficient_loading and not fsdp.sync_module_states:
+        raise ValueError("fsdp.cpu_ram_efficient_loading requires fsdp.sync_module_states: true.")
+    # TRL shards the DPO reference model with fully_shard() itself, outside
+    # accelerator.prepare(), so nothing broadcasts rank 0's weights to it and the
+    # other ranks keep uninitialized reference weights.
+    if config.method == "dpo" and fsdp.version == 2 and fsdp.cpu_ram_efficient_loading:
+        raise ValueError(
+            "fsdp.version 2 with method 'dpo' requires fsdp.cpu_ram_efficient_loading: false. "
+            "TRL does not broadcast the reference model's weights from rank 0, so the "
+            "other ranks would train against an uninitialized reference model."
+        )
+
+    t = config.training
+    if fsdp.activation_checkpointing and t.gradient_checkpointing:
+        raise ValueError(
+            "fsdp.activation_checkpointing and training.gradient_checkpointing are mutually "
+            "exclusive; keep one."
+        )
+    # Early stopping lets each rank end the recompute at a data-dependent point, so
+    # ranks with different sequence lengths issue FSDP all-gathers in different orders.
+    if t.gradient_checkpointing and (
+        t.gradient_checkpointing_kwargs is None or t.gradient_checkpointing_kwargs.early_stop
+    ):
+        raise ValueError(
+            "With fsdp and training.gradient_checkpointing, set "
+            "training.gradient_checkpointing_kwargs.early_stop: false. Early stopping "
+            "makes FSDP collectives rank-dependent when sequence lengths differ."
+        )
+    if config.method == "dpo" and t.use_liger_kernel:
+        raise ValueError(
+            "Liger Kernel does not work with fsdp and method 'dpo'; set "
+            "training.use_liger_kernel: false."
+        )
+
+
 class TRLBackend(Backend):
     def validate(self, config: PostTrainingConfig) -> None:
         if config.method not in _SUPPORTED_METHODS:
@@ -101,6 +186,9 @@ class TRLBackend(Backend):
                 )
             if not config.container.env_file:
                 raise ValueError("container.env_file must be set when container.image is set.")
+
+        if config.fsdp is not None:
+            _validate_fsdp(config)
 
         total_weight = 0.0
         for entry in config.data.datasets:
@@ -231,6 +319,8 @@ class LlamaFactoryBackend(Backend):
             raise ValueError("llamafactory must be set when backend='llamafactory'.")
         if config.container is None or not config.container.image:
             raise ValueError("container.image must be set when backend='llamafactory'.")
+        if config.fsdp is not None:
+            raise ValueError("fsdp is only supported with backend='trl'.")
 
     def generate_run_name(self, config: PostTrainingConfig, timestamp: str) -> str:
         return f"llamafactory-{config.method}-{timestamp}"

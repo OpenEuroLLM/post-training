@@ -8,7 +8,9 @@ tokenizer — just enough to load the model for inference or evaluation.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
+from typing import Any
 
 from transformers import (
     TrainerCallback,
@@ -34,6 +36,13 @@ class InferenceCheckpointCallback(TrainerCallback):
     def __init__(self, save_steps: int, output_dir: str | Path) -> None:
         self.save_steps = save_steps
         self.output_dir = Path(output_dir)
+        # Set by ``bind_trainer`` once the trainer exists. Under FSDP the
+        # ``model`` passed to callbacks holds only this rank's shards, so the
+        # full weights must be gathered through the trainer's accelerator.
+        self.trainer: Any = None
+
+    def bind_trainer(self, trainer: Any) -> None:
+        self.trainer = trainer
 
     # ------------------------------------------------------------------
 
@@ -60,6 +69,19 @@ class InferenceCheckpointCallback(TrainerCallback):
         if not (is_periodic or is_last_step):
             return
 
+        trainer = self.trainer
+        if trainer is None and os.environ.get("ACCELERATE_USE_FSDP", "false").lower() == "true":
+            raise RuntimeError(
+                "InferenceCheckpointCallback needs bind_trainer() under FSDP to gather the "
+                "sharded weights."
+            )
+        fsdp = trainer is not None and trainer.is_fsdp_enabled
+        state_dict = None
+        if fsdp:
+            # A collective: every rank must join, so this runs before the rank-0 check.
+            # Only rank 0 receives the full (CPU) state dict.
+            state_dict = trainer.accelerator.get_state_dict(trainer.model)
+
         # Only save on the main process.
         if not state.is_world_process_zero:
             return
@@ -73,7 +95,10 @@ class InferenceCheckpointCallback(TrainerCallback):
             save_path,
         )
 
-        if model is not None:
+        if fsdp:
+            unwrapped = trainer.accelerator.unwrap_model(trainer.model)
+            unwrapped.save_pretrained(save_path, state_dict=state_dict)
+        elif model is not None:
             model.save_pretrained(save_path)
         if processing_class is not None:
             processing_class.save_pretrained(save_path)

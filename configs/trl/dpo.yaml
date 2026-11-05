@@ -105,6 +105,22 @@ deepspeed:
       eps: "auto"
       weight_decay: "auto"
 
+# -- FSDP (alternative to DeepSpeed) ----------------------------------------
+# FSDP2 by default, launched through accelerate. Requires container.image and
+# `deepspeed: null`. With gradient_checkpointing on, also set
+# training.gradient_checkpointing_kwargs.early_stop: false (early stopping makes
+# FSDP collectives rank-dependent when sequence lengths differ).
+# fsdp:
+#   version: 2                                 # 1 = FullyShardedDataParallel (needs FULL_STATE_DICT)
+#   sharding_strategy: FULL_SHARD
+#   auto_wrap_policy: TRANSFORMER_BASED_WRAP
+#   transformer_layer_cls_to_wrap: null       # null = the model's _no_split_modules
+#   backward_prefetch: BACKWARD_PRE            # FSDP1 only
+#   state_dict_type: SHARDED_STATE_DICT        # resumable checkpoints/; needs accelerate >= 1.13.0
+#   use_orig_params: true                      # FSDP1 only
+#   cpu_ram_efficient_loading: false           # must be false for DPO + version 2 (reference model)
+#   sync_module_states: true
+
 # -- Accelerate launch flags -------------------------------------------------
 accelerate:
   mixed_precision: "bf16"

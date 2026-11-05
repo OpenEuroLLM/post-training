@@ -18,6 +18,7 @@ from transformers.integrations import WandbCallback
 
 from post_training.callbacks.inference_checkpoint import InferenceCheckpointCallback
 from post_training.callbacks.mfu import MFUCallback
+from post_training.callbacks.resume_check import ResumeCheckCallback
 from post_training.callbacks.throughput import ThroughputCallback
 from post_training.chat_templates.registry import get_chat_template, infer_end_token_from_render
 
@@ -149,11 +150,34 @@ def build_model_init_kwargs(config: PostTrainingConfig) -> dict[str, Any]:
     }
 
 
+def check_fsdp_runtime(config: PostTrainingConfig) -> None:
+    """Fail in the job phase if the installed Accelerate cannot resume sharded FSDP saves.
+
+    Before 1.13.0, ``load_fsdp_optimizer`` builds its sharded load target from the
+    fresh, empty optimizer, so a resume silently drops the Adam state. Fixed for
+    FSDP2 in 1.13.0 by huggingface/accelerate#3904 (FSDP1 stays broken; the
+    validator rejects it). The check runs here, not in config validation, because
+    the container's Accelerate can differ from the login node's.
+    """
+    if config.fsdp is None or config.fsdp.state_dict_type != "SHARDED_STATE_DICT":
+        return
+    import accelerate
+    from packaging.version import Version
+
+    if Version(accelerate.__version__) < Version("1.13.0"):
+        raise RuntimeError(
+            f"fsdp.state_dict_type SHARDED_STATE_DICT needs accelerate >= 1.13.0 to restore "
+            f"the optimizer state on resume; found {accelerate.__version__}. Upgrade "
+            "accelerate or set fsdp.state_dict_type: FULL_STATE_DICT."
+        )
+
+
 def build_common_training_kwargs(
     config: PostTrainingConfig,
     run_dir: Path,
 ) -> dict[str, Any]:
     """Return ``TrainingArguments`` kwargs shared across all methods."""
+    check_fsdp_runtime(config)
     world_size = int(os.environ.get("WORLD_SIZE", 1))
     grad_accum = config.resolve_gradient_accumulation_steps(world_size)
     logger.info("world_size=%d, gradient_accumulation_steps=%d", world_size, grad_accum)
@@ -297,7 +321,24 @@ def build_callbacks(config: PostTrainingConfig, run_dir: Path) -> list:
             )
         )
 
+    if config.debug.resume_check:
+        callbacks.append(ResumeCheckCallback())
+
     return callbacks
+
+
+def bind_inference_checkpoint_callback(trainer: Any) -> None:
+    """Give ``InferenceCheckpointCallback`` and ``ResumeCheckCallback`` the trainer.
+
+    The first gathers FSDP shards through it; the second reads the optimizer state.
+
+    Callbacks receive the model that ``Trainer.__init__`` saw, not the wrapper
+    that ``accelerator.prepare`` builds later, so only the trainer can reach
+    the sharded weights.
+    """
+    for callback in trainer.callback_handler.callbacks:
+        if isinstance(callback, InferenceCheckpointCallback | ResumeCheckCallback):
+            callback.bind_trainer(trainer)
 
 
 def prioritize_metric_callbacks(trainer: Any) -> None:
