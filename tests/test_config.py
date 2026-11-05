@@ -9,11 +9,14 @@ from post_training.methods.common import build_common_training_kwargs
 
 def test_thinking_instruction_config_override():
     from omegaconf import OmegaConf
+
     from post_training.config import SFTMethodConfig
 
     config = OmegaConf.structured(SFTMethodConfig)
     assert config.thinking_instruction_probability is None
-    config = OmegaConf.merge(config, OmegaConf.from_dotlist(["thinking_instruction_probability=0.5"]))
+    config = OmegaConf.merge(
+        config, OmegaConf.from_dotlist(["thinking_instruction_probability=0.5"])
+    )
     assert OmegaConf.to_object(config).thinking_instruction_probability == 0.5
 
 

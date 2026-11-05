@@ -10,13 +10,16 @@ from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pyarrow as pa
 from accelerate import PartialState
 from datasets import Dataset, Features, List, Value
-import pyarrow as pa
 from transformers import PreTrainedTokenizerBase
 from trl import SFTConfig, SFTTrainer
 
-from post_training.chat_templates.registry import THINKING_INSTRUCTION_TEMPLATES, has_generation_markers
+from post_training.chat_templates.registry import (
+    THINKING_INSTRUCTION_TEMPLATES,
+    has_generation_markers,
+)
 from post_training.data.loader import load_and_mix_datasets
 from post_training.methods.common import (
     align_generation_eos,
@@ -67,7 +70,9 @@ def _has_final_reasoning(messages: list[dict]) -> bool:
     return False
 
 
-def _with_thinking_instructions(ds: Dataset, probability: float, seed: int, num_proc: int) -> Dataset:
+def _with_thinking_instructions(
+    ds: Dataset, probability: float, seed: int, num_proc: int
+) -> Dataset:
     reasoning = ds.map(
         lambda row: {"has_reasoning": _has_final_reasoning(row["messages"])},
         remove_columns=ds.column_names,
@@ -78,11 +83,15 @@ def _with_thinking_instructions(ds: Dataset, probability: float, seed: int, num_
     selected = set(random.Random(seed).sample(indices, round(len(indices) * probability)))
     logger.info(
         "Thinking instructions: %d explicit, %d omitted, %d no_think before filtering.",
-        len(selected), len(indices) - len(selected), len(ds) - len(indices),
+        len(selected),
+        len(indices) - len(selected),
+        len(ds) - len(indices),
     )
     instructions = pa.array(
-        ("think" if i in selected else None if value else "no_think"
-         for i, value in enumerate(reasoning)),
+        (
+            "think" if i in selected else None if value else "no_think"
+            for i, value in enumerate(reasoning)
+        ),
         type=pa.string(),
     )
     return ds.add_column(
@@ -239,13 +248,18 @@ def _filter_sft_rows(
         )
 
     if thinking_instruction_probability is not None:
-        ds = _with_thinking_instructions(ds, thinking_instruction_probability, instruction_seed, num_proc)
+        ds = _with_thinking_instructions(
+            ds, thinking_instruction_probability, instruction_seed, num_proc
+        )
 
     # remove_columns keeps the map cache tiny: it holds the verdict alone, not a copy of the data.
     verdicts = ds.map(
         lambda row: {
             "verdict": _classify_row(
-                row["messages"], tokenizer, max_length, tools=row.get("tools"),
+                row["messages"],
+                tokenizer,
+                max_length,
+                tools=row.get("tools"),
                 chat_template_kwargs=row.get("chat_template_kwargs"),
             )
         },
@@ -349,10 +363,14 @@ def _filter_sft_rows(
 
     result = ds.select(keep)
     if thinking_instruction_probability is not None:
-        instructions = Counter(row["thinking_instruction"] for row in result["chat_template_kwargs"])
+        instructions = Counter(
+            row["thinking_instruction"] for row in result["chat_template_kwargs"]
+        )
         logger.info(
             "Surviving thinking instructions: %d explicit, %d omitted, %d no_think.",
-            instructions["think"], instructions[None], instructions["no_think"],
+            instructions["think"],
+            instructions[None],
+            instructions["no_think"],
         )
     return result
 

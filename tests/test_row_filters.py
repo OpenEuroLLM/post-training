@@ -47,16 +47,22 @@ from datasets import Dataset
 from post_training.chat_templates.registry import get_chat_template
 from post_training.methods.dpo import _filter_dpo_rows
 from post_training.methods.sft import (
-    _classify_row, _filter_sft_rows, _has_final_reasoning,
+    _classify_row,
+    _filter_sft_rows,
+    _has_final_reasoning,
     _with_thinking_instructions,
 )
 
 
 def test_thinking_instruction_split_is_exact_and_deterministic():
-    rows = [[{"role": "user", "content": "Q"},
-             {"role": "assistant", "content": f"<think>Reason {i}</think>Answer"}]
-            for i in range(10)]
-    rows.append([{ "role": "user", "content": "Q"}, {"role": "assistant", "content": "Direct"}])
+    rows = [
+        [
+            {"role": "user", "content": "Q"},
+            {"role": "assistant", "content": f"<think>Reason {i}</think>Answer"},
+        ]
+        for i in range(10)
+    ]
+    rows.append([{"role": "user", "content": "Q"}, {"role": "assistant", "content": "Direct"}])
     ds = Dataset.from_dict({"messages": rows})
     first = _with_thinking_instructions(ds, 0.5, 42, 1)
     repeat = _with_thinking_instructions(ds, 0.5, 42, 2)
@@ -68,11 +74,17 @@ def test_thinking_instruction_split_is_exact_and_deterministic():
 
 
 def test_instruction_column_survives_filter_and_drives_tokenization(tokenizer):
-    ds = Dataset.from_dict({"messages": [
-        [{"role": "user", "content": "Q"},
-         {"role": "assistant", "content": "<think>Reason</think>Answer"}],
-        _exchange(),
-    ]})
+    ds = Dataset.from_dict(
+        {
+            "messages": [
+                [
+                    {"role": "user", "content": "Q"},
+                    {"role": "assistant", "content": "<think>Reason</think>Answer"},
+                ],
+                _exchange(),
+            ]
+        }
+    )
     kept = _filter_sft_rows(ds, 1, tokenizer=tokenizer, thinking_instruction_probability=1.0)
     for row, instruction in zip(kept, ["think", "no_think"], strict=True):
         assert row["chat_template_kwargs"] == {"thinking_instruction": instruction}
@@ -85,13 +97,16 @@ def test_instruction_column_survives_filter_and_drives_tokenization(tokenizer):
 @pytest.mark.parametrize("template,probability", [("chatml", 0.5), ("qwen3", -0.1), ("qwen3", 1.1)])
 def test_instruction_config_fails_before_loading(template, probability, tmp_path):
     from types import SimpleNamespace
+
     from post_training.methods.sft import build_sft_trainer
+
     config = SimpleNamespace(
         sft=SimpleNamespace(thinking_instruction_probability=probability),
         data=SimpleNamespace(chat_template=template),
     )
     with pytest.raises(ValueError):
         build_sft_trainer(config, tmp_path)
+
 
 SFT_LOGGER = "post_training.methods.sft"
 
@@ -125,7 +140,9 @@ class _CharTokenizer:
         utils = pytest.importorskip("transformers.utils.chat_template_utils")
         if self.template_name not in _COMPILED:
             _COMPILED[self.template_name] = utils._compile_jinja_template(self.chat_template)
-        kwargs.setdefault("thinking_instruction", None if _has_final_reasoning(conversation) else "no_think")
+        kwargs.setdefault(
+            "thinking_instruction", None if _has_final_reasoning(conversation) else "no_think"
+        )
         return utils._render_with_assistant_indices(
             _COMPILED[self.template_name], conversation, tools, None, False, **kwargs
         )

@@ -128,41 +128,53 @@ def test_qwen3_instruction_and_mask(instruction, reasoning, with_tools):
     ]
     rendered, spans = utils._render_with_assistant_indices(
         utils._compile_jinja_template(get_chat_template("qwen3")),
-        messages, [{"name": "lookup"}] if with_tools else None, None, False,
+        messages,
+        [{"name": "lookup"}] if with_tools else None,
+        None,
+        False,
         thinking_instruction=instruction,
     )
     assert "Existing system." in rendered
-    system = rendered.split('<|im_end|>', 1)[0]
+    system = rendered.split("<|im_end|>", 1)[0]
     assert ("/" + instruction in system) if instruction else "/think" not in system
     assert [rendered[a:b] for a, b in spans] == [_think(reasoning, "A") + "<|im_end|>"]
 
 
-@pytest.mark.parametrize("kwargs,content", [
-    ({"thinking_instruction": "invalid"}, _think("R", "A")),
-    ({"enable_thinking": "false"}, _think("R", "A")),
-    ({"thinking_instruction": "think", "enable_thinking": False}, _think("R", "A")),
-    ({"thinking_instruction": "no_think"}, _think("R", "A")),
-    ({"thinking_instruction": "think"}, "A"),
-    ({}, "A"),
-])
+@pytest.mark.parametrize(
+    "kwargs,content",
+    [
+        ({"thinking_instruction": "invalid"}, _think("R", "A")),
+        ({"enable_thinking": "false"}, _think("R", "A")),
+        ({"thinking_instruction": "think", "enable_thinking": False}, _think("R", "A")),
+        ({"thinking_instruction": "no_think"}, _think("R", "A")),
+        ({"thinking_instruction": "think"}, "A"),
+        ({}, "A"),
+    ],
+)
 def test_qwen3_rejects_invalid_conditioning(kwargs, content):
     from jinja2.exceptions import TemplateError
+
     utils = pytest.importorskip("transformers.utils.chat_template_utils")
     template = utils._compile_jinja_template(get_chat_template("qwen3"))
     with pytest.raises(TemplateError):
-        template.render(messages=[{"role": "user", "content": "Q"},
-                                  {"role": "assistant", "content": content}],
-                        add_generation_prompt=False, **kwargs)
+        template.render(
+            messages=[{"role": "user", "content": "Q"}, {"role": "assistant", "content": content}],
+            add_generation_prompt=False,
+            **kwargs,
+        )
 
 
 @pytest.mark.parametrize("enabled", [True, False, None])
 def test_qwen3_inference_preserves_upstream_prefix_and_accepts_history(enabled):
     from pathlib import Path
+
     utils = pytest.importorskip("transformers.utils.chat_template_utils")
     upstream = (Path(__file__).parent / "fixtures/qwen3-8b-upstream.jinja").read_text()
-    messages = [{"role": "user", "content": "Q"},
-                {"role": "assistant", "content": "Old direct answer."},
-                {"role": "user", "content": "Next Q"}]
+    messages = [
+        {"role": "user", "content": "Q"},
+        {"role": "assistant", "content": "Old direct answer."},
+        {"role": "user", "content": "Next Q"},
+    ]
     kwargs = dict(messages=messages, add_generation_prompt=True, enable_thinking=enabled)
     ours = utils._compile_jinja_template(get_chat_template("qwen3")).render(**kwargs)
     assert ours == utils._compile_jinja_template(upstream).render(**kwargs)
