@@ -157,6 +157,10 @@ class DPOMethodConfig:
     ref_model_name_or_path: str | None = None
     max_seq_length: int = 2048
     dataset_num_proc: int | None = None
+    # Score the dataset with the reference model once, before training, and drop the
+    # reference model afterwards. The batch size defaults to per_device_train_batch_size.
+    precompute_ref_log_probs: bool = False
+    precompute_ref_batch_size: int | None = None
 
 
 @dataclass
