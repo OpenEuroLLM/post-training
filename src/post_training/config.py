@@ -157,6 +157,9 @@ class DPOMethodConfig:
     ref_model_name_or_path: str | None = None
     max_seq_length: int = 2048
     dataset_num_proc: int | None = None
+    # Opt-in TRL optimization; defaults preserve existing DPO behavior.
+    precompute_ref_log_probs: bool = False
+    precompute_ref_batch_size: int | None = None
 
 
 @dataclass
