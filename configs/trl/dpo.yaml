@@ -60,6 +60,11 @@ dpo:
   loss_type: "sigmoid"                       # "sigmoid" | "hinge" | "ipo" | etc.
   ref_model_name_or_path: null               # null → TRL creates an implicit copy
   max_seq_length: 2048
+  # Compute reference log-probs once and cache them next to the dataset cache
+  # (TRL precompute_ref_log_probs). The cache key is derived from the checkpoint
+  # files, so a cache written under one DeepSpeed ZeRO stage is reused under
+  # another (e.g. precompute with stage 3, train with stage 2).
+  precompute_ref_log_probs: false
 
 # -- Checkpointing -----------------------------------------------------------
 checkpointing:

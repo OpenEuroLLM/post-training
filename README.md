@@ -290,6 +290,7 @@ Select your training strategy using `method`.
   - **Reference model**: set `dpo.ref_model_name_or_path`
     - If `null`, TRL creates an implicit copy of the active model
     - If using **ZeRO Stage 3**, consider specifying the reference model explicitly (implicit copy creation can be unstable with Stage 3)
+  - **Precomputed reference log-probs**: set `dpo.precompute_ref_log_probs: true` to compute the reference log-probs once and cache them next to the dataset cache. The cache key is derived from the checkpoint files (not the in-memory, possibly ZeRO-3-partitioned `state_dict`), so a cache written under one DeepSpeed ZeRO stage is reused under another — e.g. precompute with `deepspeed.zero_optimization.stage=3`, then train with stage 2
 
 ### 2. Data Pipeline
 
