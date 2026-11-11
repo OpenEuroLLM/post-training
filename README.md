@@ -214,9 +214,9 @@ The container used for SFT is available in `/gpfs/projects/ehpc533/containers/po
 The environment to use for submitting post-training jobs can be found in `/gpfs/projects/ehpc533/environments/post-training-venv`
 
 ### Configuration setup
-Now, update the environment file (`mn5.env`) and the sft config (`configs/trl/sft_prelude_mn5.yaml`) with your paths.
+Now, update the environment file (`env/mn5.env`) and the sft config (`configs/trl/sft_prelude_mn5.yaml`) with your paths.
 
-In `mn5.env`, it is:
+In `env/mn5.env`, it is:
 ```
 export HF_HOME=/your/hf/path/here
 ```
@@ -228,13 +228,13 @@ run_name: "your-run-name"              # must be set, see "Running SFT on MN5"
 container:
   bind_mounts:
     - /path/to/your/user
-  env_file: mn5.env                    # path to your mn5.env, relative to the repository root
+  env_file: env/mn5.env                # path to the env file, relative to the repository root
 model:
   name_or_path: "/path/to/your/model"
   tokenizer_name_or_path: "/path/to/your/tokenizer/if/not/the/models/default"
 data:
   datasets:
-    - name: "tiny-dolci-instruct-sft"
+    - name: "your-dataset-name"
       path: "/path/to/your/dataset"
       split: "train"
       weight: 1.0
@@ -276,7 +276,7 @@ Then, submit the SFT job
 python scripts/submit.py --config configs/trl/sft_prelude_mn5.yaml
 ```
 
-Do not change the config or `mn5.env` between the two jobs, except for `slurm.*`. The SFT job reuses the tokenized dataset only if `run_name`, `data.*`, `sft.*`, the model and tokenizer paths, `container.*` and `HF_HOME` are the same.
+Do not change the config or `env/mn5.env` between the two jobs, except for `slurm.*`. The SFT job reuses the tokenized dataset only if `run_name`, `data.*`, `sft.*`, the model and tokenizer paths, `container.*` and `HF_HOME` are the same.
 
 ### Logs
 - The job output is in `<run_dir>/slurm/slurm-<job_id>.out` and `.err`.
