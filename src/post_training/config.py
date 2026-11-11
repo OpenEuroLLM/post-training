@@ -309,7 +309,7 @@ class ThinkingConditioningConfig:
     """Optional Qwen3 SFT instructions, with omission applied to reasoning rows."""
 
     enable: bool = False
-    default_omission_probability: float = 0.5
+    default_mode_omission_probability: float = 0.5
 
 
 # ---------------------------------------------------------------------------
@@ -418,9 +418,9 @@ class PostTrainingConfig:
         from post_training.backend import get_backend
 
         conditioning = self.thinking_conditioning
-        if not 0 <= conditioning.default_omission_probability <= 1:
+        if not 0 <= conditioning.default_mode_omission_probability <= 1:
             raise ValueError(
-                "thinking_conditioning.default_omission_probability must be between 0 and 1."
+                "thinking_conditioning.default_mode_omission_probability must be between 0 and 1."
             )
         if conditioning.enable:
             if self.method != "sft" or self.backend != "trl":

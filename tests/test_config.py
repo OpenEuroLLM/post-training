@@ -209,7 +209,7 @@ def test_resolve_tokenizer_without_any_revision():
 @pytest.mark.parametrize(
     ("overrides", "error"),
     [
-        (["thinking_conditioning.default_omission_probability=1.5"], "between 0 and 1"),
+        (["thinking_conditioning.default_mode_omission_probability=1.5"], "between 0 and 1"),
         (["thinking_conditioning.enable=true", "method=dpo"], "requires method=sft"),
         (["thinking_conditioning.enable=true", "backend=llamafactory"], "requires method=sft"),
         (

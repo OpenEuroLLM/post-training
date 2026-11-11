@@ -400,7 +400,9 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
     mc = config.sft  # method-specific config
 
     conditioning = config.thinking_conditioning
-    omission_probability = conditioning.default_omission_probability if conditioning.enable else None
+    omission_probability = (
+        conditioning.default_mode_omission_probability if conditioning.enable else None
+    )
 
     tokenizer = build_tokenizer(config)
 
