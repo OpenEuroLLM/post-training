@@ -50,8 +50,10 @@ _TRUNCATED_SPAN_ACTIONS = ("warn", "drop")
 def _has_supervised_reasoning(messages: list[dict]) -> bool:
     for message in reversed(messages):
         content = message.get("content")
-        if message["role"] == "user" and isinstance(content, str) and not (
-            content.startswith("<tool_response>") and content.endswith("</tool_response>")
+        if (
+            message["role"] == "user"
+            and isinstance(content, str)
+            and not (content.startswith("<tool_response>") and content.endswith("</tool_response>"))
         ):
             break
         if message["role"] != "assistant":

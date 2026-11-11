@@ -617,7 +617,6 @@ def test_dpo_reads_chosen_and_rejected_rather_than_messages() -> None:
     assert len(_filter_dpo_rows(ds, num_proc=1)) == 1
 
 
-
 def test_qwen3_conditioning_is_forwarded_and_counts_reasoning_tool_turns(tokenizer):
     question = {"role": "user", "content": "Q"}
     answer = {"role": "assistant", "content": "A"}
@@ -628,17 +627,18 @@ def test_qwen3_conditioning_is_forwarded_and_counts_reasoning_tool_turns(tokeniz
         answer,
     ]
     ds = Dataset.from_dict({"messages": [mixed, mixed, [question, answer]]})
-    kept = _filter_sft_rows(
-        ds, 1, tokenizer=tokenizer, thinking_omission_probability=0.5
-    )
+    kept = _filter_sft_rows(ds, 1, tokenizer=tokenizer, thinking_omission_probability=0.5)
 
     instructions = kept["chat_template_kwargs"]
     assert instructions[:2].count({"thinking_instruction": "think"}) == 1
     assert instructions[:2].count({"thinking_instruction": None}) == 1
     assert instructions[2] == {"thinking_instruction": "no_think"}
-    assert kept["chat_template_kwargs"] == _filter_sft_rows(
-        ds, 1, tokenizer=tokenizer, thinking_omission_probability=0.5
-    )["chat_template_kwargs"]
+    assert (
+        kept["chat_template_kwargs"]
+        == _filter_sft_rows(ds, 1, tokenizer=tokenizer, thinking_omission_probability=0.5)[
+            "chat_template_kwargs"
+        ]
+    )
     for row in kept:
         tokens = tokenizer.apply_chat_template(row["messages"], **row["chat_template_kwargs"])
         rendered = "".join(map(chr, tokens["input_ids"]))

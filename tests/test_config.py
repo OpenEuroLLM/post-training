@@ -205,7 +205,6 @@ def test_resolve_tokenizer_without_any_revision():
     assert ModelConfig(name_or_path="org/model").resolve_tokenizer() == ("org/model", None)
 
 
-
 @pytest.mark.parametrize(
     ("overrides", "error"),
     [

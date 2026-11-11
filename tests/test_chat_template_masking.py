@@ -201,7 +201,6 @@ def test_olmo3_instruct_sft_masks_all_assistant_turns() -> None:
     assert spans[1].startswith("A2")
 
 
-
 @pytest.mark.parametrize("instruction", ["think", "no_think", None])
 @pytest.mark.parametrize("with_tools", [False, True])
 def test_qwen3_thinking_instruction_only_changes_system_prompt(instruction, with_tools):
