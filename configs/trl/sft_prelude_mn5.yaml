@@ -123,5 +123,5 @@ debug:
   override_existing: false
 
 paths:
-  output_base: "outputs_sft"
-  debug_base: "outputs_sft/debug"
+  output_base: "/path/to/your/outputs"
+  debug_base: "/path/to/your/outputs/debug"
