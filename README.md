@@ -10,6 +10,7 @@ This repo supports two training backends:
 
 - [Quick Start](#quick-start)
 - [Run SFT using a pre-built container](#-run-sft-using-a-pre-built-container)
+- [Run SFT on MareNostrum 5 (MN5)](#run-sft-on-marenostrum-5-mn5)
 - [Project Structure](#-project-structure)
 - [Design Philosophy](#-design-philosophy)
 - [Feature Guide](#-feature-guide)
@@ -195,6 +196,91 @@ The cache is hit only when every input to the data pipeline is unchanged. Betwee
 | `run_name` | the frozen transforms and chat templates |
 
 To confirm the cache hit, open the training job's `<run_dir>/slurm/slurm-<id>.err`: the `Tokenizing train dataset` and `Packing train dataset` progress bars must not appear. If they do, an input in the table changed, or `datasets` warned in Step 1 that a function `couldn't be hashed properly`. Either way, the training job processes the data again from scratch.
+
+## Run SFT on MareNostrum 5 (MN5)
+
+### Local Setup
+
+Since there is no internet access on MN5, you will need to ensure that all necessary dependencies and data are available on the MN5 file system before running SFT.
+
+The following must be present on MN5 before running SFT
+1. The base model
+2. The base tokenizer
+3. The dataset
+
+Download them on a machine with internet access (for example, `hf download <repo_id> --local-dir <dir>` for the model and the tokenizer), then copy them to MN5 with `rsync` or `scp`.
+
+The container used for SFT is available in `/gpfs/projects/ehpc533/containers/post-training.sif`
+The environment to use for submitting post-training jobs can be found in `/gpfs/projects/ehpc533/environments/post-training-venv`
+
+### Configuration setup
+Now, update the environment file (`mn5.env`) and the sft config (`configs/trl/sft_prelude_mn5.yaml`) with your paths.
+
+In `mn5.env`, it is:
+```
+export HF_HOME=/your/hf/path/here
+```
+In `configs/trl/sft_prelude_mn5.yaml`, they're the following keys:
+
+```
+offline: true                          # must be true, MN5 has no internet access
+run_name: "your-run-name"              # must be set, see "Running SFT on MN5"
+container:
+  bind_mounts:
+    - /path/to/your/user
+  env_file: mn5.env                    # path to your mn5.env, relative to the repository root
+model:
+  name_or_path: "/path/to/your/model"
+  tokenizer_name_or_path: "/path/to/your/tokenizer/if/not/the/models/default"
+data:
+  datasets:
+    - name: "tiny-dolci-instruct-sft"
+      path: "/path/to/your/dataset"
+      split: "train"
+      weight: 1.0
+      transform: null
+paths:
+  output_base: /path/to/your/outputs   # the run directories are created here
+slurm:
+  account: your_account                # change these if you are not in ehpc533
+  qos: your_qos
+```
+
+Notes on the paths:
+- Use absolute paths for the model, the tokenizer and the dataset. The job runs from the run directory, so relative paths do not resolve there.
+- Every path the job uses must be inside one of the `bind_mounts`: this repository, `HF_HOME`, the model, the tokenizer, the dataset and `paths.output_base`. Add more bind mounts if they are not all below one directory.
+
+### Running SFT on MN5
+Run all commands from the root of this repository. The path in `container.env_file` resolves against the root, and `submit.py` copies the code from it.
+
+First, activate the job submission environment
+```
+module load hdf5 python
+unset PYTHONPATH PYTHONHOME
+export PYTHONNOUSERSITE=1
+
+source /gpfs/projects/ehpc533/environments/post-training-venv/bin/activate
+```
+
+Then, submit the job to tokenize the dataset
+```
+python scripts/submit.py --config configs/trl/sft_prelude_mn5.yaml --tokenize-only # The first run tokenizes the dataset using a single GPU. This run will not perform SFT.
+```
+
+`submit.py` prints a review of the submission and asks for confirmation. Add `--confirm` to skip it.
+
+Wait until the tokenize job is complete (`squeue -u $USER`). Then read `<run_dir>/slurm/slurm-<job_id>.out` and check the `Tokenized dataset preview` block.
+
+Then, submit the SFT job
+```
+python scripts/submit.py --config configs/trl/sft_prelude_mn5.yaml
+```
+
+Do not change the config or `mn5.env` between the two jobs, except for `slurm.*`. The SFT job reuses the tokenized dataset only if `run_name`, `data.*`, `sft.*`, the model and tokenizer paths, `container.*` and `HF_HOME` are the same.
+
+### Logs
+- The job output is in `<run_dir>/slurm/slurm-<job_id>.out` and `.err`.
+- WandB runs are saved offline in the run directory. MN5 cannot sync them. Copy the run's `wandb/` directory to a machine with internet access and run `wandb sync <offline-run-dir>` there.
 
 ## 📂 Project Structure
 
