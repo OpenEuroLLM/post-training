@@ -13,6 +13,7 @@ models and cache snapshot dirs, and file name/size/safetensors-header (plus
 """
 
 import json
+import os
 import types
 
 import pytest
@@ -41,12 +42,39 @@ def _write_snapshot(root, sha: str, weight_bytes: bytes = b"weights-v1"):
     return _write_local(snap, weight_bytes)
 
 
+def _pin_mtime(root, ns: int = 1_700_000_000_000_000_000) -> None:
+    for p in root.rglob("*"):
+        if p.is_file():
+            os.utime(p, ns=(ns, ns))
+
+
 def test_local_key_is_stable_across_copies(tmp_path):
+    """Identical content with identical mtimes shares one key (a plain copy sets new
+    mtimes and therefore misses the cache — accepted tradeoff, see mtime test)."""
     a = _write_local(tmp_path / "a")
     b = _write_local(tmp_path / "b")
+    _pin_mtime(a)
+    _pin_mtime(b)
     assert checkpoint_cache_key(str(a), None, "bfloat16") == checkpoint_cache_key(
         str(b), None, "bfloat16"
     )
+
+
+def test_local_key_changes_with_mtime(tmp_path):
+    """A checkpoint retrained in place at the same path must not reuse stale log-probs.
+
+    Same file name, same size, same safetensors header — only the mtime moves, exactly
+    what happens when `/checkpoints/sft-final` is overwritten by a new training run.
+    """
+    ckpt = _write_local(tmp_path / "ckpt", weight_bytes=b"weights-v1")
+    key_before = checkpoint_cache_key(str(ckpt), None, "bfloat16")
+
+    weight_file = ckpt / "model.bin"
+    weight_file.write_bytes(b"WEIGHTS-v1")  # same length, different content
+    st = weight_file.stat()
+    os.utime(weight_file, ns=(st.st_mtime_ns + 10**9, st.st_mtime_ns + 10**9))
+
+    assert checkpoint_cache_key(str(ckpt), None, "bfloat16") != key_before
 
 
 def test_local_key_changes_with_file_size(tmp_path):
@@ -72,6 +100,8 @@ def test_local_key_ignores_weight_values_but_not_the_safetensors_header(tmp_path
     save_file({"w": torch.zeros(4, 4)}, str(a / "model.safetensors"))
     save_file({"w": torch.ones(4, 4)}, str(b / "model.safetensors"))
     save_file({"w": torch.zeros(4, 5)}, str(c / "model.safetensors"))
+    for d in (a, b, c):
+        _pin_mtime(d)
 
     key_a = checkpoint_cache_key(str(a), None, "bfloat16")
     assert checkpoint_cache_key(str(b), None, "bfloat16") == key_a

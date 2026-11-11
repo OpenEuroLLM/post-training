@@ -63,8 +63,8 @@ dpo:
   max_seq_length: 2048
   # Compute reference log-probs once and cache them next to the dataset cache
   # (TRL precompute_ref_log_probs). The cache key identifies the checkpoint on
-  # disk (Hub commit SHA, or file name/size/safetensors-header for local dirs),
-  # not the in-memory ZeRO-partitioned state_dict — so it is cheap to compute
+  # disk (Hub commit SHA, or file name/size/mtime/safetensors-header for local
+  # dirs), not the in-memory ZeRO-partitioned state_dict — so it is cheap to compute
   # and a cache written under one DeepSpeed ZeRO stage is reused under another
   # (e.g. precompute with stage 3, train with stage 2).
   precompute_ref_log_probs: false

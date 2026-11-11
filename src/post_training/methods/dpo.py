@@ -80,9 +80,13 @@ def _safetensors_header(path: Path) -> bytes:
 def _update_local_dir(h: Any, root: Path) -> None:
     """Feed a plain local checkpoint directory into *h* without reading weight contents.
 
-    ``config.json`` and the shard index are hashed byte-for-byte; for weight files only the
-    name, size, and (for safetensors) the header — which lists every tensor's name, dtype,
-    shape, and offset — are used. That is kilobytes instead of gigabytes per rank per run.
+    ``config.json`` and the shard index are hashed byte-for-byte; for every file the name,
+    size, and ``st_mtime_ns`` are used, plus the safetensors header (which lists every
+    tensor's name, dtype, shape, and offset) for ``*.safetensors``. That is kilobytes
+    instead of gigabytes per rank per run. The mtime guards against a checkpoint that is
+    retrained in place at the same path (same size and header, new weights) silently
+    reusing stale log-probs; the tradeoff is that a *copy* of the directory misses the
+    cache, because copying sets new mtimes.
     """
     files: list[Path] = []
     for name in ("config.json", "model.safetensors.index.json"):
@@ -94,8 +98,10 @@ def _update_local_dir(h: Any, root: Path) -> None:
     if not files:
         raise FileNotFoundError(f"No config.json, shard index, or weight files found in '{root}'.")
     for path in files:
+        st = path.stat()
         h.update(path.relative_to(root).as_posix().encode())
-        h.update(str(path.stat().st_size).encode())
+        h.update(str(st.st_size).encode())
+        h.update(str(st.st_mtime_ns).encode())
         if path.suffix == ".safetensors":
             h.update(_safetensors_header(path))
         elif path.name in ("config.json", "model.safetensors.index.json"):
@@ -121,8 +127,9 @@ def checkpoint_cache_key(
       non-prefetched runs of the same checkpoint share the cache.
     - Local HF-cache snapshot directory (``.../snapshots/<sha>``, what prefetch substitutes
       into the config): the commit SHA from the path.
-    - Any other local directory: ``config.json`` / shard-index bytes plus, per weight file,
-      the name, size, and safetensors header.
+    - Any other local directory: ``config.json`` / shard-index bytes plus, per file, the
+      name, size, mtime, and (for safetensors) the header. The mtime keeps a checkpoint
+      retrained in place at the same path from reusing stale log-probs.
 
     *dtype* and *extra* are folded in as well — *extra* carries tokenization parameters that
     TRL applies at forward time (after the dataset fingerprint is fixed), notably
