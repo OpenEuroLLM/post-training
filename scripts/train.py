@@ -149,6 +149,10 @@ def main() -> None:
         os.environ["HF_DATASETS_OFFLINE"] = "0"
         os.environ["TRANSFORMERS_OFFLINE"] = "0"
 
+    # wandb waits only 30 s for its wandb-core service to start. On a busy compute
+    # node, this is not always enough (ServicePollForTokenError). An existing value wins.
+    os.environ.setdefault("WANDB__SERVICE_WAIT", "300")
+
     # Lazy import: must come after offline env vars are set so that
     # huggingface_hub caches HF_HUB_OFFLINE=1 on first import.
     from post_training.methods import build_trainer
