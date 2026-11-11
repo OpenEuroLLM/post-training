@@ -146,8 +146,6 @@ class SFTMethodConfig:
     # Dropping is never silent: it changes the realised mixture, because
     # data.datasets[].weight applies to the rows that survive filtering.
     truncated_span_action: str = "warn"
-    # Opt-in fraction of reasoning rows given /think; others omit it, direct answers get /no_think.
-    thinking_instruction_probability: float | None = None
 
 
 @dataclass
@@ -306,6 +304,14 @@ class PathsConfig:
     debug_base: str = "outputs/debug"
 
 
+@dataclass
+class ThinkingConditioningConfig:
+    """Optional Qwen3 SFT instructions, with omission applied to reasoning rows."""
+
+    enable: bool = False
+    default_omission_probability: float = 0.5
+
+
 # ---------------------------------------------------------------------------
 # Top-level config
 # ---------------------------------------------------------------------------
@@ -327,6 +333,9 @@ class PostTrainingConfig:
     training: TrainingConfig = field(default_factory=TrainingConfig)
     checkpointing: CheckpointingConfig = field(default_factory=CheckpointingConfig)
     data: DataConfig = field(default_factory=DataConfig)
+    thinking_conditioning: ThinkingConditioningConfig = field(
+        default_factory=ThinkingConditioningConfig
+    )
 
     # Method-specific (only the active method's block is used at runtime).
     sft: SFTMethodConfig = field(default_factory=SFTMethodConfig)
@@ -407,6 +416,17 @@ class PostTrainingConfig:
     def _validate(self) -> None:
         """Run cross-field validation."""
         from post_training.backend import get_backend
+
+        conditioning = self.thinking_conditioning
+        if not 0 <= conditioning.default_omission_probability <= 1:
+            raise ValueError(
+                "thinking_conditioning.default_omission_probability must be between 0 and 1."
+            )
+        if conditioning.enable:
+            if self.method != "sft" or self.backend != "trl":
+                raise ValueError("thinking_conditioning requires method=sft and backend=trl.")
+            if self.data.chat_template != "qwen3":
+                raise ValueError("thinking_conditioning requires data.chat_template=qwen3.")
 
         get_backend(self.backend).validate(self)
 

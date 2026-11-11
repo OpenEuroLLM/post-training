@@ -16,10 +16,7 @@ from datasets import Dataset, Features, List, Value
 from transformers import PreTrainedTokenizerBase
 from trl import SFTConfig, SFTTrainer
 
-from post_training.chat_templates.registry import (
-    THINKING_INSTRUCTION_TEMPLATES,
-    has_generation_markers,
-)
+from post_training.chat_templates.registry import has_generation_markers
 from post_training.data.loader import load_and_mix_datasets
 from post_training.methods.common import (
     align_generation_eos,
@@ -50,38 +47,37 @@ _BEYOND_CAP = 3  # dropped: assistant tokens exist, all of them past max_length
 _TRUNCATED_SPAN_ACTIONS = ("warn", "drop")
 
 
-def _has_final_reasoning(messages: list[dict]) -> bool:
-    target = None
-    for message in messages:
-        content = message.get("content") or ""
-        if message["role"] == "user" and not (
+def _has_supervised_reasoning(messages: list[dict]) -> bool:
+    for message in reversed(messages):
+        content = message.get("content")
+        if message["role"] == "user" and isinstance(content, str) and not (
             content.startswith("<tool_response>") and content.endswith("</tool_response>")
         ):
-            target = None
-        elif message["role"] == "assistant":
-            target = message
-    if target is None:
-        return False
-    reasoning = target.get("reasoning_content")
-    if isinstance(reasoning, str):
-        return bool(reasoning.strip())
-    content = target.get("content") or ""
-    if "<think>" in content and "</think>" in content:
-        return bool(content.split("</think>")[0].split("<think>")[-1].strip())
+            break
+        if message["role"] != "assistant":
+            continue
+        reasoning = message.get("reasoning_content")
+        if not isinstance(reasoning, str):
+            reasoning = ""
+            if isinstance(content, str) and "</think>" in content:
+                reasoning = content.split("</think>", 1)[0].rsplit("<think>", 1)[-1]
+        if reasoning.strip():
+            return True
     return False
 
 
 def _with_thinking_instructions(
-    ds: Dataset, probability: float, seed: int, num_proc: int
+    ds: Dataset, omission_probability: float, seed: int, num_proc: int
 ) -> Dataset:
     reasoning = ds.map(
-        lambda row: {"has_reasoning": _has_final_reasoning(row["messages"])},
+        lambda row: {"has_reasoning": _has_supervised_reasoning(row["messages"])},
         remove_columns=ds.column_names,
         num_proc=num_proc,
-        desc="Classifying final assistant reasoning",
+        desc="Classifying supervised assistant reasoning",
     )["has_reasoning"]
     indices = [i for i, value in enumerate(reasoning) if value]
-    selected = set(random.Random(seed).sample(indices, round(len(indices) * probability)))
+    explicit_count = round(len(indices) * (1 - omission_probability))
+    selected = set(random.Random(seed).sample(indices, explicit_count))
     logger.info(
         "Thinking instructions: %d explicit, %d omitted, %d no_think before filtering.",
         len(selected),
@@ -192,7 +188,7 @@ def _filter_sft_rows(
     tokenizer: PreTrainedTokenizerBase,
     max_length: int | None = None,
     truncated_span_action: str = "warn",
-    thinking_instruction_probability: float | None = None,
+    thinking_omission_probability: float | None = None,
     instruction_seed: int = 42,
 ) -> Dataset:
     """Drop rows that contribute nothing to the SFT loss, and report what does.
@@ -258,9 +254,9 @@ def _filter_sft_rows(
             "Check the dataset and its transform."
         )
 
-    if thinking_instruction_probability is not None:
+    if thinking_omission_probability is not None:
         ds = _with_thinking_instructions(
-            ds, thinking_instruction_probability, instruction_seed, num_proc
+            ds, thinking_omission_probability, instruction_seed, num_proc
         )
 
     # remove_columns keeps the map cache tiny: it holds the verdict alone, not a copy of the data.
@@ -373,7 +369,7 @@ def _filter_sft_rows(
         )
 
     result = ds.select(keep)
-    if thinking_instruction_probability is not None:
+    if thinking_omission_probability is not None:
         instructions = Counter(
             row["thinking_instruction"] for row in result["chat_template_kwargs"]
         )
@@ -403,14 +399,8 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
     """
     mc = config.sft  # method-specific config
 
-    probability = mc.thinking_instruction_probability
-    if probability is not None:
-        if not 0 <= probability <= 1:
-            raise ValueError("sft.thinking_instruction_probability must be between 0 and 1.")
-        if config.data.chat_template not in THINKING_INSTRUCTION_TEMPLATES:
-            raise ValueError(
-                f"Template '{config.data.chat_template}' does not support thinking_instruction."
-            )
+    conditioning = config.thinking_conditioning
+    omission_probability = conditioning.default_omission_probability if conditioning.enable else None
 
     tokenizer = build_tokenizer(config)
 
@@ -457,7 +447,7 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
                 # drop rows the trainer still trains on.
                 max_length=mc.max_seq_length,
                 truncated_span_action=mc.truncated_span_action,
-                thinking_instruction_probability=probability,
+                thinking_omission_probability=omission_probability,
                 instruction_seed=config.data.seed,
             ),
             columns_to_keep=["messages", "tools"],

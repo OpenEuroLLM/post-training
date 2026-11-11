@@ -46,67 +46,7 @@ from datasets import Dataset
 
 from post_training.chat_templates.registry import get_chat_template
 from post_training.methods.dpo import _filter_dpo_rows
-from post_training.methods.sft import (
-    _classify_row,
-    _filter_sft_rows,
-    _has_final_reasoning,
-    _with_thinking_instructions,
-)
-
-
-def test_thinking_instruction_split_is_exact_and_deterministic():
-    rows = [
-        [
-            {"role": "user", "content": "Q"},
-            {"role": "assistant", "content": f"<think>Reason {i}</think>Answer"},
-        ]
-        for i in range(10)
-    ]
-    rows.append([{"role": "user", "content": "Q"}, {"role": "assistant", "content": "Direct"}])
-    ds = Dataset.from_dict({"messages": rows})
-    first = _with_thinking_instructions(ds, 0.5, 42, 1)
-    repeat = _with_thinking_instructions(ds, 0.5, 42, 2)
-    instructions = [row["thinking_instruction"] for row in first["chat_template_kwargs"]]
-    assert instructions.count("think") == 5
-    assert instructions.count(None) == 5
-    assert instructions[-1] == "no_think"
-    assert first["chat_template_kwargs"] == repeat["chat_template_kwargs"]
-
-
-def test_instruction_column_survives_filter_and_drives_tokenization(tokenizer):
-    ds = Dataset.from_dict(
-        {
-            "messages": [
-                [
-                    {"role": "user", "content": "Q"},
-                    {"role": "assistant", "content": "<think>Reason</think>Answer"},
-                ],
-                _exchange(),
-            ]
-        }
-    )
-    kept = _filter_sft_rows(ds, 1, tokenizer=tokenizer, thinking_instruction_probability=1.0)
-    for row, instruction in zip(kept, ["think", "no_think"], strict=True):
-        assert row["chat_template_kwargs"] == {"thinking_instruction": instruction}
-        tokens = tokenizer.apply_chat_template(row["messages"], **row["chat_template_kwargs"])
-        rendered = "".join(map(chr, tokens["input_ids"]))
-        assert "/" + instruction in rendered.split("<|im_end|>", 1)[0]
-        assert any(tokens["assistant_masks"])
-
-
-@pytest.mark.parametrize("template,probability", [("chatml", 0.5), ("qwen3", -0.1), ("qwen3", 1.1)])
-def test_instruction_config_fails_before_loading(template, probability, tmp_path):
-    from types import SimpleNamespace
-
-    from post_training.methods.sft import build_sft_trainer
-
-    config = SimpleNamespace(
-        sft=SimpleNamespace(thinking_instruction_probability=probability),
-        data=SimpleNamespace(chat_template=template),
-    )
-    with pytest.raises(ValueError):
-        build_sft_trainer(config, tmp_path)
-
+from post_training.methods.sft import _classify_row, _filter_sft_rows
 
 SFT_LOGGER = "post_training.methods.sft"
 
@@ -140,9 +80,6 @@ class _CharTokenizer:
         utils = pytest.importorskip("transformers.utils.chat_template_utils")
         if self.template_name not in _COMPILED:
             _COMPILED[self.template_name] = utils._compile_jinja_template(self.chat_template)
-        kwargs.setdefault(
-            "thinking_instruction", None if _has_final_reasoning(conversation) else "no_think"
-        )
         return utils._render_with_assistant_indices(
             _COMPILED[self.template_name], conversation, tools, None, False, **kwargs
         )
@@ -370,12 +307,12 @@ def test_separates_the_two_reasons_a_row_was_dropped(tokenizer, caplog) -> None:
             _sft_dataset([_exchange(0), prompt_only, beyond_cap]),
             num_proc=1,
             tokenizer=tokenizer,
-            max_length=160,
+            max_length=64,
         )
 
     causes = next(record for record in caplog.records if "by cause" in record.getMessage())
     assert "1 with no assistant tokens at all" in causes.getMessage()
-    assert "1 with every assistant token beyond max_length=160" in causes.getMessage()
+    assert "1 with every assistant token beyond max_length=64" in causes.getMessage()
 
 
 def _straddling_row(tokenizer) -> tuple[list[dict], int]:
@@ -678,3 +615,35 @@ def test_dpo_reads_chosen_and_rejected_rather_than_messages() -> None:
     assert "messages" not in ds.column_names
 
     assert len(_filter_dpo_rows(ds, num_proc=1)) == 1
+
+
+
+def test_qwen3_conditioning_is_forwarded_and_counts_reasoning_tool_turns(tokenizer):
+    question = {"role": "user", "content": "Q"}
+    answer = {"role": "assistant", "content": "A"}
+    mixed = [
+        question,
+        {"role": "assistant", "content": "<think>Look it up.</think>"},
+        {"role": "tool", "content": "Result"},
+        answer,
+    ]
+    ds = Dataset.from_dict({"messages": [mixed, mixed, [question, answer]]})
+    kept = _filter_sft_rows(
+        ds, 1, tokenizer=tokenizer, thinking_omission_probability=0.5
+    )
+
+    instructions = kept["chat_template_kwargs"]
+    assert instructions[:2].count({"thinking_instruction": "think"}) == 1
+    assert instructions[:2].count({"thinking_instruction": None}) == 1
+    assert instructions[2] == {"thinking_instruction": "no_think"}
+    assert kept["chat_template_kwargs"] == _filter_sft_rows(
+        ds, 1, tokenizer=tokenizer, thinking_omission_probability=0.5
+    )["chat_template_kwargs"]
+    for row in kept:
+        tokens = tokenizer.apply_chat_template(row["messages"], **row["chat_template_kwargs"])
+        rendered = "".join(map(chr, tokens["input_ids"]))
+        instruction = row["chat_template_kwargs"]["thinking_instruction"]
+        prefix = (
+            f"<|im_start|>system\n/{instruction}<|im_end|>" if instruction else "<|im_start|>user"
+        )
+        assert rendered.startswith(prefix)

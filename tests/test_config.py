@@ -7,19 +7,6 @@ from post_training.config import ModelConfig, PostTrainingConfig
 from post_training.methods.common import build_common_training_kwargs
 
 
-def test_thinking_instruction_config_override():
-    from omegaconf import OmegaConf
-
-    from post_training.config import SFTMethodConfig
-
-    config = OmegaConf.structured(SFTMethodConfig)
-    assert config.thinking_instruction_probability is None
-    config = OmegaConf.merge(
-        config, OmegaConf.from_dotlist(["thinking_instruction_probability=0.5"])
-    )
-    assert OmegaConf.to_object(config).thinking_instruction_probability == 0.5
-
-
 def test_nullable_container_and_training_kwargs_load(tmp_path, monkeypatch):
     monkeypatch.setenv("WORLD_SIZE", "1")
     config_path = tmp_path / "config.yaml"
@@ -216,3 +203,23 @@ def test_resolve_tokenizer(tokenizer_name_or_path, tokenizer_revision, expected)
 
 def test_resolve_tokenizer_without_any_revision():
     assert ModelConfig(name_or_path="org/model").resolve_tokenizer() == ("org/model", None)
+
+
+
+@pytest.mark.parametrize(
+    ("overrides", "error"),
+    [
+        (["thinking_conditioning.default_omission_probability=1.5"], "between 0 and 1"),
+        (["thinking_conditioning.enable=true", "method=dpo"], "requires method=sft"),
+        (["thinking_conditioning.enable=true", "backend=llamafactory"], "requires method=sft"),
+        (
+            ["thinking_conditioning.enable=true", "data.chat_template=chatml"],
+            "requires data.chat_template=qwen3",
+        ),
+    ],
+)
+def test_invalid_thinking_conditioning_is_rejected_on_config_load(tmp_path, overrides, error):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("{}")
+    with pytest.raises(ValueError, match=error):
+        PostTrainingConfig.load(config_path, overrides)
