@@ -68,6 +68,7 @@ dpo:
   # and a cache written under one DeepSpeed ZeRO stage is reused under another
   # (e.g. precompute with stage 3, train with stage 2).
   precompute_ref_log_probs: false
+  precompute_ref_batch_size: null             # batch size used while precomputing; null = TRL default
 
 # -- Checkpointing -----------------------------------------------------------
 checkpointing:
