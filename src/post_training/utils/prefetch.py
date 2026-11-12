@@ -146,7 +146,9 @@ def prefetch_assets(config: PostTrainingConfig) -> PrefetchedPaths:
 
     ref_model_path = None
     if config.method == "dpo" and config.dpo.ref_model_name_or_path is not None:
-        ref_model_path = _prefetch_model(config.dpo.ref_model_name_or_path)
+        ref_model_path = _prefetch_model(
+            config.dpo.ref_model_name_or_path, revision=config.dpo.ref_model_revision
+        )
 
     for entry in config.data.datasets:
         _prefetch_dataset(entry)

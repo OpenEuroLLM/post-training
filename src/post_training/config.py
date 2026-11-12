@@ -155,8 +155,14 @@ class DPOMethodConfig:
     beta: float = 5.0
     loss_type: str = "sigmoid"
     ref_model_name_or_path: str | None = None
+    # Pins the ref repo only; independent of model.revision when ref_model_name_or_path
+    # points at a different repo. null = the ref repo's default branch.
+    ref_model_revision: str | None = None
     max_seq_length: int = 2048
     dataset_num_proc: int | None = None
+    # Opt-in TRL optimization; defaults preserve existing DPO behavior.
+    precompute_ref_log_probs: bool = False
+    precompute_ref_batch_size: int | None = None
 
 
 @dataclass
