@@ -59,6 +59,14 @@ _TOKENIZE_PREVIEW_SAMPLES = 1
 _TOKENIZE_PREVIEW_MAX_CHARS = 200
 _TOKENIZE_PREVIEW_SEP = "─" * 72
 
+# Token-ID columns to decode. SFT has ``input_ids``. TRL >= 1.0 DPO has
+# ``prompt_ids`` / ``chosen_ids`` / ``rejected_ids`` (older TRL used ``*_input_ids``).
+_TOKEN_ID_COLUMNS = {"prompt_ids", "chosen_ids", "rejected_ids", "completion_ids"}
+
+
+def _is_token_id_column(key: str) -> bool:
+    return key == "input_ids" or key.endswith("_input_ids") or key in _TOKEN_ID_COLUMNS
+
 
 def _indent(text: str, n: int) -> str:
     prefix = " " * n
@@ -94,7 +102,7 @@ def _print_tokenized_samples(trainer) -> None:
         row = dataset[i]
         print(f"\n  [Sample {i}]")
         for key, value in row.items():
-            if isinstance(value, list) and key.endswith("input_ids"):
+            if isinstance(value, list) and _is_token_id_column(key):
                 print(f"    {key}  (length {len(value)})")
                 print(_indent(_truncate_preview(tokenizer.decode(value)), 6))
             elif key == "labels" and isinstance(value, list):
