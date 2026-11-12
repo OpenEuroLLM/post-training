@@ -203,3 +203,25 @@ def test_resolve_tokenizer(tokenizer_name_or_path, tokenizer_revision, expected)
 
 def test_resolve_tokenizer_without_any_revision():
     assert ModelConfig(name_or_path="org/model").resolve_tokenizer() == ("org/model", None)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "error"),
+    [
+        (["thinking_conditioning.default_mode_omission_probability=1.5"], "between 0 and 1"),
+        (["thinking_conditioning.enable=true", "method=dpo"], "requires method=sft"),
+        (
+            ["thinking_conditioning.enable=true", "backend=llamafactory"],
+            "only supported with backend='trl'",
+        ),
+        (
+            ["thinking_conditioning.enable=true", "data.chat_template=chatml"],
+            "requires data.chat_template=qwen3",
+        ),
+    ],
+)
+def test_invalid_thinking_conditioning_is_rejected_on_config_load(tmp_path, overrides, error):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("{}")
+    with pytest.raises(ValueError, match=error):
+        PostTrainingConfig.load(config_path, overrides)

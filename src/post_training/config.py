@@ -304,6 +304,14 @@ class PathsConfig:
     debug_base: str = "outputs/debug"
 
 
+@dataclass
+class ThinkingConditioningConfig:
+    """Optional Qwen3 SFT instructions, with omission applied to reasoning rows."""
+
+    enable: bool = False
+    default_mode_omission_probability: float = 0.5
+
+
 # ---------------------------------------------------------------------------
 # Top-level config
 # ---------------------------------------------------------------------------
@@ -325,6 +333,9 @@ class PostTrainingConfig:
     training: TrainingConfig = field(default_factory=TrainingConfig)
     checkpointing: CheckpointingConfig = field(default_factory=CheckpointingConfig)
     data: DataConfig = field(default_factory=DataConfig)
+    thinking_conditioning: ThinkingConditioningConfig = field(
+        default_factory=ThinkingConditioningConfig
+    )
 
     # Method-specific (only the active method's block is used at runtime).
     sft: SFTMethodConfig = field(default_factory=SFTMethodConfig)
