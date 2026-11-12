@@ -113,6 +113,13 @@ def main() -> None:
         config.slurm.num_nodes = 1
         config.slurm.gpus_per_node = 1
 
+    # Reject inexact batch sizes in the submission phase. The job phase derives
+    # the same world size (WORLD_SIZE) and would only fail after the queue wait.
+    if config.backend == "trl":
+        config.resolve_gradient_accumulation_steps(
+            config.slurm.num_nodes * config.slurm.gpus_per_node
+        )
+
     if config.container is not None and config.container.env_file:
         _apply_hf_env_from_file(config.container.env_file)
 
