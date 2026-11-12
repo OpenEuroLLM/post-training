@@ -171,6 +171,17 @@ class TRLBackend(Backend):
                 f"Supported methods: {', '.join(_SUPPORTED_METHODS)}"
             )
 
+        conditioning = config.thinking_conditioning
+        if not 0 <= conditioning.default_mode_omission_probability <= 1:
+            raise ValueError(
+                "thinking_conditioning.default_mode_omission_probability must be between 0 and 1."
+            )
+        if conditioning.enable:
+            if config.method != "sft":
+                raise ValueError("thinking_conditioning requires method=sft.")
+            if config.data.chat_template != "qwen3":
+                raise ValueError("thinking_conditioning requires data.chat_template=qwen3.")
+
         if isinstance(config.deepspeed, dict) and "config_path" in config.deepspeed:
             raise ValueError(
                 "deepspeed.config_path is no longer supported. Inline the DeepSpeed "
@@ -315,6 +326,8 @@ class TRLBackend(Backend):
 
 class LlamaFactoryBackend(Backend):
     def validate(self, config: PostTrainingConfig) -> None:
+        if config.thinking_conditioning.enable:
+            raise ValueError("thinking_conditioning is only supported with backend='trl'.")
         if not config.llamafactory:
             raise ValueError("llamafactory must be set when backend='llamafactory'.")
         if config.container is None or not config.container.image:

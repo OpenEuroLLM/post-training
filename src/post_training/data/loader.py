@@ -142,7 +142,7 @@ def _align_message_fields(datasets: list[Dataset], num_proc: int) -> list[Datase
 
 def load_and_mix_datasets(
     config: DataConfig,
-    dataset_filter_fn: Callable[[Dataset, int], Dataset] | None = None,
+    dataset_filter_fn: Callable[[Dataset, int, int], Dataset] | None = None,
     columns_to_keep: list[str] | None = None,
     features: Features | None = None,
 ) -> Dataset:
@@ -153,8 +153,9 @@ def load_and_mix_datasets(
     config:
         The ``data`` section of :class:`PostTrainingConfig`.
     dataset_filter_fn:
-        Optional callable ``(dataset, num_proc) -> dataset`` applied to each
-        dataset after transforms and column selection. Each training method
+        Optional callable ``(dataset, num_proc, seed) -> dataset`` applied after
+        transforms and column selection. Each source receives the configured
+        seed plus its index. Each training method
         passes its own filter (e.g. SFT drops rows whose assistant tokens
         never enter the loss, DPO drops rows with an empty ``chosen`` or
         ``rejected``). Bind extra arguments with :func:`functools.partial`.
@@ -192,7 +193,7 @@ def load_and_mix_datasets(
         weights.append(entry.weight)
 
     loaded_datasets: list[Dataset] = []
-    for entry in entries:
+    for idx, entry in enumerate(entries):
         logger.info(
             "Loading dataset '%s' from '%s' (data_dir=%s, subset=%s, split=%s, "
             "weight=%s, transform=%s)",
@@ -252,7 +253,7 @@ def load_and_mix_datasets(
         # an all-zero assistant loss mask, DPO drops empty preference pairs).
         if dataset_filter_fn is not None:
             logger.info("Filtering dataset '%s' (%d rows).", entry.name, len(ds))
-            ds = dataset_filter_fn(ds, num_proc=num_proc)
+            ds = dataset_filter_fn(ds, num_proc=num_proc, seed=seed + idx)
             logger.info("Dataset '%s' has %d rows after filtering.", entry.name, len(ds))
 
         loaded_datasets.append(ds)

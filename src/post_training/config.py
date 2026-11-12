@@ -417,17 +417,6 @@ class PostTrainingConfig:
         """Run cross-field validation."""
         from post_training.backend import get_backend
 
-        conditioning = self.thinking_conditioning
-        if not 0 <= conditioning.default_mode_omission_probability <= 1:
-            raise ValueError(
-                "thinking_conditioning.default_mode_omission_probability must be between 0 and 1."
-            )
-        if conditioning.enable:
-            if self.method != "sft" or self.backend != "trl":
-                raise ValueError("thinking_conditioning requires method=sft and backend=trl.")
-            if self.data.chat_template != "qwen3":
-                raise ValueError("thinking_conditioning requires data.chat_template=qwen3.")
-
         get_backend(self.backend).validate(self)
 
     def resolve_max_steps(self) -> int | None:

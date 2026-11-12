@@ -186,12 +186,12 @@ MESSAGES_FEATURES = Features(
 def _filter_sft_rows(
     ds: Dataset,
     num_proc: int,
+    seed: int = 42,
     *,
     tokenizer: PreTrainedTokenizerBase,
     max_length: int | None = None,
     truncated_span_action: str = "warn",
     thinking_omission_probability: float | None = None,
-    instruction_seed: int = 42,
 ) -> Dataset:
     """Drop rows that contribute nothing to the SFT loss, and report what does.
 
@@ -257,9 +257,7 @@ def _filter_sft_rows(
         )
 
     if thinking_omission_probability is not None:
-        ds = _with_thinking_instructions(
-            ds, thinking_omission_probability, instruction_seed, num_proc
-        )
+        ds = _with_thinking_instructions(ds, thinking_omission_probability, seed, num_proc)
 
     # remove_columns keeps the map cache tiny: it holds the verdict alone, not a copy of the data.
     verdicts = ds.map(
@@ -452,7 +450,6 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
                 max_length=mc.max_seq_length,
                 truncated_span_action=mc.truncated_span_action,
                 thinking_omission_probability=omission_probability,
-                instruction_seed=config.data.seed,
             ),
             columns_to_keep=["messages", "tools"],
             features=MESSAGES_FEATURES,

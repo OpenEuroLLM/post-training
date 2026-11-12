@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _filter_dpo_rows(ds: Dataset, num_proc: int) -> Dataset:
+def _filter_dpo_rows(ds: Dataset, num_proc: int, seed: int = 42) -> Dataset:
     """Drop rows with an empty ``chosen`` or ``rejected`` field."""
     return ds.filter(
         lambda row: len(row["chosen"]) > 0 and len(row["rejected"]) > 0,
