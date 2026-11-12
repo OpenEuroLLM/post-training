@@ -376,6 +376,7 @@ Select your training strategy using `method`.
   - **Reference model**: set `dpo.ref_model_name_or_path`
     - If `null`, TRL creates an implicit copy of the active model
     - If using **ZeRO Stage 3**, consider specifying the reference model explicitly (implicit copy creation can be unstable with Stage 3)
+  - **Precomputed reference log-probs**: set `dpo.precompute_ref_log_probs: true` to score the dataset with the reference model once, before training, and free the reference model afterwards. `dpo.precompute_ref_batch_size` sets the batch size of that pass (`null` = `per_device_train_batch_size`)
 
 ### 2. Data Pipeline
 
