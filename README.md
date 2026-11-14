@@ -481,6 +481,35 @@ You must specify exactly one determining factor for training duration in the `tr
 - **Token-based**: `training.num_training_tokens` (steps based on total token count)
   - Only valid when `method: "sft"` and `sft.packing: true`
 
+#### Learning-rate schedule
+
+`training.lr_scheduler_type` selects a `transformers` scheduler. `training.lr_scheduler_kwargs` holds its arguments; only fields you set are forwarded. Config validation rejects a field that the selected scheduler does not accept, so a mismatch fails at submission instead of on the compute nodes. `training.warmup_steps` applies to every type except `constant`.
+
+| `lr_scheduler_type` | `lr_scheduler_kwargs` |
+|---|---|
+| `linear` (default), `constant_with_warmup`, `inverse_sqrt` | none |
+| `constant` | none; requires `warmup_steps: 0` |
+| `cosine` | `num_cycles` (default 0.5 = half cosine) |
+| `cosine_with_restarts` | `num_cycles` (integer, default 1) |
+| `polynomial` | `lr_end` (default 1e-7), `power` (default 1.0) |
+| `cosine_with_min_lr` | exactly one of `min_lr`, `min_lr_rate`; `num_cycles` |
+| `cosine_warmup_with_min_lr` | exactly one of `min_lr`, `min_lr_rate`; `warmup_lr_rate`, `num_cycles` |
+| `warmup_stable_decay` | `num_decay_steps` (required), `decay_type`, `warmup_type`, `min_lr_ratio`, `num_cycles` |
+
+**Warmup-stable-decay (WSD).** The LR warms up, stays at `learning_rate`, then decays to `min_lr_ratio * learning_rate` over the last `num_decay_steps` steps. Like `warmup_steps`, a value in (0, 1) is a ratio of the training steps and a value >= 1 is an absolute step count. A ratio needs a step budget that is known before training (`max_steps`, `num_training_samples`, or `num_training_tokens`); with `num_train_epochs`, give an absolute count. `warmup_type` and `decay_type` are `linear`, `cosine` (default for decay), or `1-sqrt`. Note: with `min_lr_ratio > 0`, `transformers` starts the warmup at `min_lr_ratio * learning_rate`, not at 0.
+
+```yaml
+training:
+  max_steps: 1000
+  warmup_steps: 0.05
+  lr_scheduler_type: "warmup_stable_decay"
+  lr_scheduler_kwargs:
+    num_decay_steps: 0.2        # decay over the last 200 steps
+    decay_type: "1-sqrt"
+```
+
+`reduce_lr_on_plateau` and `greedy` are not supported: they step on evaluation metrics, and this framework runs no evaluation loop.
+
 ### 4. Infrastructure & Compute
 
 - **DeepSpeed**: configured inline under the top-level `deepspeed:` key (see the reference config below); set `deepspeed: null` to disable DeepSpeed entirely.
@@ -639,9 +668,17 @@ training:
   effective_batch_size: 32                   # per_device * grad_accum * world_size
   per_device_train_batch_size: 8
   warmup_steps: 0.03
+  # linear | cosine | cosine_with_restarts | polynomial | constant | constant_with_warmup |
+  # inverse_sqrt | cosine_with_min_lr | cosine_warmup_with_min_lr | warmup_stable_decay
   lr_scheduler_type: "cosine_with_min_lr"
-  lr_scheduler_kwargs:                         # set to null for schedulers with no kwargs
+  lr_scheduler_kwargs:                         # only set fields are forwarded; null = no kwargs
     min_lr_rate: 0.1
+  # Warmup-stable-decay (WSD) example: constant LR after warmup, decay over the last 20%.
+  # lr_scheduler_type: "warmup_stable_decay"
+  # lr_scheduler_kwargs:
+  #   num_decay_steps: 0.2                     # (0, 1) = ratio of training steps; >= 1 = steps
+  #   decay_type: "1-sqrt"                     # linear | cosine | 1-sqrt
+  #   min_lr_ratio: 0.0
   gradient_checkpointing: true
   gradient_checkpointing_kwargs: null          # null = use TRL/Transformers defaults
   bf16: true

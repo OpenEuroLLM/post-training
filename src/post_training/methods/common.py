@@ -21,6 +21,7 @@ from post_training.callbacks.mfu import MFUCallback
 from post_training.callbacks.resume_check import ResumeCheckCallback
 from post_training.callbacks.throughput import ThroughputCallback
 from post_training.chat_templates.registry import get_chat_template, infer_end_token_from_render
+from post_training.utils.lr_scheduler import resolve_lr_scheduler_kwargs
 
 if TYPE_CHECKING:
     from post_training.config import PostTrainingConfig
@@ -192,6 +193,7 @@ def build_common_training_kwargs(
     # Determine training duration kwargs. When num_train_epochs is set, max_steps
     # must be -1 (disabled) so the Trainer uses epoch-based stopping. Otherwise,
     # resolve max_steps without mutating the configured sample/token budget.
+    max_steps: int | None = None
     if t.num_train_epochs is not None:
         duration_kwargs: dict[str, Any] = {
             "num_train_epochs": t.num_train_epochs,
@@ -217,13 +219,7 @@ def build_common_training_kwargs(
         gradient_accumulation_steps=grad_accum,
         warmup_steps=t.warmup_steps,
         lr_scheduler_type=t.lr_scheduler_type,
-        lr_scheduler_kwargs=(
-            None
-            if t.lr_scheduler_kwargs is None
-            else {
-                k: v for k, v in dataclasses.asdict(t.lr_scheduler_kwargs).items() if v is not None
-            }
-        ),
+        lr_scheduler_kwargs=resolve_lr_scheduler_kwargs(t, max_steps),
         gradient_checkpointing=t.gradient_checkpointing,
         gradient_checkpointing_kwargs=(
             None
