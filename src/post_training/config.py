@@ -56,12 +56,29 @@ class ModelConfig:
 class LRSchedulerKwargs:
     """Extra keyword arguments forwarded to the LR scheduler.
 
-    Set ``min_lr_rate`` only for schedulers that support it (e.g.
-    ``cosine_with_min_lr``).  Leave it as ``None`` for schedulers like
-    ``linear`` that do not accept this argument.
+    Only the fields that are set (not ``None``) are forwarded.  Each
+    ``lr_scheduler_type`` accepts only some fields; validation rejects the
+    others (see ``post_training.utils.lr_scheduler.LR_SCHEDULER_KWARGS``).
     """
 
+    # cosine, cosine_with_restarts (integer), cosine_with_min_lr,
+    # cosine_warmup_with_min_lr, warmup_stable_decay (cosine decay only).
+    num_cycles: float | None = None
+    # cosine_with_min_lr, cosine_warmup_with_min_lr: set exactly one of the two.
+    min_lr: float | None = None
     min_lr_rate: float | None = None
+    # cosine_warmup_with_min_lr: start of the warmup, as a ratio of the peak LR.
+    warmup_lr_rate: float | None = None
+    # polynomial
+    lr_end: float | None = None
+    power: float | None = None
+    # warmup_stable_decay.  num_decay_steps (required) uses the warmup_steps
+    # rule: a value in (0, 1) is a ratio of the training steps, a value >= 1 is
+    # an absolute number of steps.  The stable phase fills the remaining steps.
+    num_decay_steps: float | None = None
+    warmup_type: str | None = None  # linear | cosine | 1-sqrt
+    decay_type: str | None = None  # linear | cosine | 1-sqrt
+    min_lr_ratio: float | None = None
 
 
 @dataclass
@@ -110,7 +127,8 @@ class TrainingConfig:
             )
         },
     )
-    lr_scheduler_type: str = "cosine_with_min_lr"
+    # See post_training.utils.lr_scheduler for the supported types.
+    lr_scheduler_type: str = "linear"
     lr_scheduler_kwargs: LRSchedulerKwargs | None = field(default_factory=LRSchedulerKwargs)
     adam_beta1: float = 0.9
     adam_beta2: float = 0.999

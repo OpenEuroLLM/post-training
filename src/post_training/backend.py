@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING
 
 import yaml
 
+from post_training.utils.lr_scheduler import validate_lr_scheduler
+
 if TYPE_CHECKING:
     from post_training.config import PostTrainingConfig
 
@@ -262,6 +264,9 @@ class TRLBackend(Backend):
         if t.num_training_samples is not None:
             if t.num_training_samples <= 0:
                 raise ValueError("training.num_training_samples must be a positive integer.")
+
+        # Needs the validated training length above.
+        validate_lr_scheduler(config)
 
     def generate_run_name(self, config: PostTrainingConfig, timestamp: str) -> str:
         model_short = _shorten_model_name(config.model.name_or_path)

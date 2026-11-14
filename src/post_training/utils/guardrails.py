@@ -15,6 +15,8 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from post_training.utils.lr_scheduler import describe_lr_scheduler
+
 if TYPE_CHECKING:
     from post_training.config import PostTrainingConfig
 
@@ -219,14 +221,7 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
     _row("Backend", config.backend)
     _row("Duration", _duration_summary(config))
     _row("Learning rate", f"{config.training.learning_rate:.2e}")
-    lr_sched = config.training.lr_scheduler_type
-    min_lr = (
-        config.training.lr_scheduler_kwargs.min_lr_rate
-        if config.training.lr_scheduler_kwargs
-        else None
-    )
-    lr_sched_str = lr_sched if min_lr is None else f"{lr_sched}  (min_lr_rate={min_lr})"
-    _row("LR scheduler", lr_sched_str)
+    _row("LR scheduler", describe_lr_scheduler(config))
     _row("Warmup steps", str(config.training.warmup_steps))
     batch_line, _ = _batch_summary(config, total_gpus)
     _row("Batch sizes", batch_line)
