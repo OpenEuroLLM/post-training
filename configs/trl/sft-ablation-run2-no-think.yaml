@@ -1,6 +1,6 @@
 # SFT leave-one-out ablation, run2-no-think. Same SLURM and training settings as
 # configs/trl/ali-prelude-config.yaml; data = shard dirs written by scripts/prepare_prelude_data.py.
-# Data: tiny smoke-test shards (SFT-ablation-data-tiny).
+# Data: full shards (SFT-ablation-data).
 method: sft
 backend: trl
 llamafactory: null
@@ -62,32 +62,32 @@ data:
   seed: 42
   datasets:
     - name: "excellent_sft-part1"
-      path: "/gpfs/scratch/ehpc533/users/frei322049/datasets/SFT-ablation-data-tiny/shards/excellent_sft/part1"
+      path: "/gpfs/scratch/ehpc533/users/frei322049/datasets/SFT-ablation-data/shards/excellent_sft/part1"
       split: "train"
       weight: 1.0
       transform: null
     - name: "identity-all"
-      path: "/gpfs/scratch/ehpc533/users/frei322049/datasets/SFT-ablation-data-tiny/shards/identity/all"
+      path: "/gpfs/scratch/ehpc533/users/frei322049/datasets/SFT-ablation-data/shards/identity/all"
       split: "train"
       weight: 1.0
       transform: null
     - name: "dolci_instruct-part1"
-      path: "/gpfs/scratch/ehpc533/users/frei322049/datasets/SFT-ablation-data-tiny/shards/dolci_instruct/part1"
+      path: "/gpfs/scratch/ehpc533/users/frei322049/datasets/SFT-ablation-data/shards/dolci_instruct/part1"
       split: "train"
       weight: 1.0
       transform: null
     - name: "dolci_instruct-part2"
-      path: "/gpfs/scratch/ehpc533/users/frei322049/datasets/SFT-ablation-data-tiny/shards/dolci_instruct/part2"
+      path: "/gpfs/scratch/ehpc533/users/frei322049/datasets/SFT-ablation-data/shards/dolci_instruct/part2"
       split: "train"
       weight: 1.0
       transform: null
     - name: "euromultisynth-part1"
-      path: "/gpfs/scratch/ehpc533/users/frei322049/datasets/SFT-ablation-data-tiny/shards/euromultisynth/part1"
+      path: "/gpfs/scratch/ehpc533/users/frei322049/datasets/SFT-ablation-data/shards/euromultisynth/part1"
       split: "train"
       weight: 1.0
       transform: null
     - name: "euromultisynth-part2"
-      path: "/gpfs/scratch/ehpc533/users/frei322049/datasets/SFT-ablation-data-tiny/shards/euromultisynth/part2"
+      path: "/gpfs/scratch/ehpc533/users/frei322049/datasets/SFT-ablation-data/shards/euromultisynth/part2"
       split: "train"
       weight: 1.0
       transform: null
@@ -138,11 +138,11 @@ logging:
 slurm:
   account: "ehpc533"
   partition: "acc_ehpc"
-  qos: "acc_debug"
+  qos: "acc_ehpc"
   num_nodes: 8
   gpus_per_node: 4
   cpus_per_task: 76
-  wall_time: "00:35:00"
+  wall_time: "3-00:00:00"
   job_name: "sft-ablation-run2-no-think"
   signal_time_seconds: 300
   max_failures: 3
