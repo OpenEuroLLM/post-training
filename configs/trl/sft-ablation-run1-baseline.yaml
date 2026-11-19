@@ -137,7 +137,7 @@ slurm:
   num_nodes: 8
   gpus_per_node: 4
   cpus_per_task: 76
-  wall_time: "03:00:00"
+  wall_time: "3-00:00:00"
   job_name: "sft-ablation-run1-baseline"
   signal_time_seconds: 300
   max_failures: 3
