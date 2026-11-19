@@ -117,9 +117,9 @@ accelerate:
 
 checkpointing:
   save_strategy: "steps"
-  save_steps: 200
+  save_steps: 250
   save_total_limit: 2
-  inference_checkpoint_steps: 100
+  inference_checkpoint_steps: 1000
   inference_checkpoint_path: "inference_checkpoints"
 
 logging:
