@@ -58,7 +58,7 @@ thinking_conditioning:
 
 data:
   chat_template: "qwen3"
-  num_proc: null
+  num_proc: 72
   seed: 42
   datasets:
     - name: "excellent_sft-part1"
