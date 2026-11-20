@@ -253,6 +253,9 @@ def run_guardrails(config: PostTrainingConfig, run_dir: Path, tokenize_only: boo
         _row("Beta", str(dpo.beta))
         _row("Loss type", dpo.loss_type)
         _row("Max seq length", str(dpo.max_seq_length))
+        _row("Precompute ref log-probs", str(dpo.precompute_ref_log_probs))
+        if dpo.precompute_ref_batch_size is not None:
+            _row("Precompute ref batch size", str(dpo.precompute_ref_batch_size))
         if dpo.ref_model_name_or_path:
             _row("Ref model", dpo.ref_model_name_or_path)
 

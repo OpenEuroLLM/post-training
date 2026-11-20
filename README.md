@@ -377,6 +377,7 @@ Select your training strategy using `method`.
     - If `null`, TRL creates an implicit copy of the active model
     - If using **ZeRO Stage 3**, consider specifying the reference model explicitly (implicit copy creation can be unstable with Stage 3)
   - **Precomputed reference log-probs**: set `dpo.precompute_ref_log_probs: true` to score the dataset with the reference model once, before training, and free the reference model afterwards. `dpo.precompute_ref_batch_size` sets the batch size of that pass (`null` = `per_device_train_batch_size`)
+  - **Stage-independent cache reuse**: The cache key identifies the checkpoint on disk (Hub commit SHA for Hub models, file name/size/mtime/safetensors header for local dirs — never the in-memory, possibly ZeRO-3-partitioned `state_dict`; the mtime keeps a checkpoint retrained in place at the same path from reusing stale log-probs), so it is cheap to compute on every rank and a cache written under one DeepSpeed ZeRO stage is reused under another — e.g. precompute with `deepspeed.zero_optimization.stage=3`, then train with stage 2. `dpo.ref_model_revision` pins the revision of `dpo.ref_model_name_or_path` independently of `model.revision`
 
 ### 2. Data Pipeline
 
