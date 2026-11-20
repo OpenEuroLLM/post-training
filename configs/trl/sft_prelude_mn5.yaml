@@ -1,0 +1,127 @@
+method: sft
+backend: trl
+llamafactory: null
+run_name: your-run-name
+offline: true
+
+container:
+  image: /gpfs/projects/ehpc533/containers/post-training.sif
+  bind_mounts:
+    - /path/to/your/user
+  env_file: env/mn5.env
+  path: /usr/local/bin:/usr/bin:/bin:/opt/venv/bin
+
+model:
+  name_or_path: "/path/to/your/model"
+  tokenizer_name_or_path: "/path/to/your/tokenizer/if/not/the/models/default"
+  tokenizer_revision: "qwen3-tokens"
+  attn_implementation: "flash_attention_3"
+  dtype: "bfloat16"
+
+training:
+  max_steps: 100 # Small test run
+  learning_rate: 8.0e-5
+  lr_scheduler_type: "linear"
+  lr_scheduler_kwargs: null
+  warmup_steps: 0.03
+  weight_decay: 0.0
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_epsilon: 1e-8
+  effective_batch_size: 32
+  per_device_train_batch_size: 1
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
+    determinism_check: "default"
+    debug: false
+    early_stop: true
+  use_liger_kernel: true
+  bf16: true
+  seed: 42
+
+sft:
+  max_seq_length: 32768
+  packing: true
+  dataset_num_proc: null
+  truncated_span_action: "drop"
+
+data:
+  chat_template: "qwen3"
+  num_proc: null
+  seed: 42
+  datasets:
+    - name: "your-dataset-name"
+      path: "/path/to/your/dataset"
+      split: "train"
+      weight: 1.0
+      transform: null
+
+deepspeed:
+  bf16:
+    enabled: true
+  zero_optimization:
+    stage: 2
+    overlap_comm: false
+    contiguous_gradients: true
+    reduce_scatter: true
+  gradient_clipping: 1.0
+  train_micro_batch_size_per_gpu: "auto"
+  gradient_accumulation_steps: "auto"
+  train_batch_size: "auto"
+  optimizer:
+    type: AdamW
+    params:
+      lr: "auto"
+      betas: "auto"
+      eps: "auto"
+      weight_decay: "auto"
+
+accelerate:
+  mixed_precision: "bf16"
+  use_deepspeed: true
+  deepspeed_multinode_launcher: "standard"
+  same_network: true
+  rdzv_backend: "static"
+  dynamo_backend: "inductor"
+
+checkpointing:
+  save_strategy: "steps"
+  save_steps: 200
+  save_total_limit: 2
+  inference_checkpoint_steps: 100
+  inference_checkpoint_path: "inference_checkpoints"
+
+logging:
+  report_to:
+    - "wandb"
+    - "tensorboard"
+  wandb_project: "instruction-selection"
+  logging_steps: 1
+  include_num_input_tokens_seen: "non_padding"
+
+slurm:
+  account: "ehpc533"
+  partition: "acc_ehpc"
+  qos: "acc_debug"
+  num_nodes: 8
+  gpus_per_node: 4
+  cpus_per_task: 76
+  wall_time: "00:40:00"
+  job_name: "prelude-rope20m-cont-think50-sft"
+  signal_time_seconds: 300
+  max_failures: 3
+  modules:
+    - EB/apps
+    - CUDA/12.4.0
+    - gcc/12.3.0
+    - singularity
+  module_purge: false
+
+debug:
+  enabled: false
+  override_existing: false
+
+paths:
+  output_base: "/path/to/your/outputs"
+  debug_base: "/path/to/your/outputs/debug"

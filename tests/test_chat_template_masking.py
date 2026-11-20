@@ -199,3 +199,26 @@ def test_olmo3_instruct_sft_masks_all_assistant_turns() -> None:
     assert len(spans) == 2
     assert spans[0].startswith("A1")
     assert spans[1].startswith("A2")
+
+
+@pytest.mark.parametrize("instruction", ["think", "no_think", None])
+@pytest.mark.parametrize("with_tools", [False, True])
+def test_qwen3_thinking_instruction_only_changes_system_prompt(instruction, with_tools):
+    utils = pytest.importorskip("transformers.utils.chat_template_utils")
+    template = utils._compile_jinja_template(get_chat_template("qwen3"))
+    messages = [
+        {"role": "system", "content": ""},
+        {"role": "user", "content": "Q"},
+        {"role": "assistant", "content": "A"},
+    ]
+    tools = [{"name": "lookup"}] if with_tools else None
+    baseline = template.render(messages=messages, tools=tools)
+    rendered = template.render(messages=messages, tools=tools, thinking_instruction=instruction)
+    system_prefix = "<|im_start|>system\n"
+    assert baseline.startswith(system_prefix + ("\n\n# Tools" if with_tools else "<|im_end|>"))
+    expected = (
+        baseline.replace(system_prefix, system_prefix + "/" + instruction, 1)
+        if instruction
+        else baseline
+    )
+    assert rendered == expected

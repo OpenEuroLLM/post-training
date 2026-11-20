@@ -147,6 +147,13 @@ def build_model_init_kwargs(config: PostTrainingConfig) -> dict[str, Any]:
         "attn_implementation": config.model.attn_implementation,
         "dtype": dtype,
         "revision": config.model.revision,
+        # TRL defaults device_map to "auto", which balances the model across every
+        # GPU of the node and attaches accelerate device hooks. TRL forces None for
+        # MULTI_GPU and DEEPSPEED only; under FSDP the DPO reference model keeps
+        # "auto", FSDP2 then moves its weights to the local GPU while the hooks keep
+        # sending inputs to cuda:0 ("Expected all tensors to be on the same device").
+        # None loads on CPU and lets FSDP place the weights.
+        "device_map": None,
     }
 
 

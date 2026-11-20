@@ -75,13 +75,13 @@ class _CharTokenizer:
         return get_chat_template(self.template_name)
 
     def _render(
-        self, conversation: list[dict], tools: list[dict] | None = None
+        self, conversation: list[dict], tools: list[dict] | None = None, **kwargs
     ) -> tuple[str, list[tuple[int, int]]]:
         utils = pytest.importorskip("transformers.utils.chat_template_utils")
         if self.template_name not in _COMPILED:
             _COMPILED[self.template_name] = utils._compile_jinja_template(self.chat_template)
         return utils._render_with_assistant_indices(
-            _COMPILED[self.template_name], conversation, tools, None, False
+            _COMPILED[self.template_name], conversation, tools, None, False, **kwargs
         )
 
     def render(self, conversation: list[dict], tools: list[dict] | None = None) -> str:
@@ -97,8 +97,9 @@ class _CharTokenizer:
         return_assistant_tokens_mask: bool = False,
         truncation: bool = False,
         max_length: int | None = None,
+        **kwargs,
     ) -> dict:
-        rendered, indices = self._render(conversation, tools)
+        rendered, indices = self._render(conversation, tools, **kwargs)
 
         input_ids = [ord(character) for character in rendered]
         assistant_masks = [0] * len(rendered)
@@ -614,3 +615,35 @@ def test_dpo_reads_chosen_and_rejected_rather_than_messages() -> None:
     assert "messages" not in ds.column_names
 
     assert len(_filter_dpo_rows(ds, num_proc=1)) == 1
+
+
+def test_qwen3_conditioning_is_forwarded_and_counts_reasoning_tool_turns(tokenizer):
+    question = {"role": "user", "content": "Q"}
+    answer = {"role": "assistant", "content": "A"}
+    mixed = [
+        question,
+        {"role": "assistant", "content": "<think>Look it up.</think>"},
+        {"role": "tool", "content": "Result"},
+        answer,
+    ]
+    ds = Dataset.from_dict({"messages": [mixed, mixed, [question, answer]]})
+    kept = _filter_sft_rows(ds, 1, tokenizer=tokenizer, thinking_omission_probability=0.5)
+
+    instructions = kept["chat_template_kwargs"]
+    assert instructions[:2].count({"thinking_instruction": "think"}) == 1
+    assert instructions[:2].count({"thinking_instruction": None}) == 1
+    assert instructions[2] == {"thinking_instruction": "no_think"}
+    assert (
+        kept["chat_template_kwargs"]
+        == _filter_sft_rows(ds, 1, tokenizer=tokenizer, thinking_omission_probability=0.5)[
+            "chat_template_kwargs"
+        ]
+    )
+    for row in kept:
+        tokens = tokenizer.apply_chat_template(row["messages"], **row["chat_template_kwargs"])
+        rendered = "".join(map(chr, tokens["input_ids"]))
+        instruction = row["chat_template_kwargs"]["thinking_instruction"]
+        prefix = (
+            f"<|im_start|>system\n/{instruction}<|im_end|>" if instruction else "<|im_start|>user"
+        )
+        assert rendered.startswith(prefix)

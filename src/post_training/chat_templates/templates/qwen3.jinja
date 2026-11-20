@@ -1,7 +1,13 @@
+{%- set instruction = thinking_instruction | default(none) %}
+{%- set has_system = messages[0].role == 'system' %}
+{%- set system_content = messages[0].content if has_system else '' %}
+{%- if instruction is not none %}
+    {%- set system_content = system_content + ('\n\n' if system_content else '') + '/' + instruction %}
+{%- endif %}
 {%- if tools %}
     {{- '<|im_start|>system\n' }}
-    {%- if messages[0].role == 'system' %}
-        {{- messages[0].content + '\n\n' }}
+    {%- if has_system or instruction is not none %}
+        {{- system_content + '\n\n' }}
     {%- endif %}
     {{- "# Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>" }}
     {%- for tool in tools %}
@@ -10,8 +16,8 @@
     {%- endfor %}
     {{- "\n</tools>\n\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\n<tool_call>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</tool_call><|im_end|>\n" }}
 {%- else %}
-    {%- if messages[0].role == 'system' %}
-        {{- '<|im_start|>system\n' + messages[0].content + '<|im_end|>\n' }}
+    {%- if has_system or instruction is not none %}
+        {{- '<|im_start|>system\n' + system_content + '<|im_end|>\n' }}
     {%- endif %}
 {%- endif %}
 {%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}

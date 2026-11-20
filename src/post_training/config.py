@@ -160,7 +160,8 @@ class DPOMethodConfig:
     ref_model_revision: str | None = None
     max_seq_length: int = 2048
     dataset_num_proc: int | None = None
-    # Opt-in TRL optimization; defaults preserve existing DPO behavior.
+    # Score the dataset with the reference model once, before training, and drop the
+    # reference model afterwards. The batch size defaults to per_device_train_batch_size.
     precompute_ref_log_probs: bool = False
     precompute_ref_batch_size: int | None = None
 
@@ -310,6 +311,14 @@ class PathsConfig:
     debug_base: str = "outputs/debug"
 
 
+@dataclass
+class ThinkingConditioningConfig:
+    """Optional Qwen3 SFT instructions, with omission applied to reasoning rows."""
+
+    enable: bool = False
+    default_mode_omission_probability: float = 0.5
+
+
 # ---------------------------------------------------------------------------
 # Top-level config
 # ---------------------------------------------------------------------------
@@ -331,6 +340,9 @@ class PostTrainingConfig:
     training: TrainingConfig = field(default_factory=TrainingConfig)
     checkpointing: CheckpointingConfig = field(default_factory=CheckpointingConfig)
     data: DataConfig = field(default_factory=DataConfig)
+    thinking_conditioning: ThinkingConditioningConfig = field(
+        default_factory=ThinkingConditioningConfig
+    )
 
     # Method-specific (only the active method's block is used at runtime).
     sft: SFTMethodConfig = field(default_factory=SFTMethodConfig)

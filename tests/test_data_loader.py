@@ -71,6 +71,24 @@ def test_weight_resampling_uses_each_dataset_size(monkeypatch):
     assert Counter(mixed["source"]) == {"a": 2, "b": 4}
 
 
+def test_filter_receives_seed_for_each_dataset(monkeypatch):
+    _patch_load_dataset(monkeypatch, {"dataset-a": _dataset("a", 2), "dataset-b": _dataset("b", 2)})
+    config = _config(
+        DatasetEntry(name="a", path="dataset-a"),
+        DatasetEntry(name="b", path="dataset-b"),
+        seed=7,
+    )
+    calls = []
+
+    def record_seed(dataset, *, num_proc, seed):
+        calls.append((dataset["source"][0], num_proc, seed))
+        return dataset
+
+    loader.load_and_mix_datasets(config, dataset_filter_fn=record_seed)
+
+    assert calls == [("a", 1, 7), ("b", 1, 8)]
+
+
 def test_weight_resampling_is_reproducible(monkeypatch):
     _patch_load_dataset(
         monkeypatch,

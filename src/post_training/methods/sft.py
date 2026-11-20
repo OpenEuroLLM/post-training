@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 from collections import Counter
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pyarrow as pa
 from accelerate import PartialState
 from datasets import Dataset, Features, List, Value
 from transformers import PreTrainedTokenizerBase
@@ -45,11 +47,64 @@ _BEYOND_CAP = 3  # dropped: assistant tokens exist, all of them past max_length
 _TRUNCATED_SPAN_ACTIONS = ("warn", "drop")
 
 
+def _has_supervised_reasoning(messages: list[dict]) -> bool:
+    for message in reversed(messages):
+        content = message.get("content")
+        if (
+            message["role"] == "user"
+            and isinstance(content, str)
+            and not (content.startswith("<tool_response>") and content.endswith("</tool_response>"))
+        ):
+            break
+        if message["role"] != "assistant":
+            continue
+        reasoning = message.get("reasoning_content")
+        if not isinstance(reasoning, str):
+            reasoning = ""
+            if isinstance(content, str) and "</think>" in content:
+                reasoning = content.split("</think>", 1)[0].rsplit("<think>", 1)[-1]
+        if reasoning.strip():
+            return True
+    return False
+
+
+def _with_thinking_instructions(
+    ds: Dataset, omission_probability: float, seed: int, num_proc: int
+) -> Dataset:
+    reasoning = ds.map(
+        lambda row: {"has_reasoning": _has_supervised_reasoning(row["messages"])},
+        remove_columns=ds.column_names,
+        num_proc=num_proc,
+        desc="Classifying supervised assistant reasoning",
+    )["has_reasoning"]
+    indices = [i for i, value in enumerate(reasoning) if value]
+    explicit_count = round(len(indices) * (1 - omission_probability))
+    selected = set(random.Random(seed).sample(indices, explicit_count))
+    logger.info(
+        "Thinking instructions: %d explicit, %d omitted, %d no_think before filtering.",
+        len(selected),
+        len(indices) - len(selected),
+        len(ds) - len(indices),
+    )
+    instructions = pa.array(
+        (
+            "think" if i in selected else None if value else "no_think"
+            for i, value in enumerate(reasoning)
+        ),
+        type=pa.string(),
+    )
+    return ds.add_column(
+        "chat_template_kwargs",
+        pa.StructArray.from_arrays([instructions], names=["thinking_instruction"]),
+    )
+
+
 def _classify_row(
     messages: list[dict],
     tokenizer: PreTrainedTokenizerBase,
     max_length: int | None,
     tools: str | list[dict] | None = None,
+    chat_template_kwargs: dict | None = None,
 ) -> int:
     """Say what ``max_length`` does to one row's supervised span.
 
@@ -85,6 +140,7 @@ def _classify_row(
         tools=json.loads(tools) if isinstance(tools, str) else tools,
         return_dict=True,
         return_assistant_tokens_mask=True,
+        **(chat_template_kwargs or {}),
     )
     mask = rendered["assistant_masks"]
 
@@ -130,10 +186,12 @@ MESSAGES_FEATURES = Features(
 def _filter_sft_rows(
     ds: Dataset,
     num_proc: int,
+    seed: int = 42,
     *,
     tokenizer: PreTrainedTokenizerBase,
     max_length: int | None = None,
     truncated_span_action: str = "warn",
+    thinking_omission_probability: float | None = None,
 ) -> Dataset:
     """Drop rows that contribute nothing to the SFT loss, and report what does.
 
@@ -198,10 +256,19 @@ def _filter_sft_rows(
             "Check the dataset and its transform."
         )
 
+    if thinking_omission_probability is not None:
+        ds = _with_thinking_instructions(ds, thinking_omission_probability, seed, num_proc)
+
     # remove_columns keeps the map cache tiny: it holds the verdict alone, not a copy of the data.
     verdicts = ds.map(
         lambda row: {
-            "verdict": _classify_row(row["messages"], tokenizer, max_length, tools=row.get("tools"))
+            "verdict": _classify_row(
+                row["messages"],
+                tokenizer,
+                max_length,
+                tools=row.get("tools"),
+                chat_template_kwargs=row.get("chat_template_kwargs"),
+            )
         },
         num_proc=num_proc,
         remove_columns=ds.column_names,
@@ -301,7 +368,18 @@ def _filter_sft_rows(
             "\n".join(sorted(patterns)),
         )
 
-    return ds.select(keep)
+    result = ds.select(keep)
+    if thinking_omission_probability is not None:
+        instructions = Counter(
+            row["thinking_instruction"] for row in result["chat_template_kwargs"]
+        )
+        logger.info(
+            "Surviving thinking instructions: %d explicit, %d omitted, %d no_think.",
+            instructions["think"],
+            instructions[None],
+            instructions["no_think"],
+        )
+    return result
 
 
 def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
@@ -320,6 +398,11 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
         Ready to call ``.train()``.
     """
     mc = config.sft  # method-specific config
+
+    conditioning = config.thinking_conditioning
+    omission_probability = (
+        conditioning.default_mode_omission_probability if conditioning.enable else None
+    )
 
     tokenizer = build_tokenizer(config)
 
@@ -366,6 +449,7 @@ def build_sft_trainer(config: PostTrainingConfig, run_dir: Path) -> SFTTrainer:
                 # drop rows the trainer still trains on.
                 max_length=mc.max_seq_length,
                 truncated_span_action=mc.truncated_span_action,
+                thinking_omission_probability=omission_probability,
             ),
             columns_to_keep=["messages", "tools"],
             features=MESSAGES_FEATURES,
