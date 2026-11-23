@@ -24,6 +24,7 @@ Any extra arguments are forwarded as OmegaConf dot-list overrides::
 from __future__ import annotations
 
 import argparse
+import json
 import statistics
 import sys
 from functools import partial
@@ -67,6 +68,17 @@ def _template_kwargs(row_kwargs: list | None, idx: int) -> dict:
     if row_kwargs is None:
         return {}
     return row_kwargs[idx] or {}
+
+
+def _json_tools(tools: Any) -> list | None:
+    """Decode a ``tools`` column the way TRL and the SFT row filter do.
+
+    The column is stored as a JSON string (see ``MESSAGES_FEATURES``); datasets
+    fills it with null when the source has no tools.
+    """
+    if isinstance(tools, str):
+        return json.loads(tools)
+    return tools
 
 
 # ── Pretty printing helpers ─────────────────────────────────────────────────
@@ -153,7 +165,9 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
         ds = load_dataset(entry.path, split=entry.split, **load_kwargs)
 
         row_kwargs = None
-        if omission_probability is not None:
+        if omission_probability is not None and (
+            args.show_formatted or args.show_tokens or args.show_stats
+        ):
             view = ds
             if entry.transform is not None:
                 view = ds.map(
@@ -165,7 +179,7 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
                 view = _with_thinking_instructions(
                     view, omission_probability, config.data.seed + idx, num_proc
                 )
-                row_kwargs = view["chat_template_kwargs"]
+                row_kwargs = view.select(range(min(n, len(view))))["chat_template_kwargs"]
 
         # ── Raw ─────────────────────────────────────────────────────
         if args.show_raw:
@@ -202,6 +216,7 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
                         messages,
                         tokenize=False,
                         add_generation_prompt=False,
+                        tools=_json_tools(row.get("tools")),
                         **_template_kwargs(row_kwargs, i),
                     )
                 except Exception as exc:
@@ -229,6 +244,7 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
                         messages,
                         tokenize=True,
                         add_generation_prompt=False,
+                        tools=_json_tools(row.get("tools")),
                         **_template_kwargs(row_kwargs, i),
                     )
                 except Exception as exc:
@@ -269,6 +285,7 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
                         messages,
                         tokenize=True,
                         add_generation_prompt=False,
+                        tools=_json_tools(row.get("tools")),
                         **_template_kwargs(row_kwargs, i),
                     )
                     lengths.append(len(tids))
@@ -314,7 +331,7 @@ def _run_count_tokens(args: argparse.Namespace, cli_overrides: list[str]) -> Non
     features = None
     dataset_filter_fn = None
     if config.method == "sft":
-        columns_to_keep = ["messages"]
+        columns_to_keep = ["messages", "tools"]
         features = MESSAGES_FEATURES
         dataset_filter_fn = partial(
             _filter_sft_rows,
@@ -339,6 +356,7 @@ def _run_count_tokens(args: argparse.Namespace, cli_overrides: list[str]) -> Non
             x["messages"],
             tokenize=True,
             add_generation_prompt=False,
+            tools=_json_tools(x.get("tools")),
             **(x.get("chat_template_kwargs") or {}),
             desc="Tokenizing dataset",
         ),
