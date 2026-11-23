@@ -52,6 +52,23 @@ def _extract_messages(row: dict) -> list | None:
     return None
 
 
+def _thinking_omission_probability(config: PostTrainingConfig) -> float | None:
+    """Omission probability the SFT trainer passes to its row filter.
+
+    ``None`` when thinking conditioning is disabled, matching
+    :func:`post_training.methods.sft.build_sft_trainer`.
+    """
+    conditioning = config.thinking_conditioning
+    return conditioning.default_mode_omission_probability if conditioning.enable else None
+
+
+def _template_kwargs(row_kwargs: list | None, idx: int) -> dict:
+    """Per-row ``chat_template_kwargs`` assigned by the thinking-conditioning filter."""
+    if row_kwargs is None:
+        return {}
+    return row_kwargs[idx] or {}
+
+
 # ── Pretty printing helpers ─────────────────────────────────────────────────
 
 _SEPARATOR = "─" * 72
@@ -112,12 +129,16 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
     # ── Lazy imports (heavy) ────────────────────────────────────────
     from datasets import load_dataset
 
+    from post_training.data.loader import _resolve_num_proc
     from post_training.data.transforms import get_transform
     from post_training.methods.common import build_tokenizer
+    from post_training.methods.sft import _with_thinking_instructions
 
     n = args.num_samples
+    num_proc = _resolve_num_proc(config.data.num_proc)
+    omission_probability = _thinking_omission_probability(config)
 
-    for entry in config.data.datasets:
+    for idx, entry in enumerate(config.data.datasets):
         print(f"\n{'═' * 72}")
         print(f"  Dataset: {entry.name}  ({entry.path}, split={entry.split})")
         print(f"{'═' * 72}")
@@ -130,6 +151,21 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
             load_kwargs["data_dir"] = entry.data_dir
 
         ds = load_dataset(entry.path, split=entry.split, **load_kwargs)
+
+        row_kwargs = None
+        if omission_probability is not None:
+            view = ds
+            if entry.transform is not None:
+                view = ds.map(
+                    get_transform(entry.transform),
+                    num_proc=num_proc,
+                    desc=f"Applying transform '{entry.transform}'",
+                )
+            if "messages" in view.column_names:
+                view = _with_thinking_instructions(
+                    view, omission_probability, config.data.seed + idx, num_proc
+                )
+                row_kwargs = view["chat_template_kwargs"]
 
         # ── Raw ─────────────────────────────────────────────────────
         if args.show_raw:
@@ -163,11 +199,17 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
                     continue
                 try:
                     formatted = tokenizer.apply_chat_template(
-                        messages, tokenize=False, add_generation_prompt=False
+                        messages,
+                        tokenize=False,
+                        add_generation_prompt=False,
+                        **_template_kwargs(row_kwargs, i),
                     )
                 except Exception as exc:
                     formatted = f"<ERROR applying template: {exc}>"
-                print(f"\n  [Sample {i}]\n{formatted}")
+                header = f"\n  [Sample {i}]"
+                if row_kwargs is not None:
+                    header += f"  thinking_instruction={row_kwargs[i]['thinking_instruction']!r}"
+                print(f"{header}\n{formatted}")
 
         # ── Tokens ──────────────────────────────────────────────────
         if args.show_tokens:
@@ -184,13 +226,19 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
                     continue
                 try:
                     token_ids = tokenizer.apply_chat_template(
-                        messages, tokenize=True, add_generation_prompt=False
+                        messages,
+                        tokenize=True,
+                        add_generation_prompt=False,
+                        **_template_kwargs(row_kwargs, i),
                     )
                 except Exception as exc:
                     print(f"\n  [Sample {i}] <ERROR: {exc}>")
                     continue
                 decoded = [tokenizer.decode([tid]) for tid in token_ids]
-                print(f"\n  [Sample {i}]  length={len(token_ids)}")
+                header = f"\n  [Sample {i}]  length={len(token_ids)}"
+                if row_kwargs is not None:
+                    header += f"  thinking_instruction={row_kwargs[i]['thinking_instruction']!r}"
+                print(header)
                 # Show first 40 tokens.
                 preview = list(zip(token_ids[:40], decoded[:40]))
                 for tid, tok in preview:
@@ -218,7 +266,10 @@ def _run_inspect(args: argparse.Namespace, cli_overrides: list[str]) -> None:
                     continue
                 try:
                     tids = tokenizer.apply_chat_template(
-                        messages, tokenize=True, add_generation_prompt=False
+                        messages,
+                        tokenize=True,
+                        add_generation_prompt=False,
+                        **_template_kwargs(row_kwargs, i),
                     )
                     lengths.append(len(tids))
                 except Exception:
@@ -269,6 +320,8 @@ def _run_count_tokens(args: argparse.Namespace, cli_overrides: list[str]) -> Non
             _filter_sft_rows,
             tokenizer=tokenizer,
             max_length=config.sft.max_seq_length,
+            truncated_span_action=config.sft.truncated_span_action,
+            thinking_omission_probability=_thinking_omission_probability(config),
         )
 
     # Load dataset mix
@@ -286,6 +339,7 @@ def _run_count_tokens(args: argparse.Namespace, cli_overrides: list[str]) -> Non
             x["messages"],
             tokenize=True,
             add_generation_prompt=False,
+            **(x.get("chat_template_kwargs") or {}),
             desc="Tokenizing dataset",
         ),
         num_proc=_resolve_num_proc(config.data.num_proc),
