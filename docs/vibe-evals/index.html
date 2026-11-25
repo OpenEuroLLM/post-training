@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vibe evals</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1c2128; --muted: #5b6573;
+    --line: #d9dee5; --accent: #1f6feb; --think: #f1f4f8; --ok: #1a7f37; --warn: #9a6700;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1318; --card: #171c23; --text: #e4e8ee; --muted: #9aa5b3;
+      --line: #2b333d; --accent: #6ea8ff; --think: #11161c; --ok: #4ac26b; --warn: #d4a72c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header {
+    position: sticky; top: 0; z-index: 1; background: var(--card);
+    border-bottom: 1px solid var(--line); padding: 12px 16px;
+  }
+  h1 { margin: 0 0 8px; font-size: 18px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  label { color: var(--muted); font-size: 13px; }
+  select, input[type="file"] {
+    font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; max-width: 100%;
+  }
+  #meta { margin: 8px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+  main { max-width: 1400px; margin: 0 auto; padding: 16px; }
+  .entry {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px; margin-bottom: 16px;
+  }
+  .entry h2 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+  .prompt { margin: 0 0 6px; font-size: 16px; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .reference { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+  .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+  .mode { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; min-width: 0; }
+  .mode h3 { margin: 0 0 6px; font-size: 13px; color: var(--accent); }
+  .badge { margin-left: 8px; font-weight: 400; color: var(--muted); }
+  .badge.ok { color: var(--ok); }
+  .badge.warn { color: var(--warn); }
+  .text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+  details { background: var(--think); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  details .text { margin-top: 6px; color: var(--muted); font-size: 14px; }
+  .empty { color: var(--muted); font-style: italic; }
+  #status { color: var(--muted); }
+  #status code { background: var(--think); padding: 1px 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Vibe evals</h1>
+  <div class="controls">
+    <label>Run <select id="run"></select></label>
+    <label>Language <select id="lang"></select></label>
+    <label><input type="checkbox" id="expand"> Show reasoning</label>
+    <label>Load JSON files <input type="file" id="files" accept=".json,application/json" multiple></label>
+  </div>
+  <p id="meta"></p>
+</header>
+<main>
+  <div id="status"></div>
+  <div id="entries"></div>
+</main>
+
+<script>
+"use strict";
+
+// Run name -> content of one output file of scripts/generate_responses.py.
+const runs = new Map();
+const STOP_TOKEN = "<|im_end|>";
+const el = (id) => document.getElementById(id);
+
+function node(tag, className, text) {
+  const n = document.createElement(tag);
+  if (className) n.className = className;
+  if (text !== undefined) n.textContent = text; // textContent only: responses are untrusted text
+  return n;
+}
+
+function addRun(name, data) {
+  if (!data || !Array.isArray(data.prompts)) throw new Error(`${name}: no "prompts" list`);
+  runs.set(name, data);
+}
+
+// Split a response into its <think> block, its answer, and its end state.
+function splitResponse(raw) {
+  let text = raw;
+  const stopped = text.endsWith(STOP_TOKEN);
+  if (stopped) text = text.slice(0, -STOP_TOKEN.length);
+
+  let reasoning = null;
+  let closed = true;
+  const open = text.indexOf("<think>");
+  if (open !== -1 && text.slice(0, open).trim() === "") {
+    const close = text.indexOf("</think>", open);
+    closed = close !== -1;
+    reasoning = text.slice(open + "<think>".length, closed ? close : undefined).trim();
+    text = closed ? text.slice(close + "</think>".length) : "";
+  }
+  return { reasoning, closed, answer: text.trim(), stopped };
+}
+
+function renderMode(mode, raw, expand) {
+  const box = node("section", "mode");
+  const title = node("h3", "", mode);
+  box.append(title);
+  if (typeof raw !== "string") {
+    box.append(node("p", "empty", "No response in the file."));
+    return box;
+  }
+  const { reasoning, closed, answer, stopped } = splitResponse(raw);
+  title.append(node("span", "badge", `${raw.length.toLocaleString()} characters`));
+  if (stopped) title.append(node("span", "badge ok", `ends with ${STOP_TOKEN}`));
+
+  if (reasoning !== null) {
+    const details = node("details");
+    details.open = expand || !closed;
+    let label = reasoning ? `Reasoning (${reasoning.length.toLocaleString()} characters)` : "Reasoning (empty)";
+    if (!closed) label += ", not closed";
+    details.append(node("summary", closed ? "" : "badge warn", label));
+    details.append(node("pre", "text", reasoning));
+    box.append(details);
+  }
+  const body = node("pre", answer ? "text" : "text empty", answer || "No answer text.");
+  body.dir = "auto";
+  box.append(body);
+  return box;
+}
+
+function renderEntry(entry, expand) {
+  const card = node("article", "entry");
+  const head = [`#${entry.prompt_index ?? "?"}`, entry.category].filter(Boolean).join(" · ");
+  card.append(node("h2", "", head));
+  const prompt = node("p", "prompt", entry.prompt);
+  prompt.dir = "auto";
+  card.append(prompt);
+  if (entry.reference_answer) card.append(node("p", "reference", `Reference: ${entry.reference_answer}`));
+
+  const modes = node("div", "modes");
+  const response = entry.generated_response;
+  if (response && typeof response === "object") {
+    for (const [mode, raw] of Object.entries(response)) modes.append(renderMode(mode, raw, expand));
+  } else {
+    modes.append(renderMode("response", response, expand));
+  }
+  card.append(modes);
+  return card;
+}
+
+function fillSelect(select, options, keep) {
+  select.replaceChildren(...options.map(([value, label]) => {
+    const option = node("option", "", label);
+    option.value = value;
+    return option;
+  }));
+  if (options.some(([value]) => value === keep)) select.value = keep;
+}
+
+function refreshRuns() {
+  fillSelect(el("run"), [...runs.keys()].map((name) => [name, name]), el("run").value);
+  refreshLanguages();
+}
+
+function refreshLanguages() {
+  const data = runs.get(el("run").value);
+  const languages = new Map();
+  for (const entry of data ? data.prompts : []) {
+    if (!languages.has(entry.lang)) languages.set(entry.lang, entry.language_name || entry.lang);
+  }
+  const options = [...languages].sort((a, b) => a[1].localeCompare(b[1]));
+  fillSelect(el("lang"), options.map(([code, name]) => [code, `${name} (${code})`]), el("lang").value);
+  render();
+}
+
+function render() {
+  const data = runs.get(el("run").value);
+  el("entries").replaceChildren();
+  if (!data) {
+    el("meta").textContent = "";
+    el("status").innerHTML =
+      "No run is loaded. Put the output files of <code>scripts/generate_responses.py</code> " +
+      "next to this page and list them in <code>runs.json</code>, or select the files with " +
+      "<em>Load JSON files</em>.";
+    return;
+  }
+  el("status").textContent = "";
+  const lang = el("lang").value;
+  const entries = data.prompts
+    .filter((entry) => entry.lang === lang)
+    .sort((a, b) => (a.prompt_index ?? 0) - (b.prompt_index ?? 0));
+  const info = ["model", "chat_template", "max_new_tokens", "temperature"]
+    .filter((key) => data[key] !== undefined)
+    .map((key) => `${key}: ${data[key]}`);
+  el("meta").textContent = [`${entries.length} prompts`, ...info].join(" · ");
+  const expand = el("expand").checked;
+  el("entries").append(...entries.map((entry) => renderEntry(entry, expand)));
+}
+
+// runs.json: [{"name": "<run name>", "file": "<path relative to this page>"}, ...]
+async function loadManifest() {
+  let manifest;
+  try {
+    const res = await fetch("runs.json", { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    manifest = await res.json();
+  } catch (err) {
+    return; // No manifest, or the page is open as a local file. The file input still works.
+  }
+  const errors = [];
+  for (const { name, file } of manifest) {
+    try {
+      const res = await fetch(file, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      addRun(name || file, await res.json());
+    } catch (err) {
+      errors.push(`${file}: ${err.message}`);
+    }
+  }
+  refreshRuns();
+  if (errors.length) el("status").textContent = `Could not load: ${errors.join("; ")}`;
+}
+
+el("files").addEventListener("change", async (event) => {
+  const errors = [];
+  for (const file of event.target.files) {
+    try {
+      addRun(file.name.replace(/\.json$/i, ""), JSON.parse(await file.text()));
+    } catch (err) {
+      errors.push(`${file.name}: ${err.message}`);
+    }
+  }
+  refreshRuns();
+  if (errors.length) el("status").textContent = `Could not load: ${errors.join("; ")}`;
+});
+el("run").addEventListener("change", refreshLanguages);
+el("lang").addEventListener("change", render);
+el("expand").addEventListener("change", render);
+
+render();
+loadManifest();
+</script>
+</body>
+</html>
