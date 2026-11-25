@@ -1,0 +1,1852 @@
+{
+  "prompts": [
+    {
+      "lang": "bul",
+      "language_name": "Bulgarian",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Влак тръгва в 09:40. Изминава 150 км със скорост 60 км/ч, спира за 20 минути и след това изминава още 90 км със скорост 45 км/ч. В колко часа пристига?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "bul",
+      "language_name": "Bulgarian",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Охлюв се катери по стена, висока 10 метра. Всеки ден се изкачва с 3 метра, а всяка нощ се плъзга надолу с 2 метра. На кой ден ще стигне върха?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "bul",
+      "language_name": "Bulgarian",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Анна е по-висока от Бен. Бен е по-висок от Клара. Давид е по-нисък от Клара, но по-висок от Ева. Кой е вторият най-нисък?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "bul",
+      "language_name": "Bulgarian",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "В торба има 3 червени и 2 сини топки. Изваждате две топки, без да връщате първата. Каква е вероятността и двете топки да са червени?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "bul",
+      "language_name": "Bulgarian",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Имате една кана от 3 литра и една кана от 5 литра и никакъв друг съд. Как можете да отмерите точно 4 литра вода? Опишете стъпките.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "bul",
+      "language_name": "Bulgarian",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Коя държава спечели Световното първенство по футбол през 1946 г.?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "bul",
+      "language_name": "Bulgarian",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Защо на Земята има годишни времена? Обяснете в три или четири изречения.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "bul",
+      "language_name": "Bulgarian",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Избройте пет животни по азбучен ред, по едно на ред, без никакъв друг текст."
+    },
+    {
+      "lang": "bul",
+      "language_name": "Bulgarian",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Напишете кратък и учтив имейл до моя хазяин. Отоплението не работи от три дни и искам да бъде поправено."
+    },
+    {
+      "lang": "bul",
+      "language_name": "Bulgarian",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Напишете стихотворение от четири стиха за есента."
+    },
+    {
+      "lang": "hrv",
+      "language_name": "Croatian",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Vlak kreće u 09:40. Prijeđe 150 km brzinom od 60 km/h, stoji 20 minuta, a zatim prijeđe još 90 km brzinom od 45 km/h. U koliko sati stiže?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "hrv",
+      "language_name": "Croatian",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Puž se penje uz zid visok 10 metara. Svaki dan popne se 3 metra, a svake noći sklizne 2 metra. Kojeg će dana stići do vrha?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "hrv",
+      "language_name": "Croatian",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna je viša od Bena. Ben je viši od Clare. David je niži od Clare, ali viši od Eve. Tko je drugi najniži?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "hrv",
+      "language_name": "Croatian",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "U vrećici su 3 crvene i 2 plave kuglice. Izvlačiš dvije kuglice bez vraćanja prve. Kolika je vjerojatnost da su obje kuglice crvene?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "hrv",
+      "language_name": "Croatian",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Imaš vrč od 3 litre i vrč od 5 litara i nijednu drugu posudu. Kako možeš odmjeriti točno 4 litre vode? Opiši korake.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "hrv",
+      "language_name": "Croatian",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Koja je država osvojila Svjetsko nogometno prvenstvo 1946. godine?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "hrv",
+      "language_name": "Croatian",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Zašto na Zemlji postoje godišnja doba? Objasni u tri ili četiri rečenice.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "hrv",
+      "language_name": "Croatian",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Navedi pet životinja abecednim redom, svaku u svom retku, bez ikakvog drugog teksta."
+    },
+    {
+      "lang": "hrv",
+      "language_name": "Croatian",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Napiši kratak i pristojan e-mail mom stanodavcu. Grijanje ne radi već tri dana i želim da se popravi."
+    },
+    {
+      "lang": "hrv",
+      "language_name": "Croatian",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Napiši pjesmu od četiri stiha o jeseni."
+    },
+    {
+      "lang": "ces",
+      "language_name": "Czech",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Vlak odjíždí v 09:40. Ujede 150 km rychlostí 60 km/h, zastaví na 20 minut a poté ujede dalších 90 km rychlostí 45 km/h. V kolik hodin dorazí do cíle?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "ces",
+      "language_name": "Czech",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Šnek leze po zdi vysoké 10 metrů. Každý den vyleze o 3 metry výš a každou noc sklouzne o 2 metry dolů. Který den dosáhne vrcholu?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "ces",
+      "language_name": "Czech",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna je vyšší než Ben. Ben je vyšší než Clara. David je menší než Clara, ale vyšší než Eva. Kdo je druhý nejmenší?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "ces",
+      "language_name": "Czech",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "V sáčku jsou 3 červené a 2 modré kuličky. Vytáhneš dvě kuličky a první nevracíš zpět. Jaká je pravděpodobnost, že jsou obě kuličky červené?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "ces",
+      "language_name": "Czech",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Máš třílitrový a pětilitrový džbán a žádnou jinou nádobu. Jak odměříš přesně 4 litry vody? Popiš jednotlivé kroky.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "ces",
+      "language_name": "Czech",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Která země vyhrála mistrovství světa ve fotbale v roce 1946?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "ces",
+      "language_name": "Czech",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Proč se na Zemi střídají roční období? Vysvětli to ve třech nebo čtyřech větách.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "ces",
+      "language_name": "Czech",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Vyjmenuj pět zvířat v abecedním pořadí, každé na samostatném řádku, bez jakéhokoli dalšího textu."
+    },
+    {
+      "lang": "ces",
+      "language_name": "Czech",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Napiš krátký zdvořilý e-mail mému pronajímateli. Topení už tři dny nefunguje a chci, aby bylo opraveno."
+    },
+    {
+      "lang": "ces",
+      "language_name": "Czech",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Napiš čtyřveršovou báseň o podzimu."
+    },
+    {
+      "lang": "dan",
+      "language_name": "Danish",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Et tog afgår kl. 09:40. Det kører 150 km med 60 km/t, holder stille i 20 minutter og kører derefter 90 km mere med 45 km/t. Hvad er klokken, når det ankommer?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "dan",
+      "language_name": "Danish",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "En snegl kravler op ad en mur, der er 10 meter høj. Hver dag kravler den 3 meter op, og hver nat glider den 2 meter ned. På hvilken dag når den toppen?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "dan",
+      "language_name": "Danish",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna er højere end Ben. Ben er højere end Clara. David er lavere end Clara, men højere end Eva. Hvem er den næstlaveste?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "dan",
+      "language_name": "Danish",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "En pose indeholder 3 røde kugler og 2 blå kugler. Du trækker to kugler uden at lægge den første tilbage. Hvad er sandsynligheden for, at begge kugler er røde?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "dan",
+      "language_name": "Danish",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Du har en kande på 3 liter og en kande på 5 liter og ingen andre beholdere. Hvordan kan du måle præcis 4 liter vand af? Beskriv trinene.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "dan",
+      "language_name": "Danish",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Hvilket land vandt verdensmesterskabet i fodbold i 1946?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "dan",
+      "language_name": "Danish",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Hvorfor er der årstider på Jorden? Forklar det med tre eller fire sætninger.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "dan",
+      "language_name": "Danish",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Nævn fem dyr i alfabetisk rækkefølge, ét pr. linje, uden anden tekst."
+    },
+    {
+      "lang": "dan",
+      "language_name": "Danish",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Skriv en kort og høflig e-mail til min udlejer. Varmen har ikke virket i tre dage, og jeg vil gerne have den repareret."
+    },
+    {
+      "lang": "dan",
+      "language_name": "Danish",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Skriv et digt på fire linjer om efteråret."
+    },
+    {
+      "lang": "nld",
+      "language_name": "Dutch",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Een trein vertrekt om 09:40. Hij rijdt 150 km met 60 km/u, staat 20 minuten stil en rijdt daarna nog 90 km met 45 km/u. Hoe laat komt hij aan?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "nld",
+      "language_name": "Dutch",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Een slak klimt tegen een muur van 10 meter hoog. Elke dag klimt hij 3 meter omhoog en elke nacht glijdt hij 2 meter naar beneden. Op welke dag bereikt hij de top?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "nld",
+      "language_name": "Dutch",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna is langer dan Ben. Ben is langer dan Clara. David is kleiner dan Clara, maar langer dan Eva. Wie is op één na de kleinste?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "nld",
+      "language_name": "Dutch",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "In een zak zitten 3 rode en 2 blauwe ballen. Je pakt twee ballen zonder de eerste terug te leggen. Wat is de kans dat beide ballen rood zijn?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "nld",
+      "language_name": "Dutch",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Je hebt een kan van 3 liter en een kan van 5 liter, en verder niets om water in te doen. Hoe kun je precies 4 liter water afmeten? Beschrijf de stappen.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "nld",
+      "language_name": "Dutch",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Welk land won het wereldkampioenschap voetbal in 1946?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "nld",
+      "language_name": "Dutch",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Waarom zijn er seizoenen op aarde? Leg het uit in drie of vier zinnen.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "nld",
+      "language_name": "Dutch",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Noem vijf dieren in alfabetische volgorde, één per regel, zonder verdere tekst."
+    },
+    {
+      "lang": "nld",
+      "language_name": "Dutch",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Schrijf een korte, beleefde e-mail aan mijn huisbaas. De verwarming doet het al drie dagen niet en ik wil dat die gerepareerd wordt."
+    },
+    {
+      "lang": "nld",
+      "language_name": "Dutch",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Schrijf een gedicht van vier regels over de herfst."
+    },
+    {
+      "lang": "eng",
+      "language_name": "English",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "A train leaves at 09:40. It travels 150 km at 60 km/h, stops for 20 minutes, and then travels 90 km at 45 km/h. At what time does it arrive?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "eng",
+      "language_name": "English",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "A snail climbs a wall that is 10 metres high. Each day it climbs 3 metres, and each night it slides down 2 metres. On which day does it reach the top?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "eng",
+      "language_name": "English",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna is taller than Ben. Ben is taller than Clara. David is shorter than Clara but taller than Eva. Who is the second shortest?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "eng",
+      "language_name": "English",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "A bag contains 3 red balls and 2 blue balls. You take out two balls without putting the first one back. What is the probability that both balls are red?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "eng",
+      "language_name": "English",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "You have a 3-litre jug and a 5-litre jug, and no other container. How can you measure exactly 4 litres of water? Describe the steps.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "eng",
+      "language_name": "English",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Which country won the football World Cup in 1946?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "eng",
+      "language_name": "English",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Why are there seasons on Earth? Explain in three or four sentences.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "eng",
+      "language_name": "English",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Name five animals in alphabetical order, one per line, with no other text."
+    },
+    {
+      "lang": "eng",
+      "language_name": "English",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Write a short, polite email to my landlord. The heating has not worked for three days and I want it repaired."
+    },
+    {
+      "lang": "eng",
+      "language_name": "English",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Write a poem of four lines about autumn."
+    },
+    {
+      "lang": "est",
+      "language_name": "Estonian",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Rong väljub kell 09:40. See sõidab 150 km kiirusega 60 km/h, peatub 20 minutit ja sõidab seejärel veel 90 km kiirusega 45 km/h. Mis kell rong kohale jõuab?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "est",
+      "language_name": "Estonian",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Tigu ronib mööda 10 meetri kõrgust seina. Iga päev ronib ta 3 meetrit üles ja igal ööl libiseb 2 meetrit alla. Mitmendal päeval jõuab ta tippu?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "est",
+      "language_name": "Estonian",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna on pikem kui Ben. Ben on pikem kui Clara. David on lühem kui Clara, aga pikem kui Eva. Kes on pikkuselt eelviimane?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "est",
+      "language_name": "Estonian",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "Kotis on 3 punast ja 2 sinist kuuli. Võtad välja kaks kuuli ilma esimest tagasi panemata. Kui suur on tõenäosus, et mõlemad kuulid on punased?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "est",
+      "language_name": "Estonian",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Sul on 3-liitrine kann ja 5-liitrine kann ning mitte ühtegi muud anumat. Kuidas saad mõõta täpselt 4 liitrit vett? Kirjelda samme.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "est",
+      "language_name": "Estonian",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Milline riik võitis 1946. aasta jalgpalli maailmameistrivõistlused?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "est",
+      "language_name": "Estonian",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Miks on Maal aastaajad? Selgita kolme või nelja lausega.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "est",
+      "language_name": "Estonian",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Nimeta viis looma tähestikulises järjekorras, igaüks eraldi real, ilma muu tekstita."
+    },
+    {
+      "lang": "est",
+      "language_name": "Estonian",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Kirjuta lühike ja viisakas e-kiri minu üürileandjale. Küte ei ole kolm päeva töötanud ja ma soovin, et see parandataks."
+    },
+    {
+      "lang": "est",
+      "language_name": "Estonian",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Kirjuta neljarealine luuletus sügisest."
+    },
+    {
+      "lang": "fin",
+      "language_name": "Finnish",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Juna lähtee kello 09.40. Se kulkee 150 km nopeudella 60 km/h, pysähtyy 20 minuutiksi ja kulkee sitten vielä 90 km nopeudella 45 km/h. Mihin aikaan se saapuu perille?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "fin",
+      "language_name": "Finnish",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Etana kiipeää 10 metriä korkeaa seinää. Joka päivä se kiipeää 3 metriä ylöspäin, ja joka yö se liukuu 2 metriä alaspäin. Monentenako päivänä se pääsee huipulle?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "fin",
+      "language_name": "Finnish",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna on pidempi kuin Ben. Ben on pidempi kuin Clara. David on lyhyempi kuin Clara mutta pidempi kuin Eva. Kuka on toiseksi lyhin?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "fin",
+      "language_name": "Finnish",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "Pussissa on 3 punaista ja 2 sinistä palloa. Otat kaksi palloa palauttamatta ensimmäistä takaisin. Millä todennäköisyydellä molemmat pallot ovat punaisia?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "fin",
+      "language_name": "Finnish",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Sinulla on 3 litran kannu ja 5 litran kannu eikä mitään muuta astiaa. Miten voit mitata täsmälleen 4 litraa vettä? Kuvaile vaiheet.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "fin",
+      "language_name": "Finnish",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Mikä maa voitti jalkapallon maailmanmestaruuden vuonna 1946?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "fin",
+      "language_name": "Finnish",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Miksi maapallolla on vuodenaikoja? Selitä kolmella tai neljällä virkkeellä.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "fin",
+      "language_name": "Finnish",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Nimeä viisi eläintä aakkosjärjestyksessä, yksi kullekin riville, ilman muuta tekstiä."
+    },
+    {
+      "lang": "fin",
+      "language_name": "Finnish",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Kirjoita lyhyt ja kohtelias sähköposti vuokranantajalleni. Lämmitys ei ole toiminut kolmeen päivään, ja haluan, että se korjataan."
+    },
+    {
+      "lang": "fin",
+      "language_name": "Finnish",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Kirjoita nelisäkeinen runo syksystä."
+    },
+    {
+      "lang": "fra",
+      "language_name": "French",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Un train part à 9 h 40. Il parcourt 150 km à 60 km/h, s'arrête pendant 20 minutes, puis parcourt encore 90 km à 45 km/h. À quelle heure arrive-t-il ?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "fra",
+      "language_name": "French",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Un escargot grimpe le long d'un mur de 10 mètres de haut. Chaque jour, il monte de 3 mètres et, chaque nuit, il redescend de 2 mètres. Quel jour atteint-il le sommet ?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "fra",
+      "language_name": "French",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna est plus grande que Ben. Ben est plus grand que Clara. David est plus petit que Clara, mais plus grand qu'Eva. Qui est la deuxième personne la plus petite ?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "fra",
+      "language_name": "French",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "Un sac contient 3 boules rouges et 2 boules bleues. Vous tirez deux boules sans remettre la première. Quelle est la probabilité que les deux boules soient rouges ?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "fra",
+      "language_name": "French",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Vous avez une cruche de 3 litres et une cruche de 5 litres, et aucun autre récipient. Comment mesurer exactement 4 litres d'eau ? Décrivez les étapes.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "fra",
+      "language_name": "French",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Quel pays a remporté la Coupe du monde de football en 1946 ?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "fra",
+      "language_name": "French",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Pourquoi y a-t-il des saisons sur Terre ? Expliquez en trois ou quatre phrases.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "fra",
+      "language_name": "French",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Citez cinq animaux par ordre alphabétique, un par ligne, sans aucun autre texte."
+    },
+    {
+      "lang": "fra",
+      "language_name": "French",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Rédigez un e-mail court et poli à l'attention de mon propriétaire. Le chauffage ne fonctionne plus depuis trois jours et je souhaite qu'il soit réparé."
+    },
+    {
+      "lang": "fra",
+      "language_name": "French",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Écrivez un poème de quatre vers sur l'automne."
+    },
+    {
+      "lang": "deu",
+      "language_name": "German",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Ein Zug fährt um 09:40 Uhr ab. Er fährt 150 km mit 60 km/h, hält 20 Minuten lang an und fährt dann noch 90 km mit 45 km/h. Um wie viel Uhr kommt er an?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "deu",
+      "language_name": "German",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Eine Schnecke klettert eine 10 Meter hohe Mauer hinauf. Jeden Tag klettert sie 3 Meter nach oben, und jede Nacht rutscht sie 2 Meter wieder hinunter. An welchem Tag erreicht sie die Spitze?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "deu",
+      "language_name": "German",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna ist größer als Ben. Ben ist größer als Clara. David ist kleiner als Clara, aber größer als Eva. Wer ist am zweitkleinsten?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "deu",
+      "language_name": "German",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "In einem Beutel befinden sich 3 rote und 2 blaue Kugeln. Du ziehst zwei Kugeln, ohne die erste zurückzulegen. Wie groß ist die Wahrscheinlichkeit, dass beide Kugeln rot sind?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "deu",
+      "language_name": "German",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Du hast einen 3-Liter-Krug und einen 5-Liter-Krug und kein weiteres Gefäß. Wie kannst du genau 4 Liter Wasser abmessen? Beschreibe die Schritte.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "deu",
+      "language_name": "German",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Welches Land hat die Fußball-Weltmeisterschaft 1946 gewonnen?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "deu",
+      "language_name": "German",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Warum gibt es auf der Erde Jahreszeiten? Erkläre es in drei oder vier Sätzen.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "deu",
+      "language_name": "German",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Nenne fünf Tiere in alphabetischer Reihenfolge, eines pro Zeile, ohne weiteren Text."
+    },
+    {
+      "lang": "deu",
+      "language_name": "German",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Schreibe eine kurze, höfliche E-Mail an meinen Vermieter. Die Heizung funktioniert seit drei Tagen nicht, und ich möchte, dass sie repariert wird."
+    },
+    {
+      "lang": "deu",
+      "language_name": "German",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Schreibe ein vierzeiliges Gedicht über den Herbst."
+    },
+    {
+      "lang": "ell",
+      "language_name": "Greek",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Ένα τρένο αναχωρεί στις 09:40. Διανύει 150 χλμ. με ταχύτητα 60 χλμ./ώρα, σταματά για 20 λεπτά και στη συνέχεια διανύει άλλα 90 χλμ. με ταχύτητα 45 χλμ./ώρα. Τι ώρα φτάνει;",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "ell",
+      "language_name": "Greek",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Ένα σαλιγκάρι σκαρφαλώνει σε έναν τοίχο ύψους 10 μέτρων. Κάθε μέρα ανεβαίνει 3 μέτρα και κάθε νύχτα γλιστράει 2 μέτρα προς τα κάτω. Ποια μέρα φτάνει στην κορυφή;",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "ell",
+      "language_name": "Greek",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Η Άννα είναι ψηλότερη από τον Μπεν. Ο Μπεν είναι ψηλότερος από την Κλάρα. Ο Ντέιβιντ είναι κοντύτερος από την Κλάρα αλλά ψηλότερος από την Εύα. Ποιος είναι ο δεύτερος πιο κοντός;",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "ell",
+      "language_name": "Greek",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "Μια σακούλα περιέχει 3 κόκκινες και 2 μπλε μπάλες. Βγάζεις δύο μπάλες χωρίς να βάλεις πίσω την πρώτη. Ποια είναι η πιθανότητα να είναι και οι δύο μπάλες κόκκινες;",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "ell",
+      "language_name": "Greek",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Έχεις μια κανάτα 3 λίτρων και μια κανάτα 5 λίτρων και κανένα άλλο δοχείο. Πώς μπορείς να μετρήσεις ακριβώς 4 λίτρα νερό; Περίγραψε τα βήματα.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "ell",
+      "language_name": "Greek",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Ποια χώρα κέρδισε το Παγκόσμιο Κύπελλο ποδοσφαίρου το 1946;",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "ell",
+      "language_name": "Greek",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Γιατί υπάρχουν εποχές στη Γη; Εξήγησε σε τρεις ή τέσσερις προτάσεις.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "ell",
+      "language_name": "Greek",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Γράψε πέντε ζώα με αλφαβητική σειρά, ένα σε κάθε γραμμή, χωρίς κανένα άλλο κείμενο."
+    },
+    {
+      "lang": "ell",
+      "language_name": "Greek",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Γράψε ένα σύντομο και ευγενικό email στον ιδιοκτήτη του σπιτιού μου. Η θέρμανση δεν λειτουργεί εδώ και τρεις μέρες και θέλω να επισκευαστεί."
+    },
+    {
+      "lang": "ell",
+      "language_name": "Greek",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Γράψε ένα ποίημα τεσσάρων στίχων για το φθινόπωρο."
+    },
+    {
+      "lang": "hun",
+      "language_name": "Hungarian",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Egy vonat 09:40-kor indul. 150 km-t tesz meg 60 km/h sebességgel, 20 percig áll, majd további 90 km-t tesz meg 45 km/h sebességgel. Hány órakor érkezik meg?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "hun",
+      "language_name": "Hungarian",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Egy csiga egy 10 méter magas falon mászik felfelé. Minden nap 3 métert mászik fel, és minden éjjel 2 métert csúszik vissza. Hányadik napon éri el a fal tetejét?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "hun",
+      "language_name": "Hungarian",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna magasabb, mint Ben. Ben magasabb, mint Clara. David alacsonyabb, mint Clara, de magasabb, mint Eva. Ki a második legalacsonyabb?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "hun",
+      "language_name": "Hungarian",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "Egy zsákban 3 piros és 2 kék golyó van. Kihúzol két golyót úgy, hogy az elsőt nem teszed vissza. Mekkora a valószínűsége, hogy mindkét golyó piros?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "hun",
+      "language_name": "Hungarian",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Van egy 3 literes és egy 5 literes kancsód, más edényed nincs. Hogyan tudsz pontosan 4 liter vizet kimérni? Írd le a lépéseket.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "hun",
+      "language_name": "Hungarian",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Melyik ország nyerte az 1946-os labdarúgó-világbajnokságot?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "hun",
+      "language_name": "Hungarian",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Miért vannak évszakok a Földön? Magyarázd el három vagy négy mondatban.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "hun",
+      "language_name": "Hungarian",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Sorolj fel öt állatot ábécérendben, soronként egyet, minden más szöveg nélkül."
+    },
+    {
+      "lang": "hun",
+      "language_name": "Hungarian",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Írj egy rövid, udvarias e-mailt a főbérlőmnek. A fűtés három napja nem működik, és szeretném, ha megjavíttatná."
+    },
+    {
+      "lang": "hun",
+      "language_name": "Hungarian",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Írj egy négysoros verset az őszről."
+    },
+    {
+      "lang": "gle",
+      "language_name": "Irish",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Fágann traein ag 09:40. Taistealaíonn sí 150 km ar luas 60 km/u, stopann sí ar feadh 20 nóiméad, agus ansin taistealaíonn sí 90 km eile ar luas 45 km/u. Cén t-am a shroicheann sí a ceann scríbe?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "gle",
+      "language_name": "Irish",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Tá seilide ag dreapadh balla atá 10 méadar ar airde. Gach lá dreapann sé 3 mhéadar suas, agus gach oíche sleamhnaíonn sé 2 mhéadar síos. Cén lá a shroichfidh sé an barr?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "gle",
+      "language_name": "Irish",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Tá Anna níos airde ná Ben. Tá Ben níos airde ná Clara. Tá David níos ísle ná Clara ach níos airde ná Eva. Cé hé an dara duine is ísle?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "gle",
+      "language_name": "Irish",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "Tá 3 liathróid dhearga agus 2 liathróid ghorma i mála. Tógann tú amach dhá liathróid gan an chéad cheann a chur ar ais. Cad é an dóchúlacht go bhfuil an dá liathróid dearg?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "gle",
+      "language_name": "Irish",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Tá crúiscín 3 lítear agus crúiscín 5 lítear agat, agus níl aon soitheach eile agat. Conas is féidir leat 4 lítear uisce go díreach a thomhas? Déan cur síos ar na céimeanna.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "gle",
+      "language_name": "Irish",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Cén tír a bhuaigh Corn Sacair an Domhain i 1946?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "gle",
+      "language_name": "Irish",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Cén fáth a bhfuil séasúir ar an Domhan? Mínigh é i dtrí nó ceithre abairt.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "gle",
+      "language_name": "Irish",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Ainmnigh cúig ainmhí in ord aibítre, ceann amháin ar gach líne, gan aon téacs eile."
+    },
+    {
+      "lang": "gle",
+      "language_name": "Irish",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Scríobh ríomhphost gearr béasach chuig mo thiarna talún. Níl an teas ag obair le trí lá agus ba mhaith liom go ndeiseofaí é."
+    },
+    {
+      "lang": "gle",
+      "language_name": "Irish",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Scríobh dán ceithre líne faoin bhfómhar."
+    },
+    {
+      "lang": "ita",
+      "language_name": "Italian",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Un treno parte alle 09:40. Percorre 150 km a 60 km/h, si ferma per 20 minuti e poi percorre altri 90 km a 45 km/h. A che ora arriva?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "ita",
+      "language_name": "Italian",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Una lumaca si arrampica su un muro alto 10 metri. Ogni giorno sale di 3 metri e ogni notte scivola giù di 2 metri. In quale giorno raggiunge la cima?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "ita",
+      "language_name": "Italian",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna è più alta di Ben. Ben è più alto di Clara. David è più basso di Clara ma più alto di Eva. Chi è il secondo più basso?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "ita",
+      "language_name": "Italian",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "Un sacchetto contiene 3 palline rosse e 2 palline blu. Estrai due palline senza rimettere dentro la prima. Qual è la probabilità che entrambe le palline siano rosse?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "ita",
+      "language_name": "Italian",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Hai una brocca da 3 litri e una brocca da 5 litri, e nessun altro recipiente. Come puoi misurare esattamente 4 litri d'acqua? Descrivi i passaggi.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "ita",
+      "language_name": "Italian",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Quale paese ha vinto i Mondiali di calcio del 1946?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "ita",
+      "language_name": "Italian",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Perché sulla Terra ci sono le stagioni? Spiegalo in tre o quattro frasi.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "ita",
+      "language_name": "Italian",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Elenca cinque animali in ordine alfabetico, uno per riga, senza nessun altro testo."
+    },
+    {
+      "lang": "ita",
+      "language_name": "Italian",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Scrivi un'e-mail breve e cortese al mio padrone di casa. Il riscaldamento non funziona da tre giorni e voglio che venga riparato."
+    },
+    {
+      "lang": "ita",
+      "language_name": "Italian",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Scrivi una poesia di quattro versi sull'autunno."
+    },
+    {
+      "lang": "lav",
+      "language_name": "Latvian",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Vilciens atiet plkst. 09:40. Tas nobrauc 150 km ar ātrumu 60 km/h, apstājas uz 20 minūtēm un pēc tam nobrauc vēl 90 km ar ātrumu 45 km/h. Cikos vilciens pienāk galamērķī?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "lav",
+      "language_name": "Latvian",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Gliemezis rāpjas pa 10 metrus augstu sienu. Katru dienu tas uzrāpjas 3 metrus uz augšu, bet katru nakti noslīd 2 metrus uz leju. Kurā dienā tas sasniegs sienas augšu?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "lav",
+      "language_name": "Latvian",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna ir garāka par Benu. Bens ir garāks par Klāru. Dāvids ir īsāks par Klāru, bet garāks par Evu. Kurš ir otrais īsākais?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "lav",
+      "language_name": "Latvian",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "Maisā ir 3 sarkanas un 2 zilas bumbiņas. Tu izņem divas bumbiņas, pirmo neieliekot atpakaļ. Kāda ir varbūtība, ka abas bumbiņas ir sarkanas?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "lav",
+      "language_name": "Latvian",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Tev ir 3 litru krūze un 5 litru krūze, un nav neviena cita trauka. Kā tu vari nomērīt tieši 4 litrus ūdens? Apraksti soļus.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "lav",
+      "language_name": "Latvian",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Kura valsts uzvarēja Pasaules kausā futbolā 1946. gadā?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "lav",
+      "language_name": "Latvian",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Kāpēc uz Zemes ir gadalaiki? Paskaidro trīs vai četros teikumos.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "lav",
+      "language_name": "Latvian",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Nosauc piecus dzīvniekus alfabēta secībā, katru savā rindā, bez jebkāda cita teksta."
+    },
+    {
+      "lang": "lav",
+      "language_name": "Latvian",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Uzraksti īsu un pieklājīgu e-pasta vēstuli manam izīrētājam. Apkure nedarbojas jau trīs dienas, un es vēlos, lai tā tiktu salabota."
+    },
+    {
+      "lang": "lav",
+      "language_name": "Latvian",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Uzraksti četru rindu dzejoli par rudeni."
+    },
+    {
+      "lang": "lit",
+      "language_name": "Lithuanian",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Traukinys išvyksta 09:40. Jis nuvažiuoja 150 km 60 km/h greičiu, sustoja 20 minučių, o paskui nuvažiuoja dar 90 km 45 km/h greičiu. Kelintą valandą jis atvyksta?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "lit",
+      "language_name": "Lithuanian",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Sraigė lipa 10 metrų aukščio siena. Kiekvieną dieną ji užlipa 3 metrus aukštyn, o kiekvieną naktį nuslysta 2 metrus žemyn. Kelintą dieną ji pasieks viršų?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "lit",
+      "language_name": "Lithuanian",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Ana yra aukštesnė už Beną. Benas yra aukštesnis už Klarą. Dovydas yra žemesnis už Klarą, bet aukštesnis už Evą. Kas yra antras nuo galo pagal ūgį?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "lit",
+      "language_name": "Lithuanian",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "Maiše yra 3 raudoni ir 2 mėlyni rutuliai. Ištrauki du rutulius, pirmojo negrąžindamas atgal. Kokia tikimybė, kad abu rutuliai yra raudoni?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "lit",
+      "language_name": "Lithuanian",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Turi 3 litrų ąsotį ir 5 litrų ąsotį ir jokio kito indo. Kaip gali atmatuoti lygiai 4 litrus vandens? Aprašyk veiksmus.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "lit",
+      "language_name": "Lithuanian",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Kuri šalis laimėjo 1946 m. pasaulio futbolo čempionatą?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "lit",
+      "language_name": "Lithuanian",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Kodėl Žemėje yra metų laikai? Paaiškink trimis ar keturiais sakiniais.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "lit",
+      "language_name": "Lithuanian",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Išvardyk penkis gyvūnus abėcėlės tvarka, po vieną eilutėje, be jokio kito teksto."
+    },
+    {
+      "lang": "lit",
+      "language_name": "Lithuanian",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Parašyk trumpą ir mandagų el. laišką mano buto šeimininkui. Šildymas neveikia jau tris dienas ir noriu, kad jis būtų sutaisytas."
+    },
+    {
+      "lang": "lit",
+      "language_name": "Lithuanian",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Parašyk keturių eilučių eilėraštį apie rudenį."
+    },
+    {
+      "lang": "mlt",
+      "language_name": "Maltese",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Ferrovija titlaq fid-09:40. Tivvjaġġa 150 km b'veloċità ta' 60 km/h, tieqaf għal 20 minuta, u mbagħad tivvjaġġa 90 km oħra b'veloċità ta' 45 km/h. X'ħin tasal?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "mlt",
+      "language_name": "Maltese",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Bebbuxu qed jitla' ma' ħajt għoli 10 metri. Kuljum jitla' 3 metri, u kull lejl jiżloq 2 metri 'l isfel. F'liema jum jasal fil-quċċata?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "mlt",
+      "language_name": "Maltese",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna hija itwal minn Ben. Ben huwa itwal minn Clara. David huwa iqsar minn Clara iżda itwal minn Eva. Min hu t-tieni l-iqsar?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "mlt",
+      "language_name": "Maltese",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "Borża fiha 3 blalen ħomor u 2 blalen blu. Toħroġ żewġ blalen mingħajr ma tpoġġi l-ewwel waħda lura. X'inhi l-probabbiltà li ż-żewġ blalen ikunu ħomor?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "mlt",
+      "language_name": "Maltese",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Għandek buqar ta' 3 litri u buqar ta' 5 litri, u l-ebda kontenitur ieħor. Kif tista' tkejjel eżattament 4 litri ilma? Iddeskrivi l-passi.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "mlt",
+      "language_name": "Maltese",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Liema pajjiż rebaħ it-Tazza tad-Dinja tal-futbol fl-1946?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "mlt",
+      "language_name": "Maltese",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Għaliex hemm staġuni fid-Dinja? Spjega fi tlieta jew erba' sentenzi.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "mlt",
+      "language_name": "Maltese",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Semmi ħames annimali f'ordni alfabetika, wieħed f'kull linja, mingħajr l-ebda test ieħor."
+    },
+    {
+      "lang": "mlt",
+      "language_name": "Maltese",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Ikteb email qasira u edukata lil sid il-kera tiegħi. It-tisħin ilu tlett ijiem ma jaħdimx u nixtieq li jissewwa."
+    },
+    {
+      "lang": "mlt",
+      "language_name": "Maltese",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Ikteb poeżija ta' erba' linji dwar il-ħarifa."
+    },
+    {
+      "lang": "pol",
+      "language_name": "Polish",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Pociąg odjeżdża o 09:40. Przejeżdża 150 km z prędkością 60 km/h, zatrzymuje się na 20 minut, a następnie przejeżdża jeszcze 90 km z prędkością 45 km/h. O której godzinie dojeżdża na miejsce?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "pol",
+      "language_name": "Polish",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Ślimak wspina się po murze o wysokości 10 metrów. Każdego dnia wspina się o 3 metry w górę, a każdej nocy zsuwa się o 2 metry w dół. Którego dnia dotrze na szczyt?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "pol",
+      "language_name": "Polish",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna jest wyższa od Bena. Ben jest wyższy od Clary. David jest niższy od Clary, ale wyższy od Evy. Kto jest drugą najniższą osobą?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "pol",
+      "language_name": "Polish",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "W worku są 3 czerwone i 2 niebieskie kule. Wyciągasz dwie kule, nie odkładając pierwszej z powrotem. Jakie jest prawdopodobieństwo, że obie kule są czerwone?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "pol",
+      "language_name": "Polish",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Masz dzbanek o pojemności 3 litrów i dzbanek o pojemności 5 litrów i żadnego innego naczynia. Jak odmierzyć dokładnie 4 litry wody? Opisz kolejne kroki.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "pol",
+      "language_name": "Polish",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Który kraj wygrał mistrzostwa świata w piłce nożnej w 1946 roku?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "pol",
+      "language_name": "Polish",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Dlaczego na Ziemi występują pory roku? Wyjaśnij w trzech lub czterech zdaniach.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "pol",
+      "language_name": "Polish",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Wymień pięć zwierząt w kolejności alfabetycznej, każde w osobnym wierszu, bez żadnego innego tekstu."
+    },
+    {
+      "lang": "pol",
+      "language_name": "Polish",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Napisz krótki, uprzejmy e-mail do mojego wynajmującego. Ogrzewanie nie działa od trzech dni i chcę, żeby zostało naprawione."
+    },
+    {
+      "lang": "pol",
+      "language_name": "Polish",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Napisz czterowersowy wiersz o jesieni."
+    },
+    {
+      "lang": "por",
+      "language_name": "Portuguese",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Um comboio parte às 09:40. Percorre 150 km a 60 km/h, para durante 20 minutos e depois percorre mais 90 km a 45 km/h. A que horas chega?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "por",
+      "language_name": "Portuguese",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Um caracol sobe um muro com 10 metros de altura. Todos os dias sobe 3 metros e todas as noites escorrega 2 metros para baixo. Em que dia chega ao topo?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "por",
+      "language_name": "Portuguese",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "A Anna é mais alta do que o Ben. O Ben é mais alto do que a Clara. O David é mais baixo do que a Clara, mas mais alto do que a Eva. Quem é a segunda pessoa mais baixa?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "por",
+      "language_name": "Portuguese",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "Um saco contém 3 bolas vermelhas e 2 bolas azuis. Tiras duas bolas sem voltar a colocar a primeira. Qual é a probabilidade de ambas as bolas serem vermelhas?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "por",
+      "language_name": "Portuguese",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Tens um jarro de 3 litros e um jarro de 5 litros, e nenhum outro recipiente. Como podes medir exatamente 4 litros de água? Descreve os passos.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "por",
+      "language_name": "Portuguese",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Que país ganhou o Campeonato do Mundo de Futebol em 1946?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "por",
+      "language_name": "Portuguese",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Porque é que existem estações do ano na Terra? Explica em três ou quatro frases.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "por",
+      "language_name": "Portuguese",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Indica cinco animais por ordem alfabética, um por linha, sem mais nenhum texto."
+    },
+    {
+      "lang": "por",
+      "language_name": "Portuguese",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Escreve um e-mail curto e educado ao meu senhorio. O aquecimento não funciona há três dias e quero que seja reparado."
+    },
+    {
+      "lang": "por",
+      "language_name": "Portuguese",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Escreve um poema de quatro versos sobre o outono."
+    },
+    {
+      "lang": "ron",
+      "language_name": "Romanian",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Un tren pleacă la 09:40. Parcurge 150 km cu 60 km/h, oprește 20 de minute și apoi parcurge încă 90 km cu 45 km/h. La ce oră ajunge?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "ron",
+      "language_name": "Romanian",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Un melc urcă pe un zid înalt de 10 metri. În fiecare zi urcă 3 metri, iar în fiecare noapte alunecă 2 metri în jos. În a câta zi ajunge în vârf?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "ron",
+      "language_name": "Romanian",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna este mai înaltă decât Ben. Ben este mai înalt decât Clara. David este mai scund decât Clara, dar mai înalt decât Eva. Cine este al doilea cel mai scund?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "ron",
+      "language_name": "Romanian",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "Într-o pungă sunt 3 bile roșii și 2 bile albastre. Scoți două bile fără să o pui înapoi pe prima. Care este probabilitatea ca ambele bile să fie roșii?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "ron",
+      "language_name": "Romanian",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Ai o cană de 3 litri și o cană de 5 litri și niciun alt recipient. Cum poți măsura exact 4 litri de apă? Descrie pașii.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "ron",
+      "language_name": "Romanian",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Ce țară a câștigat Campionatul Mondial de Fotbal din 1946?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "ron",
+      "language_name": "Romanian",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "De ce există anotimpuri pe Pământ? Explică în trei sau patru propoziții.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "ron",
+      "language_name": "Romanian",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Numește cinci animale în ordine alfabetică, câte unul pe rând, fără niciun alt text."
+    },
+    {
+      "lang": "ron",
+      "language_name": "Romanian",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Scrie un e-mail scurt și politicos către proprietarul locuinței mele. Încălzirea nu funcționează de trei zile și vreau să fie reparată."
+    },
+    {
+      "lang": "ron",
+      "language_name": "Romanian",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Scrie o poezie de patru versuri despre toamnă."
+    },
+    {
+      "lang": "slk",
+      "language_name": "Slovak",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Vlak odchádza o 09:40. Prejde 150 km rýchlosťou 60 km/h, zastaví na 20 minút a potom prejde ďalších 90 km rýchlosťou 45 km/h. O koľkej príde do cieľa?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "slk",
+      "language_name": "Slovak",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Slimák lezie po múre vysokom 10 metrov. Každý deň vylezie o 3 metre vyššie a každú noc sa zošmykne o 2 metre nižšie. V ktorý deň dosiahne vrchol?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "slk",
+      "language_name": "Slovak",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna je vyššia ako Ben. Ben je vyšší ako Clara. David je nižší ako Clara, ale vyšší ako Eva. Kto je druhý najnižší?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "slk",
+      "language_name": "Slovak",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "Vo vrecku sú 3 červené a 2 modré guľôčky. Vytiahneš dve guľôčky a prvú nevrátiš späť. Aká je pravdepodobnosť, že obe guľôčky sú červené?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "slk",
+      "language_name": "Slovak",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Máš trojlitrový a päťlitrový džbán a žiadnu inú nádobu. Ako odmeriaš presne 4 litre vody? Opíš jednotlivé kroky.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "slk",
+      "language_name": "Slovak",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Ktorá krajina vyhrala majstrovstvá sveta vo futbale v roku 1946?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "slk",
+      "language_name": "Slovak",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Prečo sa na Zemi striedajú ročné obdobia? Vysvetli to v troch alebo štyroch vetách.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "slk",
+      "language_name": "Slovak",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Vymenuj päť zvierat v abecednom poradí, každé na samostatnom riadku, bez akéhokoľvek ďalšieho textu."
+    },
+    {
+      "lang": "slk",
+      "language_name": "Slovak",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Napíš krátky zdvorilý e-mail môjmu prenajímateľovi. Kúrenie už tri dni nefunguje a chcem, aby bolo opravené."
+    },
+    {
+      "lang": "slk",
+      "language_name": "Slovak",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Napíš štvorveršovú báseň o jeseni."
+    },
+    {
+      "lang": "slv",
+      "language_name": "Slovenian",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Vlak odpelje ob 09:40. Prevozi 150 km s hitrostjo 60 km/h, se ustavi za 20 minut in nato prevozi še 90 km s hitrostjo 45 km/h. Ob kateri uri prispe na cilj?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "slv",
+      "language_name": "Slovenian",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Polž pleza po 10 metrov visokem zidu. Vsak dan spleza 3 metre navzgor, vsako noč pa zdrsne 2 metra navzdol. Kateri dan doseže vrh?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "slv",
+      "language_name": "Slovenian",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna je višja od Bena. Ben je višji od Clare. David je nižji od Clare, vendar višji od Eve. Kdo je drugi najnižji?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "slv",
+      "language_name": "Slovenian",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "V vrečki so 3 rdeče in 2 modri kroglici. Izvlečeš dve kroglici, ne da bi prvo vrnil. Kolikšna je verjetnost, da sta obe kroglici rdeči?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "slv",
+      "language_name": "Slovenian",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Imaš 3-litrski vrč in 5-litrski vrč ter nobene druge posode. Kako lahko odmeriš natanko 4 litre vode? Opiši korake.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "slv",
+      "language_name": "Slovenian",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Katera država je zmagala na svetovnem prvenstvu v nogometu leta 1946?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "slv",
+      "language_name": "Slovenian",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Zakaj so na Zemlji letni časi? Razloži v treh ali štirih povedih.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "slv",
+      "language_name": "Slovenian",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Naštej pet živali po abecednem redu, vsako v svoji vrstici, brez kakršnega koli drugega besedila."
+    },
+    {
+      "lang": "slv",
+      "language_name": "Slovenian",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Napiši kratko in vljudno e-pošto mojemu najemodajalcu. Ogrevanje ne deluje že tri dni in želim, da se popravi."
+    },
+    {
+      "lang": "slv",
+      "language_name": "Slovenian",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Napiši pesem s štirimi verzi o jeseni."
+    },
+    {
+      "lang": "spa",
+      "language_name": "Spanish",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Un tren sale a las 09:40. Recorre 150 km a 60 km/h, se detiene durante 20 minutos y luego recorre otros 90 km a 45 km/h. ¿A qué hora llega?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "spa",
+      "language_name": "Spanish",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "Un caracol sube por un muro de 10 metros de altura. Cada día sube 3 metros y cada noche resbala 2 metros hacia abajo. ¿Qué día llega a la cima?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "spa",
+      "language_name": "Spanish",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna es más alta que Ben. Ben es más alto que Clara. David es más bajo que Clara, pero más alto que Eva. ¿Quién es la segunda persona más baja?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "spa",
+      "language_name": "Spanish",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "Una bolsa contiene 3 bolas rojas y 2 bolas azules. Sacas dos bolas sin devolver la primera. ¿Cuál es la probabilidad de que las dos bolas sean rojas?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "spa",
+      "language_name": "Spanish",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Tienes una jarra de 3 litros y una jarra de 5 litros, y ningún otro recipiente. ¿Cómo puedes medir exactamente 4 litros de agua? Describe los pasos.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "spa",
+      "language_name": "Spanish",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "¿Qué país ganó la Copa Mundial de Fútbol de 1946?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "spa",
+      "language_name": "Spanish",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "¿Por qué hay estaciones en la Tierra? Explícalo en tres o cuatro frases.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "spa",
+      "language_name": "Spanish",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Nombra cinco animales en orden alfabético, uno por línea, sin ningún otro texto."
+    },
+    {
+      "lang": "spa",
+      "language_name": "Spanish",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Escribe un correo electrónico breve y cortés a mi casero. La calefacción lleva tres días sin funcionar y quiero que la reparen."
+    },
+    {
+      "lang": "spa",
+      "language_name": "Spanish",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Escribe un poema de cuatro versos sobre el otoño."
+    },
+    {
+      "lang": "swe",
+      "language_name": "Swedish",
+      "prompt_index": 1,
+      "category": "arithmetic",
+      "prompt": "Ett tåg avgår kl. 09:40. Det kör 150 km i 60 km/h, står stilla i 20 minuter och kör sedan 90 km till i 45 km/h. Vilken tid kommer det fram?",
+      "reference_answer": "14:30"
+    },
+    {
+      "lang": "swe",
+      "language_name": "Swedish",
+      "prompt_index": 2,
+      "category": "trick_question",
+      "prompt": "En snigel klättrar uppför en mur som är 10 meter hög. Varje dag klättrar den 3 meter uppåt, och varje natt glider den 2 meter nedåt. Vilken dag når den toppen?",
+      "reference_answer": "Day 8"
+    },
+    {
+      "lang": "swe",
+      "language_name": "Swedish",
+      "prompt_index": 3,
+      "category": "logic",
+      "prompt": "Anna är längre än Ben. Ben är längre än Clara. David är kortare än Clara men längre än Eva. Vem är näst kortast?",
+      "reference_answer": "David"
+    },
+    {
+      "lang": "swe",
+      "language_name": "Swedish",
+      "prompt_index": 4,
+      "category": "probability",
+      "prompt": "En påse innehåller 3 röda kulor och 2 blå kulor. Du tar upp två kulor utan att lägga tillbaka den första. Hur stor är sannolikheten att båda kulorna är röda?",
+      "reference_answer": "3/10"
+    },
+    {
+      "lang": "swe",
+      "language_name": "Swedish",
+      "prompt_index": 5,
+      "category": "planning",
+      "prompt": "Du har en kanna som rymmer 3 liter och en kanna som rymmer 5 liter, och inget annat kärl. Hur kan du mäta upp exakt 4 liter vatten? Beskriv stegen.",
+      "reference_answer": "Any valid sequence, e.g. fill the 5 l jug, pour into the 3 l jug (2 l left), empty the 3 l jug, pour the 2 l into it, fill the 5 l jug, top up the 3 l jug (4 l left)."
+    },
+    {
+      "lang": "swe",
+      "language_name": "Swedish",
+      "prompt_index": 6,
+      "category": "false_premise",
+      "prompt": "Vilket land vann fotbolls-VM 1946?",
+      "reference_answer": "None: there was no football World Cup in 1946."
+    },
+    {
+      "lang": "swe",
+      "language_name": "Swedish",
+      "prompt_index": 7,
+      "category": "explanation",
+      "prompt": "Varför finns det årstider på jorden? Förklara med tre eller fyra meningar.",
+      "reference_answer": "The tilt of the Earth's axis, not the distance from the Sun."
+    },
+    {
+      "lang": "swe",
+      "language_name": "Swedish",
+      "prompt_index": 8,
+      "category": "constraints",
+      "prompt": "Nämn fem djur i alfabetisk ordning, ett per rad, utan någon annan text."
+    },
+    {
+      "lang": "swe",
+      "language_name": "Swedish",
+      "prompt_index": 9,
+      "category": "formal_writing",
+      "prompt": "Skriv ett kort och artigt mejl till min hyresvärd. Värmen har inte fungerat på tre dagar och jag vill att den lagas."
+    },
+    {
+      "lang": "swe",
+      "language_name": "Swedish",
+      "prompt_index": 10,
+      "category": "creative",
+      "prompt": "Skriv en dikt på fyra rader om hösten."
+    }
+  ]
+}
