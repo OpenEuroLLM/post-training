@@ -90,14 +90,17 @@ def generate_batch(model, tokenizer, prompts: list[str], mode: str, stop_ids, ar
     inputs = inputs.to(model.device)
 
     greedy = args.temperature == 0.0
+    # An explicit `eos_token_id=None` removes the eos ids of generation_config, and
+    # generation then never stops. Pass the argument only when there is a list.
+    eos_kwargs = {} if stop_ids is None else {"eos_token_id": stop_ids}
     output = model.generate(
         **inputs,
         max_new_tokens=args.max_new_tokens,
         do_sample=not greedy,
         temperature=None if greedy else args.temperature,
         top_p=None if greedy else args.top_p,
-        eos_token_id=stop_ids,  # None = the eos ids from generation_config
         pad_token_id=tokenizer.pad_token_id,
+        **eos_kwargs,
     )
 
     responses = []
