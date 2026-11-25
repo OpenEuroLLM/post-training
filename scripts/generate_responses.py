@@ -42,7 +42,13 @@ def parse_args() -> argparse.Namespace:
 
 
 def stop_token_ids(tokenizer, model) -> list[int]:
-    """The template's turn terminator plus every eos the tokenizer and the model know."""
+    """The template's turn terminator plus every eos the tokenizer and the model know.
+
+    An eos id from the model is kept only when it is an added token of this tokenizer.
+    A ``generation_config`` can carry an id from a different vocabulary (for example
+    Qwen's 151645), which is an ordinary word piece here and would cut responses short.
+    """
+    added_ids = set(tokenizer.get_added_vocab().values())
     ids = []
     probe = [{"role": "user", "content": "q"}, {"role": "assistant", "content": "a"}]
     rendered = tokenizer.apply_chat_template(probe, tokenize=False)
@@ -50,8 +56,15 @@ def stop_token_ids(tokenizer, model) -> list[int]:
     if end_token is not None:
         ids.append(tokenizer.convert_tokens_to_ids(end_token))
     ids.append(tokenizer.eos_token_id)
-    model_eos = model.generation_config.eos_token_id
-    ids.extend(model_eos if isinstance(model_eos, list) else [model_eos])
+    # `config.json` usually still has the pretraining eos, also when training
+    # changed the tokenizer's eos_token and the generation_config.
+    model_eos = []
+    for value in (model.generation_config.eos_token_id, model.config.eos_token_id):
+        model_eos.extend(value if isinstance(value, list) else [value])
+    ignored = [i for i in model_eos if i is not None and i not in added_ids]
+    if ignored:
+        print(f"Ignoring eos ids that are ordinary tokens: {ignored}")
+    ids.extend(i for i in model_eos if i in added_ids)
     return list(dict.fromkeys(i for i in ids if i is not None))
 
 
@@ -76,13 +89,19 @@ def generate_batch(model, tokenizer, prompts: list[str], mode: str, stop_ids, ar
         do_sample=not greedy,
         temperature=None if greedy else args.temperature,
         top_p=None if greedy else args.top_p,
-        eos_token_id=stop_ids,
+        eos_token_id=stop_ids,  # None = the eos ids from generation_config
         pad_token_id=tokenizer.pad_token_id,
     )
 
     responses = []
     for row in output[:, inputs["input_ids"].shape[1] :].tolist():
-        end = next((i for i, token in enumerate(row) if token in stop_ids), len(row))
+        if stop_ids is None:
+            # Remove only the batch padding. The token that stopped the row stays visible.
+            end = len(row)
+            while end > 0 and row[end - 1] == tokenizer.pad_token_id:
+                end -= 1
+        else:
+            end = next((i for i, token in enumerate(row) if token in stop_ids), len(row))
         # Keep special tokens, so the <think> block stays visible in the response.
         responses.append(tokenizer.decode(row[:end], skip_special_tokens=False))
     return responses
@@ -104,8 +123,11 @@ def main() -> None:
         args.model, dtype=torch.bfloat16, device_map="auto"
     )
     model.eval()
-    stop_ids = stop_token_ids(tokenizer, model)
-    print(f"Stop tokens: {tokenizer.convert_ids_to_tokens(stop_ids)}")
+    # Disabled for now: run with the eos ids from the checkpoint's generation_config.json.
+    # stop_ids = stop_token_ids(tokenizer, model)
+    # print(f"Stop tokens: {tokenizer.convert_ids_to_tokens(stop_ids)}")
+    stop_ids = None
+    print(f"Stop ids from generation_config: {model.generation_config.eos_token_id}")
 
     result = {
         "model": args.model,
