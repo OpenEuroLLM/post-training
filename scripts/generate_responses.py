@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 import torch
@@ -38,6 +39,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--temperature", type=float, default=0.0, help="0 = greedy")
     p.add_argument("--top-p", type=float, default=0.95, help="used only when temperature > 0")
     p.add_argument("--limit", type=int, default=None, help="use only the first N prompts")
+    p.add_argument(
+        "--preview-chars",
+        type=int,
+        default=2048,
+        help="characters of each response to print when an entry is done; 0 = none, -1 = all",
+    )
     return p.parse_args()
 
 
@@ -107,6 +114,23 @@ def generate_batch(model, tokenizer, prompts: list[str], mode: str, stop_ids, ar
     return responses
 
 
+def preview(text: str, max_chars: int) -> str:
+    if max_chars < 0 or len(text) <= max_chars:
+        return text
+    return f"{text[:max_chars]} ... [{len(text)} characters in total]"
+
+
+def print_entry(number: int, total: int, entry: dict, max_chars: int) -> None:
+    """Print one finished entry: the prompt and its response in each mode."""
+    print(
+        f"\n=== [{number}/{total}] {entry['lang']} #{entry.get('prompt_index', '?')} "
+        f"{entry.get('category', '')}"
+    )
+    print(f"prompt: {entry['prompt']}")
+    for mode, response in entry["generated_response"].items():
+        print(f"--- {mode}\n{preview(response, max_chars)}")
+
+
 def main() -> None:
     args = parse_args()
 
@@ -138,6 +162,7 @@ def main() -> None:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
+    run_start = time.monotonic()
     for start in range(0, len(entries), args.batch_size):
         batch = entries[start : start + args.batch_size]
         prompts = [entry["prompt"] for entry in batch]
@@ -147,12 +172,23 @@ def main() -> None:
         for i, entry in enumerate(batch):
             response = {mode: by_mode[mode][i] for mode in MODES}
             result["prompts"].append({**entry, "generated_response": response})
+            if args.preview_chars != 0:
+                print_entry(
+                    len(result["prompts"]), len(entries), result["prompts"][-1], args.preview_chars
+                )
 
         # Written after every batch, so a stopped job keeps its finished entries.
         args.output.write_text(
             json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
-        print(f"{len(result['prompts'])}/{len(entries)} prompts done")
+        done = len(result["prompts"])
+        elapsed = time.monotonic() - run_start
+        remaining = elapsed / done * (len(entries) - done)
+        print(
+            f"\n{done}/{len(entries)} prompts done, {elapsed / 60:.1f} min elapsed, "
+            f"about {remaining / 60:.1f} min remaining",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":
