@@ -46,10 +46,10 @@
   .badge { margin-left: 8px; font-weight: 400; color: var(--muted); }
   .badge.ok { color: var(--ok); }
   .badge.warn { color: var(--warn); }
-  .text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+  pre.text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
   details { background: var(--think); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; }
   summary { cursor: pointer; color: var(--muted); font-size: 13px; }
-  details .text { margin-top: 6px; color: var(--muted); font-size: 14px; }
+  details pre.text { margin-top: 6px; color: var(--muted); font-size: 14px; }
   .empty { color: var(--muted); font-style: italic; }
   #status { color: var(--muted); }
   #status code { background: var(--think); padding: 1px 4px; border-radius: 4px; }
@@ -69,6 +69,9 @@
   .md th, .md td { border: 1px solid var(--line); padding: 4px 8px; }
   .md hr { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
   .md a { color: var(--accent); }
+  /* KaTeX sets the width of a formula part to min-content: the "anywhere" rule of .md must not apply. */
+  .md .katex { overflow-wrap: normal; }
+  .md .katex-display { margin: 8px 0; padding: 2px 0; overflow-x: auto; overflow-y: hidden; }
 </style>
 </head>
 <body>
@@ -78,7 +81,7 @@
     <label>Run <select id="run"></select></label>
     <label>Language <select id="lang"></select></label>
     <label><input type="checkbox" id="expand"> Show reasoning</label>
-    <label><input type="checkbox" id="markdown"> Render Markdown</label>
+    <label><input type="checkbox" id="markdown"> Render Markdown and math</label>
     <label>Load JSON files <input type="file" id="files" accept=".json,application/json" multiple></label>
   </div>
   <p id="meta"></p>
@@ -88,7 +91,10 @@
   <div id="entries"></div>
 </main>
 
-<!-- Pinned library versions. Without them the page still works, and the Markdown option is off. -->
+<!-- Pinned library versions. Without them the page still works, and the Markdown option is off.
+     Without KaTeX, the Markdown option shows the math source. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <script>
@@ -139,10 +145,87 @@ function markdownReady() {
   return typeof marked !== "undefined" && typeof DOMPurify !== "undefined";
 }
 
+// One match is a code span (group 1, kept as it is) or a math segment:
+// $$...$$ (2), \[...\] (3), \(...\) (4), $...$ (5).
+const MATH_PATTERN = new RegExp(
+  [
+    /(```[\s\S]*?(?:```|$)|`[^`\n]*`)/,
+    /(?<!\\)\$\$([\s\S]+?)\$\$/,
+    /(?<!\\)\\\[([\s\S]+?)\\\]/,
+    /(?<!\\)\\\(([^\n]+?)\\\)/,
+    /(?<![\\$\w])\$(?!\$)((?:\\.|[^$\\\n])+?)\$(?![\d$])/,
+  ].map((part) => part.source).join("|"),
+  "g",
+);
+// Private-use characters mark the position of a math segment while Markdown is parsed.
+const MATH_MARK = /\uE000(\d+)\uE001/;
+
+// Markdown removes the backslash of "\[" and reads "_" in a formula as emphasis.
+// Thus the math segments go out before the Markdown parser and come back after it.
+function extractMath(answer) {
+  const segments = [];
+  const withMarks = answer.replace(MATH_PATTERN, (source, code, dollars, brackets, parens, dollar) => {
+    if (code !== undefined) return source;
+    const display = dollars !== undefined || brackets !== undefined;
+    segments.push({ source, tex: dollars ?? brackets ?? parens ?? dollar, display });
+    return `\uE000${segments.length - 1}\uE001`;
+  });
+  // A math start with no end (a response that stopped at the token limit) stays as source text.
+  const text = withMarks.replace(/(```[\s\S]*?(?:```|$)|`[^`\n]*`)|\\([\[\]()])/g, (source, code, bracket) =>
+    code !== undefined ? source : `\\\\${bracket}`,
+  );
+  return { text, segments };
+}
+
+function renderMath(segment) {
+  if (typeof katex === "undefined") return document.createTextNode(segment.source);
+  const span = node("span");
+  // A formula that KaTeX cannot parse shows as red source text with the error as its title.
+  katex.render(segment.tex, span, { displayMode: segment.display, throwOnError: false, strict: "ignore" });
+  return span;
+}
+
+function restoreMath(body, segments) {
+  if (!segments.length) return;
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+  const targets = [];
+  while (walker.nextNode()) {
+    if (MATH_MARK.test(walker.currentNode.data)) targets.push(walker.currentNode);
+  }
+  for (const target of targets) {
+    const inCode = target.parentElement.closest("code, pre") !== null;
+    const parts = target.data.split(MATH_MARK); // text, index, text, index, ..., text
+    const fragment = document.createDocumentFragment();
+    const displays = [];
+    parts.forEach((part, i) => {
+      if (i % 2 === 0) {
+        if (part) fragment.append(part);
+        return;
+      }
+      const segment = segments[Number(part)];
+      if (inCode) {
+        fragment.append(segment.source);
+        return;
+      }
+      const math = renderMath(segment);
+      fragment.append(math);
+      if (segment.display) displays.push(math);
+    });
+    target.replaceWith(fragment);
+    // Display math makes its own block: the line breaks around it are not necessary.
+    for (const math of displays) {
+      for (const side of [math.previousSibling, math.nextSibling]) {
+        if (side && side.nodeName === "BR") side.remove();
+      }
+    }
+  }
+}
+
 function renderAnswer(answer) {
   if (answer && el("markdown").checked && markdownReady()) {
     const body = node("div", "md");
-    const html = marked.parse(answer, { gfm: true, breaks: true });
+    const { text, segments } = extractMath(answer);
+    const html = marked.parse(text, { gfm: true, breaks: true });
     // The response is untrusted model output: sanitize the HTML before it goes into the page.
     body.innerHTML = DOMPurify.sanitize(html, {
       ALLOWED_TAGS: MARKDOWN_TAGS,
@@ -152,6 +235,7 @@ function renderAnswer(answer) {
       link.target = "_blank";
       link.rel = "noopener noreferrer";
     }
+    restoreMath(body, segments);
     return body;
   }
   return node("pre", answer ? "text" : "text empty", answer || "No answer text.");
