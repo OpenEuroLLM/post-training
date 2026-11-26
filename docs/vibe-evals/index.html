@@ -71,6 +71,7 @@
   .md a { color: var(--accent); }
   /* KaTeX sets the width of a formula part to min-content: the "anywhere" rule of .md must not apply. */
   .md .katex { overflow-wrap: normal; }
+  .md .bare-math { border-bottom: 2px dashed var(--warn); padding-bottom: 2px; }
   .md .katex-display { margin: 8px 0; padding: 2px 0; overflow-x: auto; overflow-y: hidden; }
 </style>
 </head>
@@ -146,7 +147,7 @@ function markdownReady() {
 }
 
 // One match is a code span (group 1, kept as it is) or a math segment:
-// $$...$$ (2), \[...\] (3), \(...\) (4), $...$ (5).
+// $$...$$ (2), \[...\] (3), \(...\) (4), $...$ (5), and \boxed{...} with no delimiters (6).
 const MATH_PATTERN = new RegExp(
   [
     /(```[\s\S]*?(?:```|$)|`[^`\n]*`)/,
@@ -154,6 +155,7 @@ const MATH_PATTERN = new RegExp(
     /(?<!\\)\\\[([\s\S]+?)\\\]/,
     /(?<!\\)\\\(([^\n]+?)\\\)/,
     /(?<![\\$\w])\$(?!\$)((?:\\.|[^$\\\n])+?)\$(?![\d$])/,
+    /(?<!\\)(\\boxed\{(?:[^{}\n]|\{(?:[^{}\n]|\{[^{}\n]*\})*\})*\})/,
   ].map((part) => part.source).join("|"),
   "g",
 );
@@ -164,10 +166,11 @@ const MATH_MARK = /\uE000(\d+)\uE001/;
 // Thus the math segments go out before the Markdown parser and come back after it.
 function extractMath(answer) {
   const segments = [];
-  const withMarks = answer.replace(MATH_PATTERN, (source, code, dollars, brackets, parens, dollar) => {
+  const withMarks = answer.replace(MATH_PATTERN, (source, code, dollars, brackets, parens, dollar, boxed) => {
     if (code !== undefined) return source;
     const display = dollars !== undefined || brackets !== undefined;
-    segments.push({ source, tex: dollars ?? brackets ?? parens ?? dollar, display });
+    const tex = dollars ?? brackets ?? parens ?? dollar ?? boxed;
+    segments.push({ source, tex, display, bare: boxed !== undefined });
     return `\uE000${segments.length - 1}\uE001`;
   });
   // A math start with no end (a response that stopped at the token limit) stays as source text.
@@ -182,6 +185,11 @@ function renderMath(segment) {
   const span = node("span");
   // A formula that KaTeX cannot parse shows as red source text with the error as its title.
   katex.render(segment.tex, span, { displayMode: segment.display, throwOnError: false, strict: "ignore" });
+  if (segment.bare) {
+    // The model wrote the command as plain text. The page renders it, and the mark keeps that visible.
+    span.className = "bare-math";
+    span.title = `No math delimiters in the source: ${segment.source}`;
+  }
   return span;
 }
 
