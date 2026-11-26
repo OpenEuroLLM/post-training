@@ -197,8 +197,8 @@ function render() {
   const entries = data.prompts
     .filter((entry) => entry.lang === lang)
     .sort((a, b) => (a.prompt_index ?? 0) - (b.prompt_index ?? 0));
-  const info = ["model", "chat_template", "max_new_tokens", "temperature"]
-    .filter((key) => data[key] !== undefined)
+  const info = ["model", "chat_template", "max_new_tokens", "temperature", "top_p", "repetition_penalty", "seed"]
+    .filter((key) => data[key] !== undefined && data[key] !== null)
     .map((key) => `${key}: ${data[key]}`);
   el("meta").textContent = [`${entries.length} prompts`, ...info].join(" · ");
   const expand = el("expand").checked;

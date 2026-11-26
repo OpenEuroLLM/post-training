@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 
 from post_training.chat_templates.registry import get_chat_template, infer_end_token_from_render
 
@@ -38,6 +38,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--batch-size", type=int, default=8)
     p.add_argument("--temperature", type=float, default=0.0, help="0 = greedy")
     p.add_argument("--top-p", type=float, default=0.95, help="used only when temperature > 0")
+    p.add_argument("--repetition-penalty", type=float, default=1.0, help="1.0 = no penalty")
+    p.add_argument("--seed", type=int, default=0, help="random seed, used when temperature > 0")
     p.add_argument("--limit", type=int, default=None, help="use only the first N prompts")
     p.add_argument(
         "--preview-chars",
@@ -99,6 +101,7 @@ def generate_batch(model, tokenizer, prompts: list[str], mode: str, stop_ids, ar
         do_sample=not greedy,
         temperature=None if greedy else args.temperature,
         top_p=None if greedy else args.top_p,
+        repetition_penalty=args.repetition_penalty,
         pad_token_id=tokenizer.pad_token_id,
         **eos_kwargs,
     )
@@ -136,6 +139,7 @@ def print_entry(number: int, total: int, entry: dict, max_chars: int) -> None:
 
 def main() -> None:
     args = parse_args()
+    set_seed(args.seed)
 
     data = json.loads(args.prompts.read_text(encoding="utf-8"))
     entries = data["prompts"][: args.limit]
@@ -161,6 +165,9 @@ def main() -> None:
         "chat_template": args.chat_template,
         "max_new_tokens": args.max_new_tokens,
         "temperature": args.temperature,
+        "top_p": None if args.temperature == 0.0 else args.top_p,
+        "repetition_penalty": args.repetition_penalty,
+        "seed": args.seed,
         "prompts": [],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
