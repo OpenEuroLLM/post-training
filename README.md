@@ -521,7 +521,7 @@ You must specify exactly one determining factor for training duration in the `tr
 
 - **What**: full training state (optimizer + model)
 - **Location**: `checkpoints/checkpoint-*`
-- **Logic**: training automatically resumes from the latest checkpoint found here
+- **Logic**: training automatically resumes from the latest complete checkpoint found here. A checkpoint that a stopped job did not finish (no `trainer_state.json`, or a truncated file) is ignored
 
 #### Inference checkpoints (lightweight)
 
