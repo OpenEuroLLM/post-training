@@ -38,9 +38,13 @@ accelerate launch \
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
+import re
+import struct
 import sys
+import zipfile
 from pathlib import Path
 
 # Ensure the project root is on ``sys.path`` so that ``post_training`` is
@@ -112,6 +116,70 @@ def _print_tokenized_samples(trainer) -> None:
                 if unmasked_ids:
                     print(_indent(_truncate_preview(tokenizer.decode(unmasked_ids)), 6))
     print(f"\n{_TOKENIZE_PREVIEW_SEP}\n")
+
+
+_CHECKPOINT_DIR_RE = re.compile(r"^checkpoint-(\d+)$")
+
+
+def _safetensors_is_whole(path: Path) -> bool:
+    """Whether a safetensors file has all the bytes that its header declares."""
+    with path.open("rb") as f:
+        prefix = f.read(8)
+        if len(prefix) < 8:
+            return False
+        (header_size,) = struct.unpack("<Q", prefix)
+        try:
+            header = json.loads(f.read(header_size))
+        except ValueError:
+            return False
+    data_size = max(
+        (entry["data_offsets"][1] for name, entry in header.items() if name != "__metadata__"),
+        default=0,
+    )
+    return path.stat().st_size == 8 + header_size + data_size
+
+
+def _is_complete_checkpoint(checkpoint: Path) -> bool:
+    """Whether the Trainer finished the save of this checkpoint.
+
+    A job that stops during a save leaves a directory that cannot be loaded. The
+    Trainer writes ``trainer_state.json`` last. A truncated ``torch.save`` file is
+    not a valid zip archive, and a truncated safetensors file is too short.
+    """
+    try:
+        json.loads((checkpoint / "trainer_state.json").read_text())
+    except (OSError, ValueError):
+        return False
+    for file in checkpoint.rglob("*"):
+        if file.suffix in (".pt", ".pth") and not zipfile.is_zipfile(file):
+            return False
+        if file.suffix == ".safetensors" and not _safetensors_is_whole(file):
+            return False
+    return True
+
+
+def _last_complete_checkpoint(checkpoints_dir: Path) -> str | None:
+    """Return the newest complete checkpoint in *checkpoints_dir*, or ``None`` if it is empty.
+
+    An incomplete checkpoint stays on disk. The Trainer writes to the same
+    directory again when the run gets to that step.
+    """
+    steps = {}
+    for path in checkpoints_dir.iterdir():
+        match = _CHECKPOINT_DIR_RE.match(path.name)
+        if match and path.is_dir():
+            steps[int(match.group(1))] = path
+    for step in sorted(steps, reverse=True):
+        if _is_complete_checkpoint(steps[step]):
+            return str(steps[step])
+        logger.warning("Checkpoint %s is incomplete — it is ignored.", steps[step])
+    if steps:
+        # A start from step 0 would silently discard the progress of the run.
+        raise RuntimeError(
+            f"{checkpoints_dir} has checkpoints, but none of them is complete. "
+            "Repair or remove them before the run starts again."
+        )
+    return None
 
 
 def _parse_args() -> tuple[str, list[str]]:
@@ -188,11 +256,9 @@ def main() -> None:
         logger.info("--tokenize-only set — exiting after trainer initialization.")
         return
 
-    # Auto-resume from the latest checkpoint if one exists.
-    from transformers.trainer_utils import get_last_checkpoint
-
+    # Auto-resume from the latest complete checkpoint if one exists.
     checkpoints_dir = run_dir / "checkpoints"
-    resume_from = get_last_checkpoint(str(checkpoints_dir)) if checkpoints_dir.exists() else None
+    resume_from = _last_complete_checkpoint(checkpoints_dir) if checkpoints_dir.exists() else None
     if resume_from:
         logger.info("Resuming from checkpoint: %s", resume_from)
 
