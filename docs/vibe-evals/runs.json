@@ -2,6 +2,7 @@
   {"name": "Completions of Run 1 (baseline), checkpoint step-28000", "file": "data/sft-ablation-run1-baseline-step-28000.json"},
   {"name": "Completions of Run 2 (no think translated), checkpoint step-28000", "file": "data/sft-ablation-run2-no-think-step-28000.json"},
   {"name": "Completions of Run 2 (no think translated), checkpoint step-28000, temperature 0.6, repetition penalty 1.05", "file": "data/sft-ablation-run2-no-think-step-28000-t0.6-rp1.05.json"},
+  {"name": "Completions of Run 2 (no think translated), checkpoint step-28000, temperature 0.6, repetition penalty 1.05, 8192 max new tokens (16 of 24 languages)", "file": "data/sft-ablation-run2-no-think-step-28000-t0.6-rp1.05-8k.json"},
   {"name": "Completions of Run 3 (no instruct), checkpoint step-25000", "file": "data/sft-ablation-run3-no-instruct-step-25000.json"},
   {"name": "Completions of Run 4 (no euromultisynth), checkpoint step-28000", "file": "data/sft-ablation-run4-no-euromultisynth-step-28000.json"}
 ]
