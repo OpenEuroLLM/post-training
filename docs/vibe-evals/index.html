@@ -53,6 +53,22 @@
   .empty { color: var(--muted); font-style: italic; }
   #status { color: var(--muted); }
   #status code { background: var(--think); padding: 1px 4px; border-radius: 4px; }
+  .md { overflow-wrap: anywhere; }
+  .md > :first-child { margin-top: 0; }
+  .md > :last-child { margin-bottom: 0; }
+  .md p, .md ul, .md ol, .md pre, .md table, .md blockquote { margin: 0 0 10px; }
+  .md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { margin: 14px 0 6px; font-size: 16px; color: var(--text); }
+  .md h1 { font-size: 20px; }
+  .md h2 { font-size: 18px; }
+  .md ul, .md ol { padding-left: 24px; }
+  .md code { background: var(--think); padding: 1px 4px; border-radius: 4px; font-size: 13px; }
+  .md pre { background: var(--think); padding: 8px 10px; border-radius: 6px; overflow-x: auto; }
+  .md pre code { padding: 0; background: none; }
+  .md blockquote { border-left: 3px solid var(--line); padding-left: 10px; color: var(--muted); }
+  .md table { border-collapse: collapse; display: block; overflow-x: auto; }
+  .md th, .md td { border: 1px solid var(--line); padding: 4px 8px; }
+  .md hr { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
+  .md a { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -62,6 +78,7 @@
     <label>Run <select id="run"></select></label>
     <label>Language <select id="lang"></select></label>
     <label><input type="checkbox" id="expand"> Show reasoning</label>
+    <label><input type="checkbox" id="markdown"> Render Markdown</label>
     <label>Load JSON files <input type="file" id="files" accept=".json,application/json" multiple></label>
   </div>
   <p id="meta"></p>
@@ -71,6 +88,9 @@
   <div id="entries"></div>
 </main>
 
+<!-- Pinned library versions. Without them the page still works, and the Markdown option is off. -->
+<script defer src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <script>
 "use strict";
 
@@ -109,6 +129,34 @@ function splitResponse(raw) {
   return { reasoning, closed, answer: text.trim(), stopped };
 }
 
+// Tags that rendered Markdown can contain. No images, scripts, styles, or forms.
+const MARKDOWN_TAGS = [
+  "p", "br", "hr", "strong", "em", "del", "code", "pre", "blockquote", "ul", "ol", "li",
+  "h1", "h2", "h3", "h4", "h5", "h6", "table", "thead", "tbody", "tr", "th", "td", "a", "sup", "sub",
+];
+
+function markdownReady() {
+  return typeof marked !== "undefined" && typeof DOMPurify !== "undefined";
+}
+
+function renderAnswer(answer) {
+  if (answer && el("markdown").checked && markdownReady()) {
+    const body = node("div", "md");
+    const html = marked.parse(answer, { gfm: true, breaks: true });
+    // The response is untrusted model output: sanitize the HTML before it goes into the page.
+    body.innerHTML = DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: MARKDOWN_TAGS,
+      ALLOWED_ATTR: ["href", "align", "start"],
+    });
+    for (const link of body.querySelectorAll("a")) {
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+    }
+    return body;
+  }
+  return node("pre", answer ? "text" : "text empty", answer || "No answer text.");
+}
+
 function renderMode(mode, raw, expand) {
   const box = node("section", "mode");
   const title = node("h3", "", mode);
@@ -130,7 +178,7 @@ function renderMode(mode, raw, expand) {
     details.append(node("pre", "text", reasoning));
     box.append(details);
   }
-  const body = node("pre", answer ? "text" : "text empty", answer || "No answer text.");
+  const body = renderAnswer(answer);
   body.dir = "auto";
   box.append(body);
   return box;
@@ -244,6 +292,18 @@ el("files").addEventListener("change", async (event) => {
 el("run").addEventListener("change", refreshLanguages);
 el("lang").addEventListener("change", render);
 el("expand").addEventListener("change", render);
+el("markdown").addEventListener("change", render);
+// "?markdown" in the address turns the option on, for a link to the rendered view.
+el("markdown").checked = new URLSearchParams(location.search).has("markdown");
+window.addEventListener("load", () => {
+  if (!markdownReady()) {
+    el("markdown").checked = false;
+    el("markdown").disabled = true;
+    el("markdown").parentElement.title = "The Markdown libraries did not load.";
+  } else if (el("markdown").checked) {
+    render();
+  }
+});
 
 render();
 loadManifest();
