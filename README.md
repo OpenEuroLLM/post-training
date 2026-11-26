@@ -197,6 +197,29 @@ The cache is hit only when every input to the data pipeline is unchanged. Betwee
 
 To confirm the cache hit, open the training job's `<run_dir>/slurm/slurm-<id>.err`: the `Tokenizing train dataset` and `Packing train dataset` progress bars must not appear. If they do, an input in the table changed, or `datasets` warned in Step 1 that a function `couldn't be hashed properly`. Either way, the training job processes the data again from scratch.
 
+### Run in an allocation that an external orchestrator owns
+
+An external orchestrator (for example an [oellm-autoexp](https://github.com/OpenEuroLLM/oellm-autoexp) pool) can own the SLURM allocation and the restarts. In that case, do not submit `job.sh`. Its requeue and resubmission commands act on the allocation, which is not yours. Use the launch script instead:
+
+```bash
+# New run: the full submission phase (prefetch, run directory, frozen config and code), but no sbatch
+python scripts/submit.py --config configs/trl/prelude-sft.yaml --prepare-only
+
+# Run directory that already exists (for example to continue a run): only adds the launch files
+python scripts/render_launch_script.py --run-dir <run_dir>
+```
+
+Both commands write `<run_dir>/slurm/launch.sh` and a copy of `container.env_file` as `<run_dir>/slurm/launch.env`. The orchestrator runs the launch script in an srun step that has one task for each node:
+
+```bash
+srun --nodes=N --ntasks=N --ntasks-per-node=1 bash <run_dir>/slurm/launch.sh
+```
+
+- The launch script has no `#SBATCH` header, no requeue and no resubmission. It reads only the `SLURM_STEP_*` variables, so the step can be a part of a larger allocation.
+- It stops if the step does not have `slurm.num_nodes` nodes. The gradient accumulation and the checkpoints are valid for one world size only.
+- A new start of the same launch script resumes from the latest complete checkpoint in `<run_dir>/checkpoints/`.
+- The step can run as a different Unix user (the owner of the allocation). That user must be able to read the container, the model, the datasets and the cache, and to write to the run directory.
+
 ## Run SFT on MareNostrum 5 (MN5)
 
 ### Local Setup

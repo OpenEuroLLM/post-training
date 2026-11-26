@@ -23,7 +23,7 @@ if str(_PROJECT_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 
 from post_training.config import PostTrainingConfig
-from post_training.slurm.launcher import generate_and_submit
+from post_training.slurm.launcher import generate_and_submit, render_trl_launch_script
 from post_training.utils.guardrails import run_guardrails
 from post_training.utils.logging import setup_logging
 from post_training.utils.paths import setup_run_directory
@@ -75,7 +75,7 @@ def _apply_hf_env_from_file(env_file: str) -> None:
         logger.info("Applied HF cache vars from %s: %s", env_file, ", ".join(applied))
 
 
-def _parse_args() -> tuple[str, list[str], bool]:
+def _parse_args() -> tuple[str, list[str], bool, bool, bool]:
     parser = argparse.ArgumentParser(description="Submit a SLURM training job.")
     parser.add_argument(
         "--config",
@@ -93,16 +93,29 @@ def _parse_args() -> tuple[str, list[str], bool]:
         action="store_true",
         help="Pass --tokenize-only to train.py — exits after trainer initialization.",
     )
+    parser.add_argument(
+        "--prepare-only",
+        action="store_true",
+        help=(
+            "Do the full submission phase, but do not call sbatch. Writes "
+            "<run_dir>/slurm/launch.sh for an external orchestrator that owns the allocation."
+        ),
+    )
     known, unknown = parser.parse_known_args()
-    return known.config, unknown, known.confirm, known.tokenize_only
+    return known.config, unknown, known.confirm, known.tokenize_only, known.prepare_only
 
 
 def main() -> None:
     setup_logging()
 
-    config_path, cli_overrides, confirmed, tokenize_only = _parse_args()
+    config_path, cli_overrides, confirmed, tokenize_only, prepare_only = _parse_args()
     logger.info("Loading config from %s", config_path)
     config = PostTrainingConfig.load(config_path, cli_overrides)
+
+    if prepare_only and (
+        config.backend != "trl" or config.container is None or not config.container.image
+    ):
+        raise ValueError("--prepare-only is only supported with backend=trl and container.image.")
 
     if tokenize_only:
         if config.backend == "llamafactory":
@@ -165,6 +178,14 @@ def main() -> None:
     from post_training.backend import get_backend
 
     get_backend(config.backend).post_freeze(config, run_dir)
+
+    if prepare_only:
+        launch = render_trl_launch_script(
+            config, run_dir, str(frozen.resolve()), tokenize_only=tokenize_only
+        )
+        logger.info("Run directory prepared. No job was submitted.")
+        logger.info("Run the launch script with one srun task for each node: bash %s", launch)
+        return
 
     job_id = generate_and_submit(
         config, run_dir, str(frozen.resolve()), tokenize_only=tokenize_only

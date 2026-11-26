@@ -3,11 +3,15 @@
 The Jinja template ``job.sh.jinja`` (shipped alongside this module) is
 rendered with values from the ``slurm`` and ``accelerate`` config sections
 and written into the run directory before ``sbatch`` is called.
+
+``render_trl_launch_script`` renders a launch script without a batch header
+instead. An external orchestrator that owns the allocation runs it.
 """
 
 from __future__ import annotations
 
 import logging
+import shutil
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -23,6 +27,7 @@ _TEMPLATE_DIR = Path(__file__).resolve().parent
 _TEMPLATE_NAME = "job.sh.jinja"
 _LLAMAFACTORY_TEMPLATE_NAME = "job_llamafactory.sh.jinja"
 _TRL_CONTAINER_TEMPLATE_NAME = "job_trl_container.sh.jinja"
+_TRL_CONTAINER_LAUNCH_TEMPLATE_NAME = "launch_trl_container.sh.jinja"
 
 
 def render_trl_slurm_script(
@@ -157,6 +162,73 @@ def render_trl_container_slurm_script(
     script_path.chmod(0o755)
 
     logger.info("Containerized TRL SLURM script written to %s", script_path)
+    return script_path
+
+
+def render_trl_launch_script(
+    config: PostTrainingConfig,
+    run_dir: Path,
+    config_path: str,
+    *,
+    tokenize_only: bool = False,
+) -> Path:
+    """Render the containerized TRL launch script into *run_dir/slurm/launch.sh*.
+
+    The launch script is the part of the job that runs in the srun step. It has
+    no batch header, no requeue and no resubmission, so an external orchestrator
+    (for example an oellm-autoexp pool) can run it in an allocation that it owns:
+    ``srun --ntasks-per-node=1 bash <run_dir>/slurm/launch.sh``.
+
+    ``container.env_file`` is copied to *run_dir/slurm/launch.env*. The step can
+    start in a different working directory and as a different Unix user, so the
+    launch script must not depend on a path relative to this repository.
+    """
+    if config.container is None or not config.container.image:
+        raise ValueError("container.image must be set to render a TRL launch script.")
+
+    run_dir = run_dir.resolve()
+    slurm_dir = run_dir / "slurm"
+    slurm_dir.mkdir(parents=True, exist_ok=True)
+
+    env_file = None
+    if config.container.env_file:
+        env_file = slurm_dir / "launch.env"
+        shutil.copyfile(config.container.env_file, env_file)
+
+    env = Environment(
+        loader=FileSystemLoader(str(_TEMPLATE_DIR)),
+        keep_trailing_newline=True,
+    )
+    template = env.get_template(_TRL_CONTAINER_LAUNCH_TEMPLATE_NAME)
+
+    rendered = template.render(
+        num_nodes=config.slurm.num_nodes,
+        gpus_per_node=config.slurm.gpus_per_node,
+        modules=config.slurm.modules,
+        module_purge=config.slurm.module_purge,
+        run_dir=str(run_dir),
+        config_path=config_path,
+        tokenize_only=tokenize_only,
+        # Accelerate flags
+        mixed_precision=config.accelerate.mixed_precision,
+        dynamo_backend=config.accelerate.dynamo_backend,
+        use_deepspeed=config.accelerate.use_deepspeed and bool(config.deepspeed),
+        deepspeed_multinode_launcher=config.accelerate.deepspeed_multinode_launcher,
+        same_network=config.accelerate.same_network,
+        rdzv_backend=config.accelerate.rdzv_backend,
+        fsdp=config.fsdp,
+        # Container
+        container_image=config.container.image,
+        bind_mounts=config.container.bind_mounts,
+        env_file=str(env_file) if env_file else None,
+        container_path=config.container.path,
+    )
+
+    script_path = slurm_dir / "launch.sh"
+    script_path.write_text(rendered)
+    script_path.chmod(0o755)
+
+    logger.info("Containerized TRL launch script written to %s", script_path)
     return script_path
 
 
