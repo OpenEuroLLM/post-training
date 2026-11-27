@@ -220,6 +220,20 @@ srun --nodes=N --ntasks=N --ntasks-per-node=1 bash <run_dir>/slurm/launch.sh
 - A new start of the same launch script resumes from the latest complete checkpoint in `<run_dir>/checkpoints/`.
 - The step can run as a different Unix user (the owner of the allocation). That user must be able to read the container, the model, the datasets and the cache, and to write to the run directory.
 
+An orchestrator that prepares the run directory itself calls one command for the two cases. It asks no questions, and it can be called again for the same run:
+
+```bash
+python scripts/prepare_run.py --config configs/trl/prelude-sft.yaml run_name=my-run \
+    --num-nodes 8 --gpus-per-node 4
+```
+
+- No `<run_dir>/config.yaml`: a new run, prepared as with `submit.py --prepare-only`. If the file exists: a continued run. The frozen config and code stay as they are, and only the launch files are written again.
+- `run_name` is mandatory, in the config file or as an override.
+- `--num-nodes` and `--gpus-per-node` are optional. With them, a different value in the config file is an error.
+- A config that is different from the frozen config of a continued run is an error.
+- `--check` does all checks and writes nothing.
+- The last line on stdout is the result: `PREPARE_RUN_RESULT {"run_dir": ..., "launch_script": ..., "new_run": ...}`. The exit code is 0 only on success.
+
 ## Run SFT on MareNostrum 5 (MN5)
 
 ### Local Setup
