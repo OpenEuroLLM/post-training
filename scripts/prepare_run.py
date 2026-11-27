@@ -74,9 +74,10 @@ _OWNED_KEYS = {"num_nodes": "slurm.num_nodes", "gpus_per_node": "slurm.gpus_per_
 
 # submit.py replaces a Hub repo id with its local snapshot directory before it
 # freezes the config. For these keys a repo id is compared with that directory.
+_TOKENIZER_KEY = "model.tokenizer_name_or_path"
 _PREFETCHED_KEYS = (
     "model.name_or_path",
-    "model.tokenizer_name_or_path",
+    _TOKENIZER_KEY,
     "dpo.ref_model_name_or_path",
 )
 
@@ -136,9 +137,16 @@ def _differences(frozen: PostTrainingConfig, config: PostTrainingConfig) -> list
     old = _flatten(dataclasses.asdict(frozen))
     new = _flatten(dataclasses.asdict(config))
 
+    shown = dict(new)  # the values as the user gave them, for the messages
+
     # submit.py makes the base directory absolute before it freezes the config.
     base_key = "paths.debug_base" if config.debug.enabled else "paths.output_base"
     new[base_key] = str(Path(str(new[base_key])).resolve())
+
+    # A config with no tokenizer path takes the tokenizer from the model. submit.py
+    # freezes the path of that tokenizer, so compare with the model.
+    if new[_TOKENIZER_KEY] is None and old.get(_TOKENIZER_KEY) is not None:
+        new[_TOKENIZER_KEY] = config.model.resolve_tokenizer()[0]
 
     lines = []
     for key in sorted(set(old) | set(new)):
@@ -146,7 +154,7 @@ def _differences(frozen: PostTrainingConfig, config: PostTrainingConfig) -> list
             continue
         if key in _PREFETCHED_KEYS and _is_snapshot_of(old.get(key), new.get(key)):
             continue
-        lines.append(f"  {key}: frozen {old.get(key)!r}, now {new.get(key)!r}")
+        lines.append(f"  {key}: frozen {old.get(key)!r}, now {shown.get(key)!r}")
     return lines
 
 

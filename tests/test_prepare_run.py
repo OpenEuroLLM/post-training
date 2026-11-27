@@ -19,7 +19,7 @@ prepare_run = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(prepare_run)
 
 
-def _write_config(tmp_path, *, run_name="my-run", slurm=None, container=True):
+def _write_config(tmp_path, *, run_name="my-run", slurm=None, container=True, model=None):
     env_file = tmp_path / "cluster.env"
     env_file.write_text("export HF_HOME=/scratch/hf\n")
     config = {
@@ -31,6 +31,10 @@ def _write_config(tmp_path, *, run_name="my-run", slurm=None, container=True):
     }
     if run_name:
         config["run_name"] = run_name
+    if model is not None:
+        # A local model with no tokenizer path, and the prefetch step of a real run.
+        config["model"] = {"name_or_path": str(model)}
+        config["prefetch_assets"] = True
     if slurm is not None:
         config["slurm"] = slurm
     if container:
@@ -371,3 +375,58 @@ def test_repo_id_with_the_same_prefix_is_an_error(prepared, run):
 
     assert code == 1
     assert "model.name_or_path" in err
+
+
+# ---------------------------------------------------------------------------
+# A config that takes the tokenizer from the model (no tokenizer path)
+# ---------------------------------------------------------------------------
+
+
+def test_second_call_passes_when_the_tokenizer_comes_from_a_local_model(tmp_path, run):
+    """submit.py freezes the tokenizer as the model path; the config still has no tokenizer."""
+    model = tmp_path / "model"
+    model.mkdir()
+    config_path = _write_config(tmp_path, model=model)
+
+    assert run("--config", config_path, *_NODES)[0] == 0
+    run_dir = tmp_path / "outputs" / "my-run"
+    frozen = yaml.safe_load((run_dir / "config.yaml").read_text())
+    assert frozen["model"]["tokenizer_name_or_path"] == str(model)
+    before = _snapshot(run_dir)
+
+    code, result, err = run("--config", config_path, *_NODES)
+
+    assert code == 0, err
+    assert result["new_run"] is False
+    assert _snapshot(run_dir) == before
+
+
+def _freeze_model_and_tokenizer_as_snapshot(run_dir: Path, repo_id: str) -> None:
+    frozen = yaml.safe_load((run_dir / "config.yaml").read_text())
+    cache_name = "models--" + repo_id.replace("/", "--")
+    snapshot = f"/cache/hub/{cache_name}/snapshots/abc123"
+    frozen["model"]["name_or_path"] = snapshot
+    frozen["model"]["tokenizer_name_or_path"] = snapshot
+    (run_dir / "config.yaml").write_text(yaml.safe_dump(frozen))
+
+
+def test_second_call_passes_when_the_tokenizer_comes_from_a_hub_model(prepared, run):
+    config_path, run_dir = prepared
+    _freeze_model_and_tokenizer_as_snapshot(run_dir, "my-org/model-a")
+
+    code, result, err = run("--config", config_path, *_NODES, "model.name_or_path=my-org/model-a")
+
+    assert code == 0, err
+    assert result["new_run"] is False
+
+
+def test_tokenizer_of_a_different_model_is_an_error(prepared, run):
+    config_path, run_dir = prepared
+    _freeze_model_and_tokenizer_as_snapshot(run_dir, "my-org/model-a")
+
+    code, _, err = run("--config", config_path, *_NODES, "model.name_or_path=my-org/model-b")
+
+    assert code == 1
+    assert "model.name_or_path" in err
+    assert "model.tokenizer_name_or_path" in err
+    assert "now None" in err  # the message shows the value of the config, not the derived one
