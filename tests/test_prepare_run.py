@@ -2,6 +2,8 @@
 
 import importlib.util
 import json
+import os
+import stat
 import sys
 from pathlib import Path
 
@@ -56,10 +58,13 @@ def run(monkeypatch, capsys):
     def _run(*args):
         monkeypatch.setattr(sys, "argv", ["prepare_run.py", *map(str, args)])
         code = 0
+        umask = os.umask(0o022)  # main() changes the umask of this process
         try:
             prepare_run.main()
         except SystemExit as exit_:
             code = exit_.code
+        finally:
+            os.umask(umask)
         captured = capsys.readouterr()
         results = [
             json.loads(line[len(prepare_run.RESULT_PREFIX) :])
@@ -109,6 +114,25 @@ def test_new_run_is_prepared_and_reported(tmp_path, run):
     frozen = yaml.safe_load((run_dir / "config.yaml").read_text())
     assert frozen["slurm"]["num_nodes"] == 2
     assert "EXPECTED_NODES=2" in (run_dir / "slurm" / "launch.sh").read_text()
+
+
+def test_new_run_directory_is_writable_for_the_group(tmp_path, run):
+    """The job can run as a different Unix user; the caller's umask (022 here) must not matter."""
+    config_path = _write_config(tmp_path)
+
+    code, result, _ = run("--config", config_path, *_NODES)
+
+    assert code == 0
+    run_dir = Path(result["run_dir"])
+    for path in (
+        run_dir.parent,
+        run_dir,
+        run_dir / "checkpoints",
+        run_dir / "logs",
+        run_dir / "slurm",
+    ):
+        assert path.stat().st_mode & stat.S_IWGRP, f"{path} is not writable for the group"
+    assert (run_dir / "config.yaml").stat().st_mode & stat.S_IWGRP
 
 
 def test_run_name_can_be_an_override(tmp_path, run):

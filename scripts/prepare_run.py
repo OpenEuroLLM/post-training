@@ -26,6 +26,10 @@ override of the same key.
 
 ``--check`` does all checks and writes nothing.
 
+The command sets ``umask 002`` for its own process. The job can run as a
+different Unix user (the owner of the allocation), which must be able to write
+to the run directory.
+
 The last line on stdout is the result, for the caller to parse::
 
     PREPARE_RUN_RESULT {"run_dir": "...", "launch_script": "...", "new_run": true, ...}
@@ -42,6 +46,7 @@ import argparse
 import dataclasses
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -215,6 +220,10 @@ def prepare(args, overrides: list[str]) -> dict[str, object]:
 
 def main() -> None:
     setup_logging()
+    # The orchestrator can run the job as a different Unix user (the owner of the
+    # allocation). Keep all that this process creates writable for the group, as
+    # launch.sh does for the files of the job.
+    os.umask(0o002)
 
     parser = argparse.ArgumentParser(
         description="Prepare a run directory for an external orchestrator. Submit nothing."

@@ -232,6 +232,7 @@ python scripts/prepare_run.py --config configs/trl/prelude-sft.yaml run_name=my-
 - `--num-nodes` and `--gpus-per-node` are optional. With them, a different value in the config file is an error.
 - A config that is different from the frozen config of a continued run is an error.
 - `--check` does all checks and writes nothing.
+- The command sets `umask 002` for its own process, so the run directory is writable for the group. The job can run as a different Unix user.
 - The last line on stdout is the result: `PREPARE_RUN_RESULT {"run_dir": ..., "launch_script": ..., "new_run": ...}`. The exit code is 0 only on success.
 
 ## Run SFT on MareNostrum 5 (MN5)
