@@ -466,3 +466,39 @@ def test_missing_code_of_a_run_with_checkpoints_is_an_error(prepared, run):
     assert result is None
     assert "has checkpoints but no frozen code" in err
     assert _snapshot(run_dir) == before
+
+
+# ---------------------------------------------------------------------------
+# A debug run: train.py sets logging.report_to to "none" in the frozen config
+# ---------------------------------------------------------------------------
+
+
+def _set_frozen_report_to_none(run_dir: Path) -> None:
+    frozen = yaml.safe_load((run_dir / "config.yaml").read_text())
+    frozen["logging"]["report_to"] = ["none"]
+    (run_dir / "config.yaml").write_text(yaml.safe_dump(frozen))
+
+
+def test_debug_run_can_be_prepared_again_after_it_ran(tmp_path, run):
+    config_path = _write_config(tmp_path)
+    debug = ("debug.enabled=true", f"paths.debug_base={tmp_path / 'debug'}")
+    code, result, _ = run("--config", config_path, *_NODES, *debug)
+    assert code == 0
+    run_dir = Path(result["run_dir"])
+    assert run_dir == tmp_path / "debug" / "my-run"
+    _set_frozen_report_to_none(run_dir)
+
+    code, result, err = run("--config", config_path, *_NODES, *debug)
+
+    assert code == 0, err
+    assert result["new_run"] is False
+
+
+def test_changed_reporting_of_a_normal_run_is_still_an_error(prepared, run):
+    config_path, run_dir = prepared
+    _set_frozen_report_to_none(run_dir)
+
+    code, _, err = run("--config", config_path, *_NODES)
+
+    assert code == 1
+    assert "logging.report_to" in err

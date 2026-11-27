@@ -150,6 +150,10 @@ def _differences(frozen: PostTrainingConfig, config: PostTrainingConfig) -> list
     if new[_TOKENIZER_KEY] is None and old.get(_TOKENIZER_KEY) is not None:
         new[_TOKENIZER_KEY] = config.model.resolve_tokenizer()[0]
 
+    # train.py turns the reporting off for a debug run, and saves the config again.
+    if config.debug.enabled and old.get("logging.report_to") == ["none"]:
+        new["logging.report_to"] = ["none"]
+
     lines = []
     for key in sorted(set(old) | set(new)):
         if old.get(key) == new.get(key):
