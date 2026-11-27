@@ -197,6 +197,44 @@ The cache is hit only when every input to the data pipeline is unchanged. Betwee
 
 To confirm the cache hit, open the training job's `<run_dir>/slurm/slurm-<id>.err`: the `Tokenizing train dataset` and `Packing train dataset` progress bars must not appear. If they do, an input in the table changed, or `datasets` warned in Step 1 that a function `couldn't be hashed properly`. Either way, the training job processes the data again from scratch.
 
+### Run in an allocation that an external orchestrator owns
+
+An external orchestrator (for example an [oellm-autoexp](https://github.com/OpenEuroLLM/oellm-autoexp) pool) can own the SLURM allocation and the restarts. In that case, do not submit `job.sh`. Its requeue and resubmission commands act on the allocation, which is not yours. Use the launch script instead:
+
+```bash
+# New run: the full submission phase (prefetch, run directory, frozen config and code), but no sbatch
+python scripts/submit.py --config configs/trl/prelude-sft.yaml --prepare-only
+
+# Run directory that already exists (for example to continue a run): only adds the launch files
+python scripts/render_launch_script.py --run-dir <run_dir>
+```
+
+Both commands write `<run_dir>/slurm/launch.sh` and a copy of `container.env_file` as `<run_dir>/slurm/launch.env`. The orchestrator runs the launch script in an srun step that has one task for each node:
+
+```bash
+srun --nodes=N --ntasks=N --ntasks-per-node=1 bash <run_dir>/slurm/launch.sh
+```
+
+- The launch script has no `#SBATCH` header, no requeue and no resubmission. It reads only the `SLURM_STEP_*` variables, so the step can be a part of a larger allocation.
+- It stops if the step does not have `slurm.num_nodes` nodes. The gradient accumulation and the checkpoints are valid for one world size only.
+- A new start of the same launch script resumes from the latest complete checkpoint in `<run_dir>/checkpoints/`.
+- The step can run as a different Unix user (the owner of the allocation). That user must be able to read the container, the model, the datasets and the cache, and to write to the run directory.
+
+An orchestrator that prepares the run directory itself calls one command for the two cases. It asks no questions, and it can be called again for the same run:
+
+```bash
+python scripts/prepare_run.py --config configs/trl/prelude-sft.yaml run_name=my-run \
+    --num-nodes 8 --gpus-per-node 4
+```
+
+- No `<run_dir>/config.yaml`: a new run, prepared as with `submit.py --prepare-only`. If the file exists: a continued run. The frozen config and code stay as they are, and only the launch files are written again.
+- `run_name` is mandatory, in the config file or as an override.
+- `--num-nodes` and `--gpus-per-node` are optional. With them, a different value in the config file is an error.
+- A config that is different from the frozen config of a continued run is an error.
+- `--check` does all checks and writes nothing.
+- The command sets `umask 002` for its own process, so the run directory is writable for the group. The job can run as a different Unix user.
+- The last line on stdout is the result: `PREPARE_RUN_RESULT {"run_dir": ..., "launch_script": ..., "new_run": ...}`. The exit code is 0 only on success.
+
 ## Run SFT on MareNostrum 5 (MN5)
 
 ### Local Setup
@@ -498,7 +536,7 @@ You must specify exactly one determining factor for training duration in the `tr
 
 - **What**: full training state (optimizer + model)
 - **Location**: `checkpoints/checkpoint-*`
-- **Logic**: training automatically resumes from the latest checkpoint found here
+- **Logic**: training automatically resumes from the latest complete checkpoint found here. A checkpoint that a stopped job did not finish (no `trainer_state.json`, or a truncated file) is ignored
 
 #### Inference checkpoints (lightweight)
 
