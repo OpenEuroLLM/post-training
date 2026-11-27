@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import os
+import shutil
 import stat
 import sys
 from pathlib import Path
@@ -430,3 +431,38 @@ def test_tokenizer_of_a_different_model_is_an_error(prepared, run):
     assert "model.name_or_path" in err
     assert "model.tokenizer_name_or_path" in err
     assert "now None" in err  # the message shows the value of the config, not the derived one
+
+
+# ---------------------------------------------------------------------------
+# A preparation that stopped after config.yaml and before the code freeze
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("missing", ["scripts", "src"])
+def test_interrupted_preparation_is_done_again(tmp_path, run, missing):
+    config_path = _write_config(tmp_path)
+    assert run("--config", config_path, *_NODES)[0] == 0
+    run_dir = tmp_path / "outputs" / "my-run"
+    complete = _snapshot(run_dir)
+    # The state that an interrupted submission phase leaves: no code, no launch script.
+    shutil.rmtree(run_dir / missing)
+    shutil.rmtree(run_dir / "slurm")
+
+    code, result, err = run("--config", config_path, *_NODES)
+
+    assert code == 0, err
+    assert result["new_run"] is True
+    assert _snapshot(run_dir) == complete
+
+
+def test_missing_code_of_a_run_with_checkpoints_is_an_error(prepared, run):
+    config_path, run_dir = prepared  # has checkpoints/checkpoint-250
+    shutil.rmtree(run_dir / "scripts")
+    before = _snapshot(run_dir)
+
+    code, result, err = run("--config", config_path, *_NODES)
+
+    assert code == 1
+    assert result is None
+    assert "has checkpoints but no frozen code" in err
+    assert _snapshot(run_dir) == before

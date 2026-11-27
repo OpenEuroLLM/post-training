@@ -16,6 +16,8 @@ called again for the same run:
 - A continued run (``<run_dir>/config.yaml`` exists): the frozen config and the
   frozen code stay as they are. Only ``launch.sh`` and ``launch.env`` are
   written again. A config that is different from the frozen one is an error.
+- A preparation that did not finish (``config.yaml`` exists, the frozen code does
+  not, and there is no checkpoint): it is done again, as for a new run.
 
 ``run_name`` is mandatory (in the YAML file or as an override). A generated
 name has a time stamp, so each call would make a new run directory.
@@ -171,6 +173,13 @@ def _check_continued_run(config: PostTrainingConfig, run_dir: Path) -> None:
         )
 
 
+def _has_frozen_code(run_dir: Path) -> bool:
+    """Whether the code freeze of submit.py finished. It moves each directory into place whole."""
+    return (run_dir / "src" / "post_training").is_dir() and (
+        run_dir / "scripts" / "train.py"
+    ).is_file()
+
+
 def _prepare_new_run(config_path: str, overrides: list[str], run_dir: Path) -> None:
     """Do the submission phase of submit.py --prepare-only, with no question."""
     argv = sys.argv
@@ -205,6 +214,16 @@ def prepare(args, overrides: list[str]) -> dict[str, object]:
 
     run_dir = _run_dir_of(config)
     new_run = not (run_dir / "config.yaml").is_file()
+
+    if not new_run and not _has_frozen_code(run_dir):
+        # submit.py writes config.yaml before it copies the code.
+        if any((run_dir / "checkpoints").glob("checkpoint-*")):
+            raise FileNotFoundError(
+                f"{run_dir} has checkpoints but no frozen code (src/post_training, "
+                "scripts/train.py). The launch script runs the frozen code."
+            )
+        logger.warning("The preparation of %s did not finish. It is done again.", run_dir)
+        new_run = True
 
     if not new_run:
         _check_continued_run(config, run_dir)
