@@ -119,6 +119,9 @@ def _print_tokenized_samples(trainer) -> None:
 
 
 _CHECKPOINT_DIR_RE = re.compile(r"^checkpoint-(\d+)$")
+# The optimizer state that DeepSpeed ZeRO writes for each rank, for example
+# global_step250/bf16_zero_pp_rank_3_mp_rank_00_optim_states.pt.
+_ZERO_OPTIMIZER_FILE_RE = re.compile(r"zero_pp_rank_(\d+)_mp_rank_\d+_optim_states\.pt$")
 
 
 def _safetensors_is_whole(path: Path) -> bool:
@@ -139,30 +142,51 @@ def _safetensors_is_whole(path: Path) -> bool:
     return path.stat().st_size == 8 + header_size + data_size
 
 
-def _is_complete_checkpoint(checkpoint: Path) -> bool:
+def _is_complete_checkpoint(checkpoint: Path, world_size: int | None = None) -> bool:
     """Whether the Trainer finished the save of this checkpoint.
 
     A job that stops during a save leaves a directory that cannot be loaded. The
     Trainer writes ``trainer_state.json`` last. A truncated ``torch.save`` file is
     not a valid zip archive, and a truncated safetensors file is too short.
+
+    With DeepSpeed ZeRO, each rank writes the file of its optimizer state itself.
+    Rank 0 does not wait for the other ranks before it writes ``trainer_state.json``,
+    so a file of a rank can be absent. The ranks of these files must be 0 to N-1,
+    with N = *world_size* if it is given.
     """
     try:
         json.loads((checkpoint / "trainer_state.json").read_text())
     except (OSError, ValueError):
         return False
+    zero_ranks = set()
     for file in checkpoint.rglob("*"):
         if file.suffix in (".pt", ".pth") and not zipfile.is_zipfile(file):
             return False
         if file.suffix == ".safetensors" and not _safetensors_is_whole(file):
             return False
+        match = _ZERO_OPTIMIZER_FILE_RE.search(file.name)
+        if match:
+            zero_ranks.add(int(match.group(1)))
+    if zero_ranks:
+        expected = world_size if world_size is not None else max(zero_ranks) + 1
+        if zero_ranks != set(range(expected)):
+            logger.warning(
+                "Checkpoint %s has the DeepSpeed optimizer files of %d rank(s), "
+                "but %d rank(s) are necessary.",
+                checkpoint,
+                len(zero_ranks),
+                expected,
+            )
+            return False
     return True
 
 
-def _last_complete_checkpoint(checkpoints_dir: Path) -> str | None:
+def _last_complete_checkpoint(checkpoints_dir: Path, world_size: int | None = None) -> str | None:
     """Return the newest complete checkpoint in *checkpoints_dir*, or ``None`` if it is empty.
 
     An incomplete checkpoint stays on disk. The Trainer writes to the same
-    directory again when the run gets to that step.
+    directory again when the run gets to that step. *world_size* is the number of
+    ranks of this run, if it is known.
     """
     steps = {}
     for path in checkpoints_dir.iterdir():
@@ -170,7 +194,7 @@ def _last_complete_checkpoint(checkpoints_dir: Path) -> str | None:
         if match and path.is_dir():
             steps[int(match.group(1))] = path
     for step in sorted(steps, reverse=True):
-        if _is_complete_checkpoint(steps[step]):
+        if _is_complete_checkpoint(steps[step], world_size):
             return str(steps[step])
         logger.warning("Checkpoint %s is incomplete — it is ignored.", steps[step])
     if steps:
@@ -262,7 +286,11 @@ def main() -> None:
 
     # Auto-resume from the latest complete checkpoint if one exists.
     checkpoints_dir = run_dir / "checkpoints"
-    resume_from = _last_complete_checkpoint(checkpoints_dir) if checkpoints_dir.exists() else None
+    # The job scripts export WORLD_SIZE (nodes x GPUs for each node).
+    world_size = int(os.environ["WORLD_SIZE"]) if os.environ.get("WORLD_SIZE") else None
+    resume_from = (
+        _last_complete_checkpoint(checkpoints_dir, world_size) if checkpoints_dir.exists() else None
+    )
     if resume_from:
         logger.info("Resuming from checkpoint: %s", resume_from)
 
