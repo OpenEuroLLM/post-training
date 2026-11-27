@@ -208,6 +208,10 @@ def prepare(args, overrides: list[str]) -> dict[str, object]:
         )
     if config.backend != "trl" or config.container is None or not config.container.image:
         raise ValueError("A launch script is only supported with backend=trl and container.image.")
+    # The launch script gets a copy of this file. Check it here, so that --check finds it too.
+    env_file = config.container.env_file
+    if env_file and not Path(env_file).is_file():
+        raise FileNotFoundError(f"container.env_file '{env_file}' not found.")
     if config.debug.enabled and config.debug.override_existing:
         raise ValueError(
             "debug.override_existing deletes a run directory that exists. "

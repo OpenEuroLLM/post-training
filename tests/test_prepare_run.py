@@ -502,3 +502,42 @@ def test_changed_reporting_of_a_normal_run_is_still_an_error(prepared, run):
 
     assert code == 1
     assert "logging.report_to" in err
+
+
+# ---------------------------------------------------------------------------
+# --check finds what the real preparation would stop on
+# ---------------------------------------------------------------------------
+
+
+def test_check_finds_a_missing_env_file_of_a_new_run(tmp_path, run):
+    config_path = _write_config(tmp_path)
+    (tmp_path / "cluster.env").unlink()
+
+    code, result, err = run("--config", config_path, *_NODES, "--check")
+
+    assert code == 1
+    assert result is None
+    assert "container.env_file" in err and "not found" in err
+    assert not (tmp_path / "outputs").exists()
+
+
+def test_check_finds_a_missing_env_file_of_a_continued_run(prepared, run, tmp_path):
+    config_path, run_dir = prepared
+    (tmp_path / "cluster.env").unlink()
+    before = _snapshot(run_dir)
+
+    code, _, err = run("--config", config_path, *_NODES, "--check")
+
+    assert code == 1
+    assert "container.env_file" in err
+    assert _snapshot(run_dir) == before
+
+
+def test_check_finds_missing_code_of_a_run_with_checkpoints(prepared, run):
+    config_path, run_dir = prepared
+    (run_dir / "scripts" / "train.py").unlink()
+
+    code, _, err = run("--config", config_path, *_NODES, "--check")
+
+    assert code == 1
+    assert "has checkpoints but no frozen code" in err
